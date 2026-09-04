@@ -14,6 +14,8 @@ FROM node:24-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends sqlite3 && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production DATA_DIR=/data PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
+# db.ts mkdirs DATA_DIR at import; without this the app dies on boot when no volume is mounted
+RUN mkdir -p /data && chown node:node /data
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
