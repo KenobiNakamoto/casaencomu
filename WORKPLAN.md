@@ -4,6 +4,23 @@ _2026-09-04. The unit of work is one GitHub issue = one agent = one branch = one
 owns a file set; two open issues never share a file. `SCAFFOLD.md` § numbers hold the how;
 this file holds the who, the order, and the done-when. Load into GitHub with § 5 below._
 
+## 0. Status (2026-09-04, evening)
+
+- **Done.** #6–#17 merged to `main` in order (PRs #28–#39); wave B and wave C complete. On `main`:
+  5 test files / 46 tests green, `next build` green, 13 routes + the proxy. Integration test of
+  all branches passed before the merges (journal, 2026-09-04). Feature branches and the
+  `integration` branch are deleted; worktrees removed.
+- **Open, Kenobi's hand:** #1 domain, #2 Zero Trust, #3 `limactl` grant, #5 area + member list,
+  and the go for #4 (~5 min node downtime). On the Air, two commands the agent cannot run
+  (permission classifier): add Homebrew's plugin dir to `cliPluginsExtraDirs` in
+  `~/.docker/config.json` so `docker compose` works, and `brew install cloudflared`.
+- **Then agents:** #18 Air setup → #19 M1 integration (deploy, virtiofs test, phone PIN,
+  restore) → #21 backup drill + LaunchAgent → #20 phone checklists.
+- **Lesson from the merges.** Branches stacked on an unmerged sibling carry that sibling's files
+  at an old commit; when the sibling gets a fixup later, GitHub reports a conflict on the stacked
+  PR. Fix: `git merge origin/main` into the stacked branch, push, then merge the PR. Merge in
+  dependency order. Next time: no stacking — merge each PR as soon as it is reviewed.
+
 ## 1. Milestones (= phases; done-when from `SCAFFOLD.md` § 10)
 
 | M | Name | Done when |
