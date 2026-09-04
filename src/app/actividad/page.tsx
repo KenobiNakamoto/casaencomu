@@ -59,7 +59,7 @@ function ago(iso: string) {
 
 export default async function ActividadPage() {
   const user = await currentUser();
-  const since = user.last_seen_at; // pre-touch: the previous visit
+  const since = user.last_seen_at; // last time this member opened Actividad (null = never)
 
   const { rows } = await db.execute(
     `SELECT e.id, e.property_id, e.kind, e.payload_json, e.actor_id, e.created_at,
@@ -71,7 +71,7 @@ export default async function ActividadPage() {
   );
   const events = rows as unknown as Row[];
 
-  // Unconditional: currentUser() throttles its touch to once a minute; a second visit must still clear the badge.
+  // Only this page writes last_seen_at (currentUser() does not touch it).
   await db.execute({
     sql: "UPDATE users SET last_seen_at = ? WHERE id = ?",
     args: [new Date().toISOString(), user.id],
