@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { buildBookmarklet } from "@/lib/bookmarklet";
 
@@ -49,9 +50,9 @@ export default async function AyudaPage() {
         <h2 className="text-lg font-medium">Cómo añadir un piso</h2>
         <p>
           <strong>Fotocasa o Habitaclia:</strong> copia el enlace del anuncio y pégalo en{" "}
-          <a href="/propiedades" className="underline">
+          <Link href="/propiedades" className="underline">
             Propiedades
-          </a>{" "}
+          </Link>{" "}
           → «Añadir enlace».
         </p>
         <p>
