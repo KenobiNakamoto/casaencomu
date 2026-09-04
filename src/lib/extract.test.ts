@@ -1,10 +1,17 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { extract, type Page } from "./extract";
 import { Listing } from "./listing";
 import { isAllowedImageHost } from "./url";
 
 const fixture = (name: string) => readFileSync(new URL(`./__fixtures__/${name}.html`, import.meta.url), "utf8");
+// the untrimmed spike pages (gitignored): the repo's own spike/ or the #6 worktree
+const RAW_DIR = [fileURLToPath(new URL("../../spike/", import.meta.url)), join(homedir(), "worktrees/casaencomu-6/spike")].find((d) =>
+  existsSync(join(d, "habitaclia.html")),
+);
 
 // Expected values read off the fixtures (spike 2026-09-04). Photo counts are unique images:
 // Idealista lists the same 44 in three arrays (132 entries), Habitaclia repeats photo 1 in two print sizes.
@@ -65,6 +72,31 @@ describe("extract on the live fixtures (server fetch → html)", () => {
   });
 });
 
+describe("extract on the untrimmed spike pages (search form, similar listings, logos present)", () => {
+  // Habitaclia's search form reads "+5 … Baños"; the raw page once yielded bathrooms = 5 for a 1-bath flat
+  it.skipIf(!RAW_DIR)("habitaclia: own feature block only", () => {
+    const l = extract({ url: live[2].url, html: readFileSync(join(RAW_DIR!, "habitaclia.html"), "utf8") })!;
+    expect(l).toMatchObject({ bathrooms: 1, rooms: 2, area_m2: 51, price_eur: 350000 });
+    expect(l.photos).toHaveLength(30);
+  });
+  it.skipIf(!RAW_DIR)("idealista: own feature block only", () => {
+    const l = extract({ url: live[0].url, html: readFileSync(join(RAW_DIR!, "idealista.html"), "utf8") })!;
+    expect(l).toMatchObject({ bathrooms: 3, rooms: 4, area_m2: 209, price_eur: 1350000 });
+    expect(l.photos).toHaveLength(44);
+  });
+  it.skipIf(!RAW_DIR)("fotocasa: blob only", () => {
+    const l = extract({ url: live[1].url, html: readFileSync(join(RAW_DIR!, "fotocasa.html"), "utf8") })!;
+    expect(l).toMatchObject({ bathrooms: 3, rooms: 3, area_m2: 180, price_eur: 1644999 });
+    expect(l.photos).toHaveLength(68);
+  });
+
+  it("habitaclia innerText: the search form and similar listings do not win over the listing's own block", () => {
+    const text = "Habitaciones\n+1\n+2\n+3\n+4\n+5\nBaños\n+1\n+2\n\n350.000 €\n\n51 m2\n\n2 hab.\n\n1 baño\n\n6.863 €/m2\n\nSimilares\n\n80 m2\n3 hab.\n2 baños\n";
+    const l = extract({ url: live[2].url, og: { "og:title": "Ático por 350.000 € de 51 metros x en y Barcelona - habitaclia" }, text })!;
+    expect(l).toMatchObject({ rooms: 2, bathrooms: 1, area_m2: 51, price_eur: 350000 });
+  });
+});
+
 describe("extract → null on removed or blocked pages", () => {
   it("each removed fixture", () => {
     for (const f of live) expect(extract({ url: f.url, html: fixture(`${f.name}-removed`) })).toBeNull();
@@ -103,6 +135,31 @@ describe("extract on a bookmarklet-shaped page (og + blob, no html)", () => {
     expect(l).not.toBeNull();
     expect(l).toMatchObject({ title: live[1].title, price_eur: 1644999, area_m2: 180, rooms: 3, bathrooms: 3 });
     expect(l!.photos).toHaveLength(68);
+  });
+
+  // Idealista is bookmarklet-only (server fetches get a DataDome 403), so its description must come from innerText
+  it("idealista: og + blob + innerText → verbatim description", () => {
+    const html = fixture("idealista");
+    const blob = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].find((m) => m[1].includes("var adMultimediasInfo"))![1];
+    const ad = html
+      .match(/class="adCommentsLanguage[^"]*"[^>]*>\s*<p>([\s\S]*?)<\/p>/)![1]
+      .replace(/<br\s*\/?>/g, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/ ?\n ?/g, "\n") // innerText drops the spaces around a line break
+      .trim();
+    const text = `1.350.000 €\n\n209 m²\n\n4 hab.\n\n2ª planta exterior con ascensor\n\nComentario del anunciante\n\nDisponible en:\nEspañol\nCatalà\nEnglish\n\nOtros idiomas\n\nCatalà\n\nEnglish\n\n${ad}\n\nLeer comentario completo\n\nCaracterísticas básicas\n\n209 m² construidos\n\n4 habitaciones\n\n3 baños\n`;
+    const l = extract({ url: live[0].url, og: { "og:title": "Piso en venta en Gran Via de les Corts Catalanes, 751, El Fort Pienc, Barcelona — idealista" }, blob, text })!;
+    expect(l).toMatchObject({ price_eur: 1350000, area_m2: 209, rooms: 4, bathrooms: 3 });
+    expect(l.description).toMatch(/^Presentamos en exclusiva esta propiedad de lujo de 209 m² construidos/);
+    expect(l.description).toMatch(/\n\n/);
+    expect(l.description).not.toMatch(/Disponible en|Otros idiomas|Leer comentario/);
+    // identical to the server-html extraction of the same fixture
+    expect(l.description).toBe(extract({ url: live[0].url, html })!.description);
+  });
+
+  it("og:description is the last resort on every portal", () => {
+    const l = extract({ url: live[0].url, og: { "og:title": "Piso en venta en X — idealista", "og:description": "piso de 80 m²" } });
+    expect(l).toMatchObject({ title: "Piso en venta en X", description: "piso de 80 m²" });
   });
 
   it("generic host: og only", () => {

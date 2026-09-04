@@ -1,5 +1,5 @@
 import { Listing } from "./listing";
-import { normalizeUrl, type Portal } from "./url";
+import { isAllowedImageHost, normalizeUrl, type Portal } from "./url";
 
 /**
  * Two entry shapes. The server fetch fills `html`; everything else is pulled out of it here.
@@ -82,6 +82,16 @@ const jsStr = (blob: string, key: string) => {
     return raw; // ponytail: an escape JSON does not know → keep the raw text
   }
 };
+/** `key: JSON.parse("…")` inside a JS object blob → the parsed value. */
+const jsJson = (blob: string, key: string): unknown => {
+  const lit = m1(blob, new RegExp(`\\b${key}\\s*:\\s*JSON\\.parse\\("((?:[^"\\\\]|\\\\.)*)"\\)`));
+  if (lit == null) return null;
+  try {
+    return JSON.parse(JSON.parse(`"${lit}"`) as string);
+  } catch {
+    return null;
+  }
+};
 const title = (s?: string | null) => s?.replace(/\s*(?:—|-|\|)\s*(?:idealista|fotocasa|habitaclia)(?:\.\w+)?\s*$/i, "").trim() || null;
 
 const ogOf = (html: string) =>
@@ -100,13 +110,13 @@ const blobOf = (portal: Portal, html: string) =>
   [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].find((m) => m[0].includes(BLOB_MARK[portal]))?.[1];
 const imgsOf = (html: string) => [...html.matchAll(/<img\b[^>]*?\ssrc="([^"]+)"/g)].map((m) => decode(m[1]));
 
-function photos(portal: Portal, urls: (string | undefined | null)[]) {
+function photos(portal: Portal, urls: (string | undefined | null)[], scope: (u: string) => boolean = () => true) {
   const seen = new Set<string>();
   const out: string[] = [];
   for (let u of urls) {
     if (!u) continue;
     if (u.startsWith("//")) u = "https:" + u;
-    if (!/^https?:\/\//.test(u)) continue;
+    if (!/^https?:\/\//.test(u) || !scope(u)) continue;
     const key = PHOTO_KEY[portal]?.exec(u)?.[1] ?? u;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -162,11 +172,13 @@ export function extract(page: Page): Listing | null {
     title: title(thing?.name) ?? title(og["og:title"]) ?? title(m1(html, /<title[^>]*>([^<]*)<\/title>/)) ?? undefined,
     description: thing?.description ?? null,
   };
-  let pics: (string | undefined | null)[] = [
+  const pagePics: (string | undefined | null)[] = [
     og["og:image"],
     ...(Array.isArray(ldImg) ? ldImg : [typeof ldImg === "string" ? ldImg : ldImg?.url]),
     ...imgs,
   ];
+  // the blob lists only the listing's own photos; the page's <img>s also carry logos and similar listings
+  let blobPics: (string | undefined)[] = [];
 
   // 3. the portal blob
   switch (portal) {
@@ -174,30 +186,45 @@ export function extract(page: Page): Listing | null {
       // JS object literals, not JSON → one regex per field
       const feat = (name: string) =>
         blob.match(new RegExp(`"text":"([^"]*)"[^}]*?"subText":"([^"]*)"[^}]*?"featureName":"${name}"`));
+      // text fallback scoped to the listing's own blocks: `.info-features` and "Características básicas"
+      const own = html
+        ? toText(
+            (m1(html, /<div class="info-features">([\s\S]*?)<\/div>/) ?? "") +
+              "\n" +
+              (m1(html, /Características básicas<\/h\d>\s*<div class="details-property_features">([\s\S]*?)<\/div>/) ?? ""),
+          )
+        : (text.match(/\d[\d.]*\s*m²\s+\d+\s*hab\./)?.[0] ?? "") + "\n" + (text.match(/Características básicas\n(?:[^\n]*\n){0,16}/)?.[0] ?? "");
       const floor = feat("FLOOR_NUMBER");
       const visibility = m1(blob, /"addressVisibility":"(\w+)"/);
       const center = blob.match(/center=(-?[\d.]+)%2C(-?[\d.]+)/);
+      // description: the `.comment` block in html; in bookmarklet innerText the block under
+      // "Comentario del anunciante" up to the expander, minus the language picker's short lines
+      const descHtml = m1(html, /class="adCommentsLanguage[^"]*"[^>]*>\s*<p>([\s\S]*?)<\/p>/);
+      const descText = m1(
+        text,
+        /Comentario del anunciante\n([\s\S]+?)(?=\n+(?:Leer comentario completo|Lo sentimos, no es posible traducir|Características básicas)|$)/,
+      )
+        ?.replace(/^(?:[^\n.,;!?]{0,20}\n)*/, "")
+        .trim();
       Object.assign(out, {
         price_eur: int(m1(blob, /^\s*price:\s*(\d+)/m)) ?? int(m1(text, /(\d[\d.]*)\s*€/)),
-        area_m2: int(feat("CONSTRUCTED_AREA")?.[1]) ?? int(m1(text, /(\d[\d.]*)\s*m(?:²|2\b)/)),
-        rooms: int(feat("ROOM_NUMBER")?.[1]) ?? int(m1(text, /(\d+)\s*hab\b/)),
-        bathrooms: int(feat("BATH_NUMBER")?.[1]) ?? int(m1(text, /(\d+)\s*baños?\b/i)),
+        area_m2: int(feat("CONSTRUCTED_AREA")?.[1]) ?? int(m1(own, /(\d[\d.]*)\s*m(?:²|2\b)/)),
+        rooms: int(feat("ROOM_NUMBER")?.[1]) ?? int(m1(own, /(\d+)\s*hab(?:\.|itaci)/)),
+        bathrooms: int(feat("BATH_NUMBER")?.[1]) ?? int(m1(own, /(\d+)\s*baños?\b/i)),
         floor: floor?.[1] ?? null,
         outdoor: m1(floor?.[2] ?? "", /\b(exterior|interior)\b/),
         lift: floor ? (/con ascensor/.test(floor[2]) ? true : /sin ascensor/.test(floor[2]) ? false : null) : null,
-        description: m1(html, /class="adCommentsLanguage[^"]*"[^>]*>\s*<p>([\s\S]*?)<\/p>/)?.trim() ?? null,
+        description: descHtml ? toText(descHtml) : descText || null,
         address_text: m1(og["og:title"] ?? "", / en (?:venta|alquiler) en (.+?)(?: — idealista)?$/) ?? null,
         neighborhood: m1(text, /^Barrio (.+)$/m),
         lat: num(center?.[1]),
         lng: num(center?.[2]),
         address_precision: visibility === "EXACT" ? "exact" : visibility ? "approx" : "none",
       });
-      if (out.description) out.description = toText(out.description);
       // fullScreenGalleryPics / verticalGalleryPics / picturesWithoutPlans list the same photos (44 × 3 = 132 here)
-      const blobPics = [...blob.matchAll(/\{[^{}]*?"isPlan":(true|false)[^{}]*?imageDataService:"([^"]+)"/g)]
+      blobPics = [...blob.matchAll(/\{[^{}]*?"isPlan":(true|false)[^{}]*?imageDataService:"([^"]+)"/g)]
         .filter((m) => m[1] === "false")
         .map((m) => m[2]);
-      pics = [...blobPics, ...pics];
       break;
     }
     case "fotocasa": {
@@ -224,7 +251,12 @@ export function extract(page: Page): Listing | null {
         parking: fl.parking ? true : null,
         energy_rating: re.energyCertificate || null,
         outdoor: outdoor.length ? outdoor.join(", ") : null,
-        description: v2.description ?? re.descriptions?.["es-ES"] ?? out.description,
+        // innerText fallback: the paragraph block right before "Pedir más datos al anunciante"
+        description:
+          v2.description ??
+          re.descriptions?.["es-ES"] ??
+          m1(text, /\n\n((?:[^\n]+\n)*[^\n]+)\n\n(?:Pedir más datos al anunciante|Características\n)/) ??
+          out.description,
         address_text: street?.name ? `${street.name}${street.number ? `, ${street.number}` : ""}` : re.location || null,
         neighborhood: re.address?.neighborhood ?? v2.address?.neighborhood ?? null,
         agency: re.clientAlias || re.clientName || null,
@@ -232,27 +264,36 @@ export function extract(page: Page): Listing | null {
         lng: re.coordinates?.longitude ?? null,
         address_precision: v2.address?.isExact == null ? "none" : v2.address.isExact ? "exact" : "approx",
       });
-      const blobPics = (re.multimedia ?? []).filter((m) => m.type === "image").map((m) => m.src);
-      const v2Pics = (v2.multimedias ?? []).filter((m) => m.type === "image").map((m) => m.url);
-      pics = [...blobPics, ...v2Pics, ...pics];
+      blobPics = [
+        ...(re.multimedia ?? []).filter((m) => m.type === "image").map((m) => m.src),
+        ...(v2.multimedias ?? []).filter((m) => m.type === "image").map((m) => m.url),
+      ];
       break;
     }
     case "habitaclia": {
-      // FichaDesktopDTO is a JS literal; GMapsConfig inside it is a JSON string passed to JSON.parse
-      let gps: { VGPSLat?: number; VGPSLon?: number } = {};
-      try {
-        const lit = m1(blob, /GMapsConfig\s*:\s*JSON\.parse\("((?:[^"\\]|\\.)*)"\)/);
-        if (lit) gps = JSON.parse(JSON.parse(`"${lit}"`) as string) as typeof gps;
-      } catch {
-        /* no map → no coordinates */
-      }
-      const desc = jsStr(blob, "observaciones") ?? m1(html, /id="js-detail-description"[^>]*>([\s\S]*?)<\/p>/);
+      // FichaDesktopDTO / WideMediaDTO are JS literals; GMapsConfig and image are JSON strings passed to JSON.parse
+      const gps = (jsJson(blob, "GMapsConfig") ?? {}) as { VGPSLat?: number; VGPSLon?: number };
+      const imgList = (jsJson(blob, "image") ?? []) as { URLXL?: string; URLG?: string; src?: string }[];
+      // innerText fallback: the block after "Información detallada" + the headline, up to "Ampliar descripción"
+      const desc =
+        jsStr(blob, "observaciones") ??
+        m1(html, /id="js-detail-description"[^>]*>([\s\S]*?)<\/p>/) ??
+        m1(text, /Información detallada\n+[^\n]*\n+([\s\S]+?)(?=\n+(?:Ampliar descripción|Última modificación|Distribución\n)|$)/);
+      // text fallback scoped to the listing's own block: `ul.feature-container` + "Distribución",
+      // or the first "N m2 / N hab. / N baño" run in innerText (the search form and similar listings never match it first)
+      const own = html
+        ? toText(
+            (m1(html, /<ul class="feature-container">([\s\S]*?)<\/ul>/) ?? "") +
+              "\n" +
+              (m1(html, /Distribuci(?:ón|&#xF3;n)<\/h\d>\s*<ul>([\s\S]*?)<\/ul>/) ?? ""),
+          )
+        : (text.match(/\d[\d.]*\s*m2?\s+\d+\s*hab\.?(?:\s+\d+\s*baños?)?/i)?.[0] ?? "");
       Object.assign(out, {
         title: title(jsStr(blob, "destacado")) ?? out.title,
         price_eur: int(jsStr(blob, "precioProducto")) ?? int(m1(og["og:title"] ?? "", /por ([\d.]+) €/)),
-        area_m2: int(m1(og["og:title"] ?? "", /de ([\d.]+) metros/)) ?? int(m1(text, /(\d[\d.]*)\s*m(?:²|2\b)/)),
-        rooms: int(m1(text, /(\d+)\s*hab(?:\.|itaci)/)),
-        bathrooms: int(m1(text, /(\d+)\s*baños?\b/i)),
+        area_m2: int(m1(og["og:title"] ?? "", /de ([\d.]+) metros/)) ?? int(m1(own, /(\d[\d.]*)\s*m(?:²|2\b)/)),
+        rooms: int(m1(own, /(\d+)\s*hab(?:\.|itaci)/)),
+        bathrooms: int(m1(own, /(\d+)\s*baños?\b/i)),
         description: desc ? toText(desc) : out.description,
         neighborhood: m1(html, /id="js-ver-mapa-zona"[^>]*>\s*([^<]+?)\s*</) ?? null,
         lat: gps.VGPSLat ?? null,
@@ -260,13 +301,17 @@ export function extract(page: Page): Listing | null {
         address_precision: gps.VGPSLat != null ? "approx" : "none", // no exact/approx flag on the page
       });
       if (out.neighborhood) out.neighborhood = decode(out.neighborhood);
+      blobPics = imgList.map((i) => i.URLXL ?? i.URLG ?? i.src);
       break;
     }
     case "generic":
-      out.description ??= og["og:description"] ?? null;
       break;
   }
 
   if (!out.title) return null;
-  return Listing.parse({ ...out, photos: photos(portal, pics) });
+  out.description ??= og["og:description"] || null; // last resort on every portal: the truncated og text
+  // no blob list → the page's images, portal hosts only; Habitaclia additionally scoped to og:image's ad folder
+  const folder = m1(og["og:image"] ?? "", /\/imgh\/([^/]+)\//);
+  const scope = portal === "generic" ? undefined : (u: string) => isAllowedImageHost(u) && (!folder || u.includes(`/imgh/${folder}/`));
+  return Listing.parse({ ...out, photos: blobPics.length ? photos(portal, blobPics) : photos(portal, pagePics, scope) });
 }
