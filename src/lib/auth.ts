@@ -22,8 +22,6 @@ export type User = {
   last_seen_at: string | null;
 };
 
-const TOUCH_INTERVAL_MS = 60_000;
-
 /** Reads `x-user-email` (set only by the proxy), upserts the `users` row and returns it. */
 export async function currentUser(): Promise<User> {
   // ponytail: lazy imports so this module loads in vitest without a Next request scope or a db file
@@ -41,10 +39,7 @@ export async function currentUser(): Promise<User> {
     sql: "SELECT id, email, name, capture_token, last_seen_at FROM users WHERE email = ?",
     args: [email],
   });
-  const user = rows[0] as unknown as User;
-  // Returned as selected (pre-touch): the Actividad unread badge needs the previous visit.
-  if (!user.last_seen_at || Date.parse(user.last_seen_at) < Date.now() - TOUCH_INTERVAL_MS) {
-    await db.execute({ sql: "UPDATE users SET last_seen_at = ? WHERE id = ?", args: [now, user.id] });
-  }
-  return user;
+  // ponytail: last_seen_at is written only by /actividad, so the unread badge means
+  // "since you last opened Actividad", not "since your last page view"
+  return rows[0] as unknown as User;
 }

@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@libsql/client", "sharp"],
   // `next dev` would otherwise append its own block to CLAUDE.md
   agentRules: false,
+  // a dev `./data` folder (photos, db) must never be traced into .next/standalone
+  outputFileTracingExcludes: { "*": ["./data/**"] },
 };
 
 export default nextConfig;
