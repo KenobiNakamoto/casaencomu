@@ -197,6 +197,15 @@ export function extract(page: Page): Listing | null {
       const floor = feat("FLOOR_NUMBER");
       const visibility = m1(blob, /"addressVisibility":"(\w+)"/);
       const center = blob.match(/center=(-?[\d.]+)%2C(-?[\d.]+)/);
+      // description: the `.comment` block in html; in bookmarklet innerText the block under
+      // "Comentario del anunciante" up to the expander, minus the language picker's short lines
+      const descHtml = m1(html, /class="adCommentsLanguage[^"]*"[^>]*>\s*<p>([\s\S]*?)<\/p>/);
+      const descText = m1(
+        text,
+        /Comentario del anunciante\n([\s\S]+?)(?=\n+(?:Leer comentario completo|Lo sentimos, no es posible traducir|Características básicas)|$)/,
+      )
+        ?.replace(/^(?:[^\n.,;!?]{0,20}\n)*/, "")
+        .trim();
       Object.assign(out, {
         price_eur: int(m1(blob, /^\s*price:\s*(\d+)/m)) ?? int(m1(text, /(\d[\d.]*)\s*€/)),
         area_m2: int(feat("CONSTRUCTED_AREA")?.[1]) ?? int(m1(own, /(\d[\d.]*)\s*m(?:²|2\b)/)),
@@ -205,14 +214,13 @@ export function extract(page: Page): Listing | null {
         floor: floor?.[1] ?? null,
         outdoor: m1(floor?.[2] ?? "", /\b(exterior|interior)\b/),
         lift: floor ? (/con ascensor/.test(floor[2]) ? true : /sin ascensor/.test(floor[2]) ? false : null) : null,
-        description: m1(html, /class="adCommentsLanguage[^"]*"[^>]*>\s*<p>([\s\S]*?)<\/p>/)?.trim() ?? null,
+        description: descHtml ? toText(descHtml) : descText || null,
         address_text: m1(og["og:title"] ?? "", / en (?:venta|alquiler) en (.+?)(?: — idealista)?$/) ?? null,
         neighborhood: m1(text, /^Barrio (.+)$/m),
         lat: num(center?.[1]),
         lng: num(center?.[2]),
         address_precision: visibility === "EXACT" ? "exact" : visibility ? "approx" : "none",
       });
-      if (out.description) out.description = toText(out.description);
       // fullScreenGalleryPics / verticalGalleryPics / picturesWithoutPlans list the same photos (44 × 3 = 132 here)
       blobPics = [...blob.matchAll(/\{[^{}]*?"isPlan":(true|false)[^{}]*?imageDataService:"([^"]+)"/g)]
         .filter((m) => m[1] === "false")
@@ -243,7 +251,12 @@ export function extract(page: Page): Listing | null {
         parking: fl.parking ? true : null,
         energy_rating: re.energyCertificate || null,
         outdoor: outdoor.length ? outdoor.join(", ") : null,
-        description: v2.description ?? re.descriptions?.["es-ES"] ?? out.description,
+        // innerText fallback: the paragraph block right before "Pedir más datos al anunciante"
+        description:
+          v2.description ??
+          re.descriptions?.["es-ES"] ??
+          m1(text, /\n\n((?:[^\n]+\n)*[^\n]+)\n\n(?:Pedir más datos al anunciante|Características\n)/) ??
+          out.description,
         address_text: street?.name ? `${street.name}${street.number ? `, ${street.number}` : ""}` : re.location || null,
         neighborhood: re.address?.neighborhood ?? v2.address?.neighborhood ?? null,
         agency: re.clientAlias || re.clientName || null,
@@ -261,7 +274,11 @@ export function extract(page: Page): Listing | null {
       // FichaDesktopDTO / WideMediaDTO are JS literals; GMapsConfig and image are JSON strings passed to JSON.parse
       const gps = (jsJson(blob, "GMapsConfig") ?? {}) as { VGPSLat?: number; VGPSLon?: number };
       const imgList = (jsJson(blob, "image") ?? []) as { URLXL?: string; URLG?: string; src?: string }[];
-      const desc = jsStr(blob, "observaciones") ?? m1(html, /id="js-detail-description"[^>]*>([\s\S]*?)<\/p>/);
+      // innerText fallback: the block after "Información detallada" + the headline, up to "Ampliar descripción"
+      const desc =
+        jsStr(blob, "observaciones") ??
+        m1(html, /id="js-detail-description"[^>]*>([\s\S]*?)<\/p>/) ??
+        m1(text, /Información detallada\n+[^\n]*\n+([\s\S]+?)(?=\n+(?:Ampliar descripción|Última modificación|Distribución\n)|$)/);
       // text fallback scoped to the listing's own block: `ul.feature-container` + "Distribución",
       // or the first "N m2 / N hab. / N baño" run in innerText (the search form and similar listings never match it first)
       const own = html
@@ -288,11 +305,11 @@ export function extract(page: Page): Listing | null {
       break;
     }
     case "generic":
-      out.description ??= og["og:description"] ?? null;
       break;
   }
 
   if (!out.title) return null;
+  out.description ??= og["og:description"] || null; // last resort on every portal: the truncated og text
   // no blob list → the page's images, portal hosts only; Habitaclia additionally scoped to og:image's ad folder
   const folder = m1(og["og:image"] ?? "", /\/imgh\/([^/]+)\//);
   const scope = portal === "generic" ? undefined : (u: string) => isAllowedImageHost(u) && (!folder || u.includes(`/imgh/${folder}/`));

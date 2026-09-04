@@ -137,6 +137,31 @@ describe("extract on a bookmarklet-shaped page (og + blob, no html)", () => {
     expect(l!.photos).toHaveLength(68);
   });
 
+  // Idealista is bookmarklet-only (server fetches get a DataDome 403), so its description must come from innerText
+  it("idealista: og + blob + innerText → verbatim description", () => {
+    const html = fixture("idealista");
+    const blob = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].find((m) => m[1].includes("var adMultimediasInfo"))![1];
+    const ad = html
+      .match(/class="adCommentsLanguage[^"]*"[^>]*>\s*<p>([\s\S]*?)<\/p>/)![1]
+      .replace(/<br\s*\/?>/g, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/ ?\n ?/g, "\n") // innerText drops the spaces around a line break
+      .trim();
+    const text = `1.350.000 €\n\n209 m²\n\n4 hab.\n\n2ª planta exterior con ascensor\n\nComentario del anunciante\n\nDisponible en:\nEspañol\nCatalà\nEnglish\n\nOtros idiomas\n\nCatalà\n\nEnglish\n\n${ad}\n\nLeer comentario completo\n\nCaracterísticas básicas\n\n209 m² construidos\n\n4 habitaciones\n\n3 baños\n`;
+    const l = extract({ url: live[0].url, og: { "og:title": "Piso en venta en Gran Via de les Corts Catalanes, 751, El Fort Pienc, Barcelona — idealista" }, blob, text })!;
+    expect(l).toMatchObject({ price_eur: 1350000, area_m2: 209, rooms: 4, bathrooms: 3 });
+    expect(l.description).toMatch(/^Presentamos en exclusiva esta propiedad de lujo de 209 m² construidos/);
+    expect(l.description).toMatch(/\n\n/);
+    expect(l.description).not.toMatch(/Disponible en|Otros idiomas|Leer comentario/);
+    // identical to the server-html extraction of the same fixture
+    expect(l.description).toBe(extract({ url: live[0].url, html })!.description);
+  });
+
+  it("og:description is the last resort on every portal", () => {
+    const l = extract({ url: live[0].url, og: { "og:title": "Piso en venta en X — idealista", "og:description": "piso de 80 m²" } });
+    expect(l).toMatchObject({ title: "Piso en venta en X", description: "piso de 80 m²" });
+  });
+
   it("generic host: og only", () => {
     const l = extract({
       url: "https://example.com/casa/1",
