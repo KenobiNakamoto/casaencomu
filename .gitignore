@@ -1,6 +1,7 @@
 # secrets
 .env
 .env.*
+.env.*.local
 !.env.example
 # local-only docs
 memory/
@@ -10,6 +11,9 @@ spike/*.html
 node_modules
 node_modules.nosync
 .next
+out/
 data/
+next-env.d.ts
+*.tsbuildinfo
 # os
 .DS_Store
