@@ -17,8 +17,7 @@ photos, deduplicates, maps, compares, lets each member rate and comment, and rec
 availability every 48 h. It runs on the MacBook Air inside the Colima VM that already hosts
 umbrelOS, and is reached through Cloudflare Tunnel + Access.
 
-**State (2026-09-04): docs only. Private repo `KenobiNakamoto/casaencomu` exists with milestones
-M0–M4, issues #1–#21, epics #22–#27 (`WORKPLAN.md`). No code, nothing deployed.**
+**State (2026-09-04, evening): code complete on `main` — 12 PRs (#28–#39) merged, 46 tests, build green, issues #6–#17 closed. Nothing deployed: M1 waits on Kenobi's #1–#5, the Air's compose plugin and cloudflared, then #18 → #19 → #21 → #20. Status block: `WORKPLAN.md` § 0.**
 
 ## Read in this order
 
