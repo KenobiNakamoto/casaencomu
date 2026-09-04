@@ -1,0 +1,15 @@
+# secrets
+.env
+.env.*
+!.env.example
+# local-only docs
+memory/
+_archive/
+spike/*.html
+# deps / build / data
+node_modules
+node_modules.nosync
+.next
+data/
+# os
+.DS_Store
