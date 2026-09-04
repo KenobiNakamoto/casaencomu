@@ -17,7 +17,8 @@ photos, deduplicates, maps, compares, lets each member rate and comment, and rec
 availability every 48 h. It runs on the MacBook Air inside the Colima VM that already hosts
 umbrelOS, and is reached through Cloudflare Tunnel + Access.
 
-**State (2026-09-04): planning only. No code, no git repo, nothing deployed.**
+**State (2026-09-04): docs only. Private repo `KenobiNakamoto/casaencomu` exists with milestones
+M0–M4 and issues #1–#21 (`WORKPLAN.md`). No code, nothing deployed.**
 
 ## Read in this order
 
@@ -47,7 +48,8 @@ mount. **Ponytail is on**: nothing is added until a trigger in `PLAN.md` fires.
   run the app from an iCloud folder. Never let a host launchd job touch that path directly; go
   through `ssh localhost` (launchd cannot read `/Volumes`).
 - **The nightly encrypted dump is the only backup.** Passphrase in 1Password.
-- Repo (when created): private, `KenobiNakamoto/casaencomu`. Commit and push only when asked.
+- Repo: private, `KenobiNakamoto/casaencomu` (created 2026-09-04). Work flows issue → branch
+  `issue-<n>-<slug>` in a worktree outside iCloud → PR → merge. Commit and push only when asked.
 
 ## The Air's `TimeMachine` volume — decision 2026-09-04 (Kenobi)
 
