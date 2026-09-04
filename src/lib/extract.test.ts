@@ -1,10 +1,17 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { extract, type Page } from "./extract";
 import { Listing } from "./listing";
 import { isAllowedImageHost } from "./url";
 
 const fixture = (name: string) => readFileSync(new URL(`./__fixtures__/${name}.html`, import.meta.url), "utf8");
+// the untrimmed spike pages (gitignored): the repo's own spike/ or the #6 worktree
+const RAW_DIR = [fileURLToPath(new URL("../../spike/", import.meta.url)), join(homedir(), "worktrees/casaencomu-6/spike")].find((d) =>
+  existsSync(join(d, "habitaclia.html")),
+);
 
 // Expected values read off the fixtures (spike 2026-09-04). Photo counts are unique images:
 // Idealista lists the same 44 in three arrays (132 entries), Habitaclia repeats photo 1 in two print sizes.
@@ -62,6 +69,31 @@ describe("extract on the live fixtures (server fetch → html)", () => {
     const l = extract({ url: live[0].url, html: fixture("idealista") })!;
     expect(l.description).toMatch(/^Presentamos en exclusiva esta propiedad de lujo de 209 m² construidos/);
     expect(l.description).toMatch(/\n\n/);
+  });
+});
+
+describe("extract on the untrimmed spike pages (search form, similar listings, logos present)", () => {
+  // Habitaclia's search form reads "+5 … Baños"; the raw page once yielded bathrooms = 5 for a 1-bath flat
+  it.skipIf(!RAW_DIR)("habitaclia: own feature block only", () => {
+    const l = extract({ url: live[2].url, html: readFileSync(join(RAW_DIR!, "habitaclia.html"), "utf8") })!;
+    expect(l).toMatchObject({ bathrooms: 1, rooms: 2, area_m2: 51, price_eur: 350000 });
+    expect(l.photos).toHaveLength(30);
+  });
+  it.skipIf(!RAW_DIR)("idealista: own feature block only", () => {
+    const l = extract({ url: live[0].url, html: readFileSync(join(RAW_DIR!, "idealista.html"), "utf8") })!;
+    expect(l).toMatchObject({ bathrooms: 3, rooms: 4, area_m2: 209, price_eur: 1350000 });
+    expect(l.photos).toHaveLength(44);
+  });
+  it.skipIf(!RAW_DIR)("fotocasa: blob only", () => {
+    const l = extract({ url: live[1].url, html: readFileSync(join(RAW_DIR!, "fotocasa.html"), "utf8") })!;
+    expect(l).toMatchObject({ bathrooms: 3, rooms: 3, area_m2: 180, price_eur: 1644999 });
+    expect(l.photos).toHaveLength(68);
+  });
+
+  it("habitaclia innerText: the search form and similar listings do not win over the listing's own block", () => {
+    const text = "Habitaciones\n+1\n+2\n+3\n+4\n+5\nBaños\n+1\n+2\n\n350.000 €\n\n51 m2\n\n2 hab.\n\n1 baño\n\n6.863 €/m2\n\nSimilares\n\n80 m2\n3 hab.\n2 baños\n";
+    const l = extract({ url: live[2].url, og: { "og:title": "Ático por 350.000 € de 51 metros x en y Barcelona - habitaclia" }, text })!;
+    expect(l).toMatchObject({ rooms: 2, bathrooms: 1, area_m2: 51, price_eur: 350000 });
   });
 });
 
