@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- CasaEnComú nightly backup — SCAFFOLD.md § 8.4. Install: cp to ~/Library/LaunchAgents/ then
+	     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kenobi.casaencomu-backup.plist
+	     launchd cannot read /Volumes, so the script runs through `ssh localhost` (inherits sshd's Full Disk Access).
+	     launchd does not expand ~, so /bin/sh resolves $HOME for the log; ssh's remote shell expands ~ for the script. -->
+	<key>Label</key>
+	<string>com.kenobi.casaencomu-backup</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/sh</string>
+		<string>-c</string>
+		<string>exec /usr/bin/ssh -o BatchMode=yes localhost ~/.local/bin/casaencomu-backup.sh >>"$HOME/Library/Logs/casaencomu-backup.log" 2>&amp;1</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>3</integer>
+		<key>Minute</key>
+		<integer>30</integer>
+	</dict>
+	<key>RunAtLoad</key>
+	<false/>
+</dict>
+</plist>
