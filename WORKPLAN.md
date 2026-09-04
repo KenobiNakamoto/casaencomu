@@ -108,6 +108,9 @@ gh api -X PUT repos/KenobiNakamoto/casaencomu/branches/main/protection \
   -F required_status_checks=null -F restrictions=null      # PRs only, no direct pushes
 ```
 
+Branch protection and rulesets returned 403 on 2026-09-04: a private repo needs GitHub Pro for
+them. Not applied. The guard is contract rule 7 (no push to `main`) and review before merge.
+
 Issue bodies were generated from the tables above by a one-off script (not committed);
 regenerate from the tables if the repo is ever rebuilt. Issue numbers on GitHub equal the # column. Wave labels drive the board: a GitHub Project with columns
 `wave-a` … `wave-c`, `review`, `done` is optional — milestones alone show progress.
