@@ -29,6 +29,12 @@ Wave C does not wait for Kenobi's Cloudflare items: agents run locally with `AUT
 
 ## 3. Epics and issues
 
+On GitHub (2026-09-04): epics are issues #22 E0, #23 E1, #24 E2, #25 E3, #26 E4, #27 E5, label
+`epic`, each with its issues attached as sub-issues (progress bar) and listed as a task list.
+Every issue carries a `## Steps` checklist. A Projects board was not created: the `gh` token lacks
+the `project` scope (`gh auth refresh -s project,read:project` would add it); milestones + epics
+show progress without it.
+
 Columns: **owner** (K = Kenobi's hand, A = agent, A+Air = agent over `ssh air`), **files owned**
 (the only files the branch may touch), **depends on**, **size** (S ≤ 2 h, M ≤ half day, L ≤ day),
 **check** (the acceptance test; SCAFFOLD § holds the detail).

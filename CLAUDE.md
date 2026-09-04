@@ -18,7 +18,7 @@ availability every 48 h. It runs on the MacBook Air inside the Colima VM that al
 umbrelOS, and is reached through Cloudflare Tunnel + Access.
 
 **State (2026-09-04): docs only. Private repo `KenobiNakamoto/casaencomu` exists with milestones
-M0–M4 and issues #1–#21 (`WORKPLAN.md`). No code, nothing deployed.**
+M0–M4, issues #1–#21, epics #22–#27 (`WORKPLAN.md`). No code, nothing deployed.**
 
 ## Read in this order
 
