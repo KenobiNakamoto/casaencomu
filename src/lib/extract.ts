@@ -166,13 +166,47 @@ type FotocasaProps = {
   };
 };
 
+/**
+ * Why a page yielded no listing. The three outcomes are not interchangeable: `removed` is
+ * evidence the advertisement is gone, `blocked` and `unreadable` are evidence of nothing at all.
+ * Calling any of them "removed" is finding F03.
+ */
+export type ExtractResult =
+  | { kind: "listing"; listing: Listing; presence: Presence }
+  | { kind: "removed" | "blocked" | "unreadable"; reason: string };
+
+/**
+ * Which fields this one observation actually carried. A refresh keeps the previous value of an
+ * `absent` field instead of erasing it.
+ *
+ * ponytail: only `present` and `absent` are produced today. `explicit_null` is in the type for a
+ * portal branch that can prove a field is empty ("sin ascensor" proves `lift: false`, which is a
+ * value, not a null). Add it when such a branch exists; nothing may guess it from a zod default.
+ */
+export type Presence = Record<string, "present" | "absent" | "explicit_null">;
+
+const presenceOf = (out: Partial<Listing>): Presence =>
+  Object.fromEntries(
+    Object.keys(Listing.shape)
+      .filter((k) => k !== "photos")
+      .map((k) => [k, (out as Record<string, unknown>)[k] == null ? "absent" : "present"]),
+  );
+
+/** `Listing | null`, for the callers and tests that only ask "did it parse?". */
 export function extract(page: Page): Listing | null {
+  const r = extractResult(page);
+  return r.kind === "listing" ? r.listing : null;
+}
+
+export function extractResult(page: Page): ExtractResult {
   const { portal } = normalizeUrl(page.url);
   const html = page.html ?? "";
-  if (page.status === 404 || page.status === 410 || page.status === 403) return null;
-  if (GONE_URL.test(page.finalUrl ?? "")) return null;
-  if (GONE_TEXT.test(html) || GONE_TEXT.test(page.text ?? "")) return null;
-  if (BLOCKED.test(html)) return null;
+  if (page.status === 404 || page.status === 410) return { kind: "removed", reason: `status ${page.status}` };
+  if (page.status === 403) return { kind: "blocked", reason: "status 403" };
+  if (GONE_URL.test(page.finalUrl ?? "")) return { kind: "removed", reason: "gone marker in the final URL" };
+  if (GONE_TEXT.test(html) || GONE_TEXT.test(page.text ?? ""))
+    return { kind: "removed", reason: "gone marker in the page text" };
+  if (BLOCKED.test(html)) return { kind: "blocked", reason: "challenge page" };
 
   const og = page.og ?? ogOf(html);
   const ld = (page.ld ?? ldOf(html)) as LdThing[];
@@ -375,15 +409,20 @@ export function extract(page: Page): Listing | null {
       // 404 (Vivalta does). The reference in the URL is the check: a page that never names it is
       // not that advertisement. Four digits or more, so a plain `/casa/1` is not treated as one.
       const ref = m1(new URL(page.url).pathname, /(\d{4,})/);
-      if (ref && !text.includes(ref) && !blob.includes(ref)) return null;
+      if (ref && !text.includes(ref) && !blob.includes(ref))
+        return { kind: "removed", reason: "the page never names the listing reference" };
       break;
     }
   }
 
-  if (!out.title) return null;
+  if (!out.title) return { kind: "unreadable", reason: "no title found" };
   out.description ??= og["og:description"] || null; // last resort on every portal: the truncated og text
   // no blob list → the page's images, portal hosts only; Habitaclia additionally scoped to og:image's ad folder
   const folder = m1(og["og:image"] ?? "", /\/imgh\/([^/]+)\//);
   const scope = portal === "generic" ? undefined : (u: string) => isAllowedImageHost(u) && (!folder || u.includes(`/imgh/${folder}/`));
-  return Listing.parse({ ...out, photos: blobPics.length ? photos(portal, blobPics) : photos(portal, pagePics, scope) });
+  const listing = Listing.parse({
+    ...out,
+    photos: blobPics.length ? photos(portal, blobPics) : photos(portal, pagePics, scope),
+  });
+  return { kind: "listing", listing, presence: presenceOf(out) };
 }

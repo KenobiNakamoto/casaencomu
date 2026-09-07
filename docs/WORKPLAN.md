@@ -4,26 +4,52 @@ _2026-09-04. The unit of work is one GitHub issue = one agent = one branch = one
 owns a file set; two open issues never share a file. `SCAFFOLD.md` § numbers hold the how;
 this file holds the who, the order, and the done-when. Load into GitHub with § 5 below._
 
-## 0. Status (2026-09-07)
+## 0. Status (2026-09-07, evening)
 
-- **Done.** #6–#17 merged to `main` in order (PRs #28–#39); wave B and wave C complete. Since
-  then, on top of the plan: two themes and the day/night toggle (#53), the generic-portal
-  extractor and four bugs it exposed (#57), three more photo hosts (#59), and this repository
-  layout (#62). 24 PRs merged in total. On `main`: 7 test files / 60 tests green with 3 skipped,
-  `next build` green, 13 routes and the proxy (`src/README.md` lists them).
+**Read this first. It is the only place that says what to do next.**
+
+### Done
+
+- **#6–#17 merged** to `main` in order (PRs #28–#39); waves B and C complete. On top of the plan:
+  two themes and the day/night toggle (#53), the generic-portal extractor and four bugs it exposed
+  (#57), three more photo hosts (#59), the repository layout (#62) and the cold-start fix (#64).
 - **The database is real.** 23 of the family's 25 links are imported, every field taken from the
-  advertisement by `extract()`. The two that failed are genuinely withdrawn. Repeat it with
+  advertisement by the extractor. The two that fail are genuinely withdrawn. Repeat it with
   `pnpm tsx scripts/ingest.mts --reset`.
-- **Open, Kenobi's hand:** #1 domain, #2 Zero Trust, #3 `limactl` grant, #5 area + member list,
-  and the go for #4 (~5 min node downtime). On the Air, two commands the agent cannot run
-  (permission classifier): add Homebrew's plugin dir to `cliPluginsExtraDirs` in
-  `~/.docker/config.json` so `docker compose` works, and `brew install cloudflared`.
-- **Then agents:** #18 Air setup → #19 M1 integration (deploy, virtiofs test, phone PIN,
-  restore) → #21 backup drill + LaunchAgent → #20 phone checklists.
-- **Lesson from the merges.** Branches stacked on an unmerged sibling carry that sibling's files
-  at an old commit; when the sibling gets a fixup later, GitHub reports a conflict on the stacked
-  PR. Fix: `git merge origin/main` into the stacked branch, push, then merge the PR. Merge in
-  dependency order. Next time: no stacking — merge each PR as soon as it is reviewed.
+- **#3 and #4 are closed** (2026-09-06). On the Air, both manual commands are also done:
+  `docker compose` answers (5.5.0) and `cloudflared` is installed. `/Volumes/TimeMachine` is
+  mounted into the Colima VM and already holds `casaencomu`. `~/srv/casaencomu` is empty.
+
+### Open, and only Kenobi can do them
+
+| # | What | Where |
+|---|---|---|
+| 1 | A domain on Cloudflare DNS | dash.cloudflare.com |
+| 2 | A Zero Trust account; note the team name | one.dash.cloudflare.com |
+| 5 | Confirm the area and the member email list | never in the repo |
+
+**Nothing else is blocked by these three, and they block everything on the server.** #18 needs the
+domain, the team domain, the Access AUD and the member emails. #19, #21 and #20 wait behind #18.
+
+### Two tracks from here
+
+- **Server track (blocked):** #18 Air setup → #19 M1 integration → #21 backup drill → #20 phone
+  checklists. It starts the day #1, #2 and #5 are done.
+- **Product track (open now):** `docs/product-improvement/`, Release A then Release B. It needs no
+  domain and no server. Package PIP-01 is issue #65.
+
+### Lesson from the merges
+
+Branches stacked on an unmerged sibling carry that sibling's files at an old commit; when the
+sibling gets a fixup later, GitHub reports a conflict on the stacked PR. Fix: `git merge
+origin/main` into the stacked branch, push, then merge the PR. Merge in dependency order. Next
+time: no stacking — merge each PR as soon as it is reviewed.
+
+### A worktree needs its own `node_modules`
+
+Turbopack refuses a `node_modules` symlink that points outside the worktree
+(`Symlink [project]/node_modules is invalid`). `pnpm install` inside the worktree takes about
+three seconds and hard-links from the store, so run that instead of linking to another checkout.
 
 ## 1. Milestones (= phases; done-when from `SCAFFOLD.md` § 10)
 

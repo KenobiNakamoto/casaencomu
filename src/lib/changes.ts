@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import type { Listing } from "./listing";
+import type { InValue } from "@libsql/client";
+import { Listing } from "./listing";
 
 /** What `sources.facts_json` stores: the listing minus `photos`. */
 export type Facts = Omit<Listing, "photos">;
@@ -15,6 +16,12 @@ export function canonicalFacts(listing: Listing): Facts {
 export function factsHash(facts: Facts): string {
   return createHash("sha256").update(JSON.stringify(facts)).digest("hex");
 }
+
+/** The `Listing` keys that are also `properties` columns. An allowlist: it keeps a dynamic SET safe. */
+export const FACT_COLUMNS = new Set(Object.keys(Listing.shape).filter((k) => k !== "photos"));
+
+/** SQLite has no boolean; `undefined` is rejected outright. */
+export const col = (x: unknown): InValue => (typeof x === "boolean" ? (x ? 1 : 0) : ((x ?? null) as InValue));
 
 export type Change =
   | { kind: "price_change"; payload: { from: number | null; to: number | null } }

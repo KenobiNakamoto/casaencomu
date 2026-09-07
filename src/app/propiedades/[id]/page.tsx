@@ -91,6 +91,9 @@ export default async function PropiedadPage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const estado = one(sp.estado);
+  const faltan = Number(one(sp.faltan) ?? 0);
   const user = await currentUser();
 
   // ponytail: one batch, seven statements, no joins to untangle
@@ -155,8 +158,19 @@ export default async function PropiedadPage({
         Propiedades
       </Link>
 
-      {(Array.isArray(sp.dup) ? sp.dup[0] : sp.dup) === "1" && (
-        <p className="mt-4 rounded-lg bg-ok-tint px-4 py-3 text-sm text-ok">Ya estaba guardada.</p>
+      {/* What the import just did. A second look at a known advertisement is a refresh, not a
+          rejected duplicate, so it says whether anything actually changed. */}
+      {estado === "igual" && (
+        <p className="mt-4 rounded-lg bg-ok-tint px-4 py-3 text-sm text-ok">Ya la teníamos. Sin cambios en el anuncio.</p>
+      )}
+      {estado === "actualizada" && (
+        <p className="mt-4 rounded-lg bg-ok-tint px-4 py-3 text-sm text-ok">Ya la teníamos. Datos actualizados.</p>
+      )}
+      {faltan > 0 && (
+        <p className="mt-2 rounded-lg bg-accent-tint px-4 py-3 text-sm text-body">
+          {faltan === 1 ? "No se pudo guardar 1 foto." : `No se pudieron guardar ${faltan} fotos.`} Vuelve a comprobar el
+          anuncio para intentarlo otra vez.
+        </p>
       )}
 
       <header className="mt-4 space-y-1">

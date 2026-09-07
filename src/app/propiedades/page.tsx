@@ -140,9 +140,6 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
 
   return (
     <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10">
-      {first(sp.dup) === "1" && (
-        <p className="mt-4 rounded-lg bg-ok-tint px-4 py-3 text-sm text-ok">Ya estaba guardada.</p>
-      )}
       {first(sp.error) && <p className="mt-4 rounded-lg bg-accent-tint px-4 py-3 text-sm text-error">{first(sp.error)}</p>}
 
       {/* Toolbar: the pill searches, the + opens the add-a-link field, filters sit behind one pill. */}
