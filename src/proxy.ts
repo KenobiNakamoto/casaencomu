@@ -1,6 +1,6 @@
 import { createRemoteJWKSet } from "jose";
 import { NextResponse, type NextRequest } from "next/server";
-import { verifyAccessToken } from "@/lib/auth";
+import { previewEmail, verifyAccessToken } from "@/lib/auth";
 
 // ponytail: jose over hand-rolled RS256 — security path, keep the dep
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
@@ -23,11 +23,25 @@ export async function proxy(request: NextRequest) {
 
   const team = process.env.CF_ACCESS_TEAM_DOMAIN;
   const audience = process.env.CF_ACCESS_AUD;
+
+  // Preview mode: a shared password, for the Air behind Tailscale while the Access
+  // deploy waits on its owner-only items. Cloudflare wins when it is configured, so
+  // a stray PREVIEW_PASSWORD can never downgrade a real deployment.
   if (!team || !audience) {
-    return NextResponse.json(
-      { error: "auth misconfigured: CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD must be set" },
-      { status: 500 },
-    );
+    const password = process.env.PREVIEW_PASSWORD;
+    if (!password) {
+      return NextResponse.json(
+        { error: "auth misconfigured: set CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD, or PREVIEW_PASSWORD" },
+        { status: 500 },
+      );
+    }
+    const email = await previewEmail(request.headers.get("authorization"), password);
+    return email
+      ? forward(email)
+      : new NextResponse("Escribe tu nombre y la clave de la casa.", {
+          status: 401,
+          headers: { "www-authenticate": 'Basic realm="CasaEnComu", charset="UTF-8"' },
+        });
   }
 
   const token =
