@@ -1,46 +1,78 @@
 import { STAGE_LABELS, type Stage } from "@/lib/listing";
 
+/**
+ * Status colour comes from the theme tokens, never from a Tailwind palette utility. `bg-sky-100`
+ * and friends are the same pale colour in both themes, so a night-mode badge used to sit as a
+ * near-white block on a dark card (F08). Roles: `docs/product-improvement/03-design-motion-map.md`
+ * § 2, status mapping.
+ */
 const TONES = {
-  zinc: "bg-surface-strong text-body",
-  blue: "bg-sky-100 text-sky-800",
-  amber: "bg-amber-100 text-amber-800",
-  green: "bg-ok-tint text-ok",
-  violet: "bg-violet-100 text-violet-800",
-  red: "bg-accent-tint text-error",
+  neutral: "bg-surface-strong text-body",
+  info: "bg-info-bg text-info-ink",
+  warning: "bg-warning-bg text-warning-ink",
+  success: "bg-success-bg text-success-ink",
+  visit: "bg-visit-bg text-visit-ink",
+  danger: "bg-danger-bg text-danger-ink",
+  selection: "bg-selection-bg text-selection-ink",
 } as const;
 type Tone = keyof typeof TONES;
 
-export function Chip({ tone = "zinc", children }: { tone?: Tone; children: React.ReactNode }) {
+export function Chip({ tone = "neutral", children }: { tone?: Tone; children: React.ReactNode }) {
   return (
-    <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${TONES[tone]}`}>
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${TONES[tone]}`}>
       {children}
     </span>
   );
 }
 
 const STAGE_TONE: Record<Stage, Tone> = {
-  nueva: "blue",
-  revisando: "amber",
-  preseleccionada: "green",
-  visita_prevista: "violet",
-  descartada: "zinc",
-  no_disponible: "red",
+  nueva: "info",
+  revisando: "warning",
+  preseleccionada: "success",
+  visita_prevista: "visit",
+  descartada: "neutral",
+  no_disponible: "danger",
 };
 
-/** Dot colour per stage, for the white photo badge and the stage strip. */
-export const STAGE_DOT: Record<Stage, string> = {
-  nueva: "bg-sky-500",
-  revisando: "bg-amber-500",
-  preseleccionada: "bg-ok",
-  visita_prevista: "bg-violet-500",
-  descartada: "bg-zinc-400",
-  no_disponible: "bg-accent",
+/**
+ * A shape beside the word, so the stage is never carried by colour alone. Drawn with a border and
+ * a path rather than a fill, so it inherits the chip's text colour and stays legible in both themes.
+ */
+const STAGE_MARK: Record<Stage, string> = {
+  nueva: "M12 7a5 5 0 100 10 5 5 0 000-10z", // outlined dot
+  revisando: "M9.2 9.2a2.8 2.8 0 115.3 1.3c-.5.9-1.6 1.3-2.2 2-.3.4-.3.9-.3 1.3M12 17.6v.1", // question mark
+  preseleccionada: "M6 12.5l4 4 8-8.5", // check
+  visita_prevista: "M5 7h14v13H5zM5 11h14M9 4v4M15 4v4", // calendar
+  descartada: "M7 12h10", // minus
+  no_disponible: "M5 5l14 14M5 19L19 5", // cross
 };
+
+const Mark = ({ stage }: { stage: Stage }) => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d={STAGE_MARK[stage]} />
+  </svg>
+);
 
 export function StageChip({ stage }: { stage: string }) {
   const s = stage as Stage;
-  return <Chip tone={STAGE_TONE[s] ?? "zinc"}>{STAGE_LABELS[s] ?? stage}</Chip>;
+  if (!STAGE_TONE[s]) return <Chip>{stage}</Chip>;
+  return (
+    <Chip tone={STAGE_TONE[s]}>
+      <Mark stage={s} />
+      {STAGE_LABELS[s]}
+    </Chip>
+  );
 }
+
+/** Dot colour per stage, for the stage strip. Tokens, so both themes get a visible dot. */
+export const STAGE_DOT: Record<Stage, string> = {
+  nueva: "bg-info-ink",
+  revisando: "bg-warning-ink",
+  preseleccionada: "bg-success-ink",
+  visita_prevista: "bg-visit-ink",
+  descartada: "bg-muted",
+  no_disponible: "bg-danger-ink",
+};
 
 /** White pill that floats on a photo (Airbnb's "Guest favorite" badge). */
 export function Badge({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -55,12 +87,13 @@ export function Badge({ children, className = "" }: { children: React.ReactNode;
 
 export function StageBadge({ stage }: { stage: string }) {
   const s = stage as Stage;
+  if (!STAGE_TONE[s]) return <Badge>{stage}</Badge>;
   return (
     <Badge>
-      <span className={`h-2 w-2 rounded-full ${STAGE_DOT[s] ?? "bg-zinc-400"}`} aria-hidden />
-      {STAGE_LABELS[s] ?? stage}
+      <span className={`h-2 w-2 rounded-full ${STAGE_DOT[s]}`} aria-hidden />
+      {STAGE_LABELS[s]}
     </Badge>
   );
 }
 
-export const BudgetChip = () => <Chip tone="red">Fuera de presupuesto</Chip>;
+export const BudgetChip = () => <Chip tone="danger">Fuera de presupuesto</Chip>;

@@ -28,7 +28,7 @@ export default async function Nav() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-hairline bg-raised">
-      <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-4 px-4 sm:px-6 md:h-20 lg:px-10">
+      <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-4 px-4 sm:px-6 lg:h-[72px] lg:px-10">
         <Link href="/propiedades" className="flex shrink-0 items-center gap-2 text-xl font-bold tracking-tight text-accent">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M3 11l9-8 9 8" />
@@ -37,14 +37,15 @@ export default async function Nav() {
           CasaEnComú
         </Link>
         <NavLinks items={items} />
-        <div className="ml-auto flex items-center gap-3 md:ml-0">
-          <span className="hidden truncate text-sm text-body sm:inline">Hola {user.name}</span>
+        <div className="ml-auto flex items-center gap-3 lg:ml-0">
+          {/* the greeting is the first thing to go: it is the least useful of the six items in this row */}
+          <span className="hidden max-w-[14ch] truncate text-sm text-body lg:inline">Hola {user.name}</span>
           <ThemeToggle />
           <Link
             href="/ayuda"
             aria-label="Ayuda"
             title="Ayuda"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-hairline text-sm font-semibold text-ink transition hover:shadow-tier"
+            className="touch-target flex h-11 w-11 items-center justify-center rounded-full border border-control-border text-sm font-semibold text-ink transition hover:shadow-tier"
           >
             ?
           </Link>

@@ -48,7 +48,7 @@ export function PropertyCard({ p, budget }: { p: Listed; budget: Budget | null }
     <li data-property={p.id} className="group">
       <Link href={`/propiedades/${p.id}`} className="block">
         <div className="relative aspect-[20/19] overflow-hidden rounded-card bg-surface-soft">
-          <Cover id={p.cover_id} className="h-full w-full transition duration-300 group-hover:scale-[1.03]" />
+          <Cover id={p.cover_id} className="card-photo h-full w-full transition duration-300 group-hover:scale-[1.03]" />
           <div className="absolute left-3 top-3">
             <StageBadge stage={p.stage} />
           </div>

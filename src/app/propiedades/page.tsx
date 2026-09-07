@@ -226,7 +226,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
           )}
         </section>
         <aside className="hidden split:block">
-          <div className="sticky top-[104px] h-[calc(100dvh-128px)] overflow-hidden rounded-card border border-hairline">
+          <div className="sticky top-[calc(var(--header-h)+24px)] h-[calc(100dvh-var(--header-h)-48px)] overflow-hidden rounded-card border border-hairline">
             <Mapa
               markers={markers}
               embedded
@@ -239,7 +239,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
 
       <Link
         href={mapHref}
-        className="fixed bottom-20 left-1/2 z-10 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-canvas shadow-tier transition hover:opacity-90 split:hidden"
+        className="fixed bottom-[calc(var(--nav-bottom-h)+16px)] left-1/2 z-10 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-canvas shadow-tier transition hover:opacity-90 split:hidden"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />

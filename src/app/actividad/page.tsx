@@ -104,7 +104,7 @@ export default async function ActividadPage() {
                   </span>
                   <span className="flex-1 text-[15px] leading-snug">
                     {isNew && (
-                      <span className="mr-2 inline-block rounded-full bg-accent px-2 py-0.5 align-middle text-[11px] font-semibold text-white">
+                      <span className="mr-2 inline-block rounded-full bg-action px-2 py-0.5 align-middle text-[11px] font-semibold text-on-action">
                         nuevo
                       </span>
                     )}

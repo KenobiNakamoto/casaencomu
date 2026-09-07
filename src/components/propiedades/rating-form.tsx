@@ -22,7 +22,7 @@ export function RatingForm({ propertyId, current }: Props) {
           </div>
         </fieldset>
       ))}
-      <button type="submit" className="h-12 w-full rounded-lg bg-accent px-6 text-base font-medium text-white transition hover:bg-accent-active">
+      <button type="submit" className="btn-primary h-12 w-full rounded-lg px-6 text-base font-medium">
         Guardar valoración
       </button>
     </form>

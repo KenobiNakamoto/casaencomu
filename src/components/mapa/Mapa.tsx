@@ -339,7 +339,7 @@ export default function Mapa({
   return (
     <div
       ref={ref}
-      className={embedded ? "h-full w-full" : "h-[calc(100dvh-64px-56px)] w-full md:h-[calc(100dvh-80px)]"}
+      className={embedded ? "h-full w-full" : "h-[calc(100dvh-var(--header-h)-var(--nav-bottom-h))] w-full"}
     />
   );
 }

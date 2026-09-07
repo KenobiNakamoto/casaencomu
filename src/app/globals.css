@@ -7,47 +7,73 @@
  */
 @theme inline {
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+
+  /* surfaces and text */
+  --color-canvas: var(--canvas);
+  --color-raised: var(--raised);
+  --color-sunken: var(--sunken);
+  --color-surface-soft: var(--sunken);
+  --color-surface-strong: var(--surface-strong);
+  --color-ink: var(--ink);
+  --color-body: var(--body);
+  --color-muted: var(--muted);
+  --color-placeholder: var(--placeholder);
+  --color-hairline: var(--hairline);
+  --color-hairline-soft: var(--hairline-soft);
+  --color-control-border: var(--control-border);
+  --color-focus: var(--focus);
+
+  /* brand red. `accent` is ornamental; `action` is the one you may put white text on. */
   --color-accent: var(--accent);
   --color-accent-active: var(--accent-active);
   --color-accent-soft: var(--accent-soft);
   --color-accent-tint: var(--accent-tint);
+  --color-action: var(--action-bg);
+  --color-action-hover: var(--action-hover);
+  --color-action-pressed: var(--action-pressed);
+  --color-on-action: var(--on-action);
+
+  /* yellow: selection only */
   --color-secondary: var(--secondary);
   --color-secondary-active: var(--secondary-active);
   --color-secondary-soft: var(--secondary-soft);
-  --color-secondary-tint: var(--secondary-tint);
-  --color-secondary-ink: var(--secondary-ink);
-  --color-canvas: var(--canvas);
-  --color-raised: var(--raised);
-  --color-sunken: var(--sunken);
-  --color-ink: var(--ink);
-  --color-body: var(--body);
-  --color-muted: var(--muted);
-  --color-muted-soft: var(--muted-soft);
-  --color-hairline: var(--hairline);
-  --color-hairline-soft: var(--hairline-soft);
-  --color-border-strong: var(--border-strong);
-  --color-surface-soft: var(--sunken);
-  --color-surface-strong: var(--surface-strong);
-  --color-error: var(--error);
-  --color-ok: var(--ok);
-  --color-ok-tint: var(--ok-tint);
+  --color-secondary-tint: var(--selection-bg);
+  --color-secondary-ink: var(--on-secondary);
+  --color-selection-bg: var(--selection-bg);
+  --color-selection-ink: var(--selection-ink);
+
+  /* labelled status, never decoration */
+  --color-success-bg: var(--success-bg);
+  --color-success-ink: var(--success-ink);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-ink: var(--warning-ink);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-ink: var(--danger-ink);
+  --color-info-bg: var(--info-bg);
+  --color-info-ink: var(--info-ink);
+  --color-visit-bg: var(--visit-bg);
+  --color-visit-ink: var(--visit-ink);
+
+  /* legacy names, kept so no component had to change in this pass */
+  --color-error: var(--danger-ink);
+  --color-ok: var(--success-ink);
+  --color-ok-tint: var(--success-bg);
+  --color-border-strong: var(--control-border);
+  --color-muted-soft: var(--placeholder);
+
   --breakpoint-split: 960px; /* list + map side by side from here */
   --radius-card: 14px;
   --shadow-tier: var(--shadow);
 }
 
-/* Day. `:root` carries the full set; the dark block below only overrides. */
+/*
+ * Day. `:root` carries the full set; the two night blocks below only override.
+ * Values: `docs/product-improvement/03-design-motion-map.md` § 2. Every pair that carries text
+ * is asserted unrounded in `globals.test.ts` — change a value there and the test tells you what
+ * it costs.
+ */
 :root {
   color-scheme: light;
-  --accent: #e02a1f;
-  --accent-active: #b81f16;
-  --accent-soft: #f7c4bf;
-  --accent-tint: #fdf0ee;
-  --secondary: #e0a800;
-  --secondary-active: #b98b00;
-  --secondary-soft: #f5dd8e;
-  --secondary-tint: #fdf6e0;
-  --secondary-ink: #16161a;
   --canvas: #fbfaf7;
   --canvas-far: #f1efe8;
   --raised: #ffffff;
@@ -55,14 +81,36 @@
   --surface-strong: #eae7de;
   --ink: #16161a;
   --body: #3f3d39;
-  --muted: #6f6c66;
-  --muted-soft: #93908a;
+  --muted: #68645c;
+  --placeholder: #68645c;
   --hairline: #e4e1d9;
   --hairline-soft: #efece5;
-  --border-strong: #c6c2b8;
-  --error: #c13515;
-  --ok: #1a7f4b;
-  --ok-tint: #e6f4ec;
+  --control-border: #8b867d;
+  --accent: #e02a1f;
+  --accent-active: #b81f16;
+  --accent-soft: #f7c4bf;
+  --accent-tint: #fcedeb;
+  --action-bg: #c52b22;
+  --action-hover: #b5261e;
+  --action-pressed: #a9221a;
+  --on-action: #ffffff;
+  --secondary: #e0a800;
+  --secondary-active: #b98b00;
+  --secondary-soft: #f5dd8e;
+  --selection-bg: #fdf6e0;
+  --selection-ink: #695200;
+  --on-secondary: #16161a;
+  --focus: #245f89;
+  --success-bg: #e6f4ec;
+  --success-ink: #176b3e;
+  --warning-bg: #fff5dc;
+  --warning-ink: #815c00;
+  --danger-bg: #fcedeb;
+  --danger-ink: #b52a22;
+  --info-bg: #eef5fa;
+  --info-ink: #245f89;
+  --visit-bg: #f4effa;
+  --visit-ink: #6b4b8a;
   --shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px 0, rgba(0, 0, 0, 0.1) 0 4px 8px 0;
   /* map: paint overrides for the OpenFreeMap Positron basemap */
   --map-bg: #f6f5f2;
@@ -74,19 +122,37 @@
   --map-halo: #ffffff;
   --pin-bg: #ffffff;
   --pin-ink: #16161a;
+
+  /* spacing (doc 03 § 3) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* motion (doc 03 § 5) */
+  --duration-fast: 120ms;
+  --duration-standard: 180ms;
+  --duration-theme: 320ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+  /* one name per fixed obstruction, so nothing hard-codes a second offset */
+  --nav-bottom-h: calc(64px + env(safe-area-inset-bottom));
+  --header-h: 64px;
 }
 
+/*
+ * Night, twice on purpose. The inline script in `layout.tsx` resolves the stored preference and
+ * always writes `data-theme`, so the first block is what normally applies. The media block is the
+ * fallback for a visitor whose JavaScript never ran: without it they get the day palette on a
+ * dark system. The two lists must stay identical — `globals.test.ts` fails if they drift.
+ */
 [data-theme="dark"] {
   color-scheme: dark;
-  --accent: #ff453a;
-  --accent-active: #ff6b62;
-  --accent-soft: #7a251f;
-  --accent-tint: #2a1512;
-  --secondary: #ffd60a;
-  --secondary-active: #ffe14d;
-  --secondary-soft: #6d5a00;
-  --secondary-tint: #2a2405;
-  --secondary-ink: #16161a;
   --canvas: #0b0b0d;
   --canvas-far: #141418;
   --raised: #17171c;
@@ -94,14 +160,36 @@
   --surface-strong: #23232a;
   --ink: #f6f5f2;
   --body: #c9c6bf;
-  --muted: #8f8c85;
-  --muted-soft: #6f6c68;
+  --muted: #a39f97;
+  --placeholder: #a39f97;
   --hairline: #2a2a31;
   --hairline-soft: #212127;
-  --border-strong: #3c3c45;
-  --error: #ff6b5e;
-  --ok: #4ade80;
-  --ok-tint: #10241a;
+  --control-border: #77747e;
+  --accent: #ff453a;
+  --accent-active: #ff6b62;
+  --accent-soft: #7a251f;
+  --accent-tint: #351c1b;
+  --action-bg: #c83a2f;
+  --action-hover: #be342a;
+  --action-pressed: #a92a22;
+  --on-action: #ffffff;
+  --secondary: #ffd60a;
+  --secondary-active: #ffe14d;
+  --secondary-soft: #6d5a00;
+  --selection-bg: #2a2405;
+  --selection-ink: #ffe17a;
+  --on-secondary: #16161a;
+  --focus: #98cbee;
+  --success-bg: #10241a;
+  --success-ink: #90d3aa;
+  --warning-bg: #302615;
+  --warning-ink: #f2c86e;
+  --danger-bg: #351c1b;
+  --danger-ink: #ff938c;
+  --info-bg: #182631;
+  --info-ink: #98cbee;
+  --visit-bg: #292236;
+  --visit-ink: #c5addf;
   /* night elevation is a lighter surface plus a hairline; a black shadow is invisible here */
   --shadow: rgba(255, 255, 255, 0.06) 0 0 0 1px, rgba(0, 0, 0, 0.5) 0 4px 14px 0;
   --map-bg: #101014;
@@ -115,6 +203,66 @@
   --pin-ink: #f6f5f2;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    color-scheme: dark;
+    --canvas: #0b0b0d;
+    --canvas-far: #141418;
+    --raised: #17171c;
+    --sunken: #111116;
+    --surface-strong: #23232a;
+    --ink: #f6f5f2;
+    --body: #c9c6bf;
+    --muted: #a39f97;
+    --placeholder: #a39f97;
+    --hairline: #2a2a31;
+    --hairline-soft: #212127;
+    --control-border: #77747e;
+    --accent: #ff453a;
+    --accent-active: #ff6b62;
+    --accent-soft: #7a251f;
+    --accent-tint: #351c1b;
+    --action-bg: #c83a2f;
+    --action-hover: #be342a;
+    --action-pressed: #a92a22;
+    --on-action: #ffffff;
+    --secondary: #ffd60a;
+    --secondary-active: #ffe14d;
+    --secondary-soft: #6d5a00;
+    --selection-bg: #2a2405;
+    --selection-ink: #ffe17a;
+    --on-secondary: #16161a;
+    --focus: #98cbee;
+    --success-bg: #10241a;
+    --success-ink: #90d3aa;
+    --warning-bg: #302615;
+    --warning-ink: #f2c86e;
+    --danger-bg: #351c1b;
+    --danger-ink: #ff938c;
+    --info-bg: #182631;
+    --info-ink: #98cbee;
+    --visit-bg: #292236;
+    --visit-ink: #c5addf;
+    --shadow: rgba(255, 255, 255, 0.06) 0 0 0 1px, rgba(0, 0, 0, 0.5) 0 4px 14px 0;
+    --map-bg: #101014;
+    --map-building: #1b1b21;
+    --map-water: #12222f;
+    --map-park: #14241a;
+    --map-wood: #16281c;
+    --map-label: #9a978f;
+    --map-halo: #0b0b0d;
+    --pin-bg: #23232a;
+    --pin-ink: #f6f5f2;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --header-h: 72px;
+    --nav-bottom-h: 0px;
+  }
+}
+
 @layer base {
   body {
     color: var(--ink);
@@ -125,16 +273,59 @@
   select,
   textarea {
     color: var(--ink);
+    /* 16px minimum: iOS Safari zooms the page when a focused field is smaller (F32) */
+    font-size: 16px;
+    line-height: 24px;
   }
   input::placeholder,
   textarea::placeholder {
-    color: var(--muted-soft);
+    color: var(--placeholder);
+  }
+  /*
+   * One focus ring for everything, defined once (F32). Components used to write
+   * `focus:outline-none` and rely on a border colour change, which is invisible to anyone who
+   * cannot see the difference between two greys. Never animated, so it is there on the frame the
+   * key lands.
+   */
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    transition: none;
   }
   summary {
     list-style: none;
   }
   summary::-webkit-details-marker {
     display: none;
+  }
+}
+
+/*
+ * The 44 x 44 comfort target (doc 03 § 3). The visible glyph stays whatever size it is; the hit
+ * area grows underneath it, so nothing moves on screen.
+ */
+@utility touch-target {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    translate: -50% -50%;
+  }
+}
+
+/* The one filled primary action. `--accent` is ornamental and fails 4.5:1 against white (F06). */
+@utility btn-primary {
+  background: var(--action-bg);
+  color: var(--on-action);
+  transition: background var(--duration-fast) var(--ease-out);
+  &:hover {
+    background: var(--action-hover);
+  }
+  &:active {
+    background: var(--action-pressed);
   }
 }
 
@@ -163,12 +354,12 @@
   padding: 8px 11px;
   border-radius: 9999px;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.18);
-  transition: transform 0.12s ease, background 0.12s ease, color 0.12s ease;
+  transition: transform var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
 }
 .pin:hover,
 .pin.is-active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--action-bg);
+  color: var(--on-action);
   transform: scale(1.08);
 }
 .maplibregl-popup.mini .maplibregl-popup-content {
@@ -185,15 +376,15 @@
   display: none;
 }
 .maplibregl-popup.mini .maplibregl-popup-close-button {
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
+  top: 4px;
+  right: 4px;
+  width: 44px;
+  height: 44px;
   border-radius: 9999px;
   background: var(--raised);
   color: var(--ink);
   font-size: 18px;
-  line-height: 28px;
+  line-height: 44px;
 }
 .maplibregl-ctrl-group {
   overflow: hidden;
@@ -201,8 +392,8 @@
   box-shadow: var(--shadow-tier) !important;
 }
 .maplibregl-ctrl-group button {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   background: var(--raised);
   color: var(--ink);
 }
@@ -234,7 +425,7 @@ html[data-wipe]::view-transition-old(root) {
 }
 html[data-wipe]::view-transition-new(root) {
   mix-blend-mode: normal;
-  animation: theme-wipe 520ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: theme-wipe var(--duration-theme) var(--ease-out);
 }
 @keyframes theme-wipe {
   from {
@@ -245,27 +436,44 @@ html[data-wipe]::view-transition-new(root) {
   }
 }
 
-/* Sun in the dark theme, moon in the light one: the icon shows what the click will give you. */
+/*
+ * The icon shows the state you are in, not the state one click away, because there are now three
+ * states and "the next one" is no longer guessable from a single glyph. A screen icon means the
+ * system decides; sun and moon mean you decided.
+ */
 .theme-icon > svg {
   grid-area: 1 / 1;
   width: 100%;
   height: 100%;
-  transition: opacity 0.18s ease-out, transform 0.18s ease-out;
-}
-.theme-icon > [data-icon="sun"] {
   opacity: 0;
   transform: rotate(-90deg) scale(0.5);
+  transition: opacity var(--duration-standard) var(--ease-out), transform var(--duration-standard) var(--ease-out);
 }
-[data-theme="dark"] .theme-icon > [data-icon="sun"] {
+.theme-icon[data-preference="sistema"] > [data-icon="system"],
+.theme-icon[data-preference="light"] > [data-icon="sun"],
+.theme-icon[data-preference="dark"] > [data-icon="moon"] {
   opacity: 1;
   transform: none;
 }
-[data-theme="dark"] .theme-icon > [data-icon="moon"] {
-  opacity: 0;
-  transform: rotate(90deg) scale(0.5);
-}
+/*
+ * Reduced motion, applied once and for everything. The old rule only reached the theme icon, so
+ * the card photo zoom and the pin scale still moved (F18). Two of them need the movement itself
+ * removed, not only its transition — a scale with no transition is still a jump.
+ */
 @media (prefers-reduced-motion: reduce) {
-  .theme-icon > svg {
-    transition: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .pin:hover,
+  .pin.is-active {
+    transform: none;
+  }
+  .card-photo {
+    transform: none !important;
   }
 }
