@@ -1,8 +1,10 @@
 "use client";
 
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
-import type { ExpressionSpecification, Map as MLMap } from "maplibre-gl";
+import type { ExpressionSpecification, Map as MLMap, SymbolLayerSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { areaCoords, countByArea, type AreaLevel, type Areas } from "@/lib/geo";
 import { STAGE_LABELS, type Stage } from "@/lib/listing";
 
 export type MapMarker = {
@@ -36,6 +38,17 @@ const PAINT: Record<string, Record<string, string>> = {
 };
 // Positron labels prefer `name_en` ("OLD TOWN"); the family reads the local names.
 const LOCAL_NAME: ExpressionSpecification = ["coalesce", ["get", "name:latin"], ["get", "name"]];
+/** Districts while the whole city is in view, barris once you are looking at streets. */
+const ZOOM_SPLIT = 13.5;
+const LEVELS: { level: AreaLevel; minzoom: number; maxzoom: number; size: number; width: number }[] = [
+  { level: "distrito", minzoom: 0, maxzoom: ZOOM_SPLIT, size: 13, width: 2 },
+  { level: "barrio", minzoom: ZOOM_SPLIT, maxzoom: 24, size: 12, width: 1.2 },
+];
+
+// The boundaries are 129 KB and never change within a session, so fetch them once per page load.
+let areasOnce: Promise<Areas> | undefined;
+const getAreas = () => (areasOnce ??= fetch("/areas.geojson").then((r) => r.json() as Promise<Areas>));
+
 const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -72,8 +85,22 @@ function card(m: MapMarker) {
  * Plain MapLibre mounted in an effect. Price pills are the markers; hovering any element with
  * `data-property=<id>` on the page (the list cards) highlights that pill.
  */
-export default function Mapa({ markers, embedded = false }: { markers: MapMarker[]; embedded?: boolean }) {
+export default function Mapa({
+  markers,
+  embedded = false,
+  zona = "",
+  params = {},
+}: {
+  markers: MapMarker[];
+  embedded?: boolean;
+  /** id of the area the list is filtered to, from `?zona=`. */
+  zona?: string;
+  /** the other live filters, so a click on an area keeps them. */
+  params?: Record<string, string>;
+}) {
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     let map: MLMap | undefined;
@@ -81,7 +108,7 @@ export default function Mapa({ markers, embedded = false }: { markers: MapMarker
     let detach = () => {};
     (async () => {
       // ponytail: no react wrapper; maplibre reads `window` on import, so it loads here, not at the top
-      const ml = await import("maplibre-gl");
+      const [ml, areas] = await Promise.all([import("maplibre-gl"), getAreas()]);
       if (cancelled || !ref.current) return;
       map = new ml.Map({
         container: ref.current,
@@ -104,9 +131,10 @@ export default function Mapa({ markers, embedded = false }: { markers: MapMarker
           return s;
         },
       });
-      map.touchZoomRotate.disableRotation();
-      map.addControl(new ml.NavigationControl({ showCompass: false }), "bottom-right");
-      map.addControl(new ml.AttributionControl({ compact: true }), "bottom-left");
+      const m = map;
+      m.touchZoomRotate.disableRotation();
+      m.addControl(new ml.NavigationControl({ showCompass: false }), "bottom-right");
+      m.addControl(new ml.AttributionControl({ compact: true }), "bottom-left");
 
       const byId = new Map<string, HTMLElement>();
       const bounds = new ml.LngLatBounds();
@@ -120,23 +148,154 @@ export default function Mapa({ markers, embedded = false }: { markers: MapMarker
         byId.set(m.id, el);
         bounds.extend([m.lng, m.lat]);
       }
-      if (markers.length) map.fitBounds(bounds, { padding: { top: 72, bottom: 72, left: 90, right: 90 }, maxZoom: 15, duration: 0 });
+      const activeArea = areas.features.find((f) => f.properties.id === zona);
+      if (activeArea) {
+        const b = new ml.LngLatBounds();
+        for (const c of areaCoords(activeArea)) b.extend(c);
+        map.fitBounds(b, { padding: 40, duration: 0 });
+      } else if (markers.length) {
+        map.fitBounds(bounds, { padding: { top: 72, bottom: 72, left: 90, right: 90 }, maxZoom: 15, duration: 0 });
+      }
 
-      // Approximate addresses get a 180 m halo, drawn under the labels.
-      const approx = markers.filter((m) => m.precision === "approx");
-      if (approx.length)
-        map.on("load", () => {
-          if (!map) return;
-          const features = approx.map((m) => ({
+      // Clicking an area filters the page to it; clicking it again clears the filter.
+      const go = (id: string) => {
+        const q = new URLSearchParams(params);
+        if (id === zona) q.delete("zona");
+        else q.set("zona", id);
+        const query = q.toString();
+        router.push(query ? `${pathname}?${query}` : pathname);
+      };
+
+      const approx = markers.filter((mk) => mk.precision === "approx");
+      const counts = countByArea(areas.features, markers);
+      const data: Areas = {
+        ...areas,
+        features: areas.features.map((f) => ({ ...f, properties: { ...f.properties, count: counts[f.properties.id] ?? 0 } })),
+      };
+
+      m.on("load", () => {
+        const before = m.getStyle().layers.find((l) => l.type === "symbol")?.id;
+
+        // Our area labels say what the basemap's suburb labels said, in the same places.
+        if (m.getLayer("label_other")) m.setLayoutProperty("label_other", "visibility", "none");
+
+        // Areas first, so the halos and the basemap's own labels stay above them.
+        m.addSource("areas", { type: "geojson", data, promoteId: "id" });
+        for (const { level, minzoom, maxzoom, width } of LEVELS) {
+          const filter = ["==", ["get", "level"], level] as ExpressionSpecification;
+          m.addLayer(
+            {
+              id: `areas-fill-${level}`,
+              type: "fill",
+              source: "areas",
+              filter,
+              minzoom,
+              maxzoom,
+              paint: {
+                "fill-color": "#ff385c",
+                // Outline only at rest: filling every area at once tints the whole city.
+                "fill-opacity": [
+                  "case",
+                  ["boolean", ["feature-state", "hover"], false],
+                  0.14,
+                  ["==", ["get", "id"], zona],
+                  0.12,
+                  0,
+                ],
+              },
+            },
+            before,
+          );
+          m.addLayer(
+            {
+              id: `areas-line-${level}`,
+              type: "line",
+              source: "areas",
+              filter,
+              minzoom,
+              maxzoom,
+              paint: {
+                "line-color": "#ff385c",
+                "line-width": ["case", ["==", ["get", "id"], zona], width + 1, width] as ExpressionSpecification,
+                "line-opacity": ["case", ["==", ["get", "id"], zona], 0.9, 0.4] as ExpressionSpecification,
+              },
+            },
+            before,
+          );
+        }
+
+        // Approximate addresses get a 180 m halo, drawn under the labels.
+        if (approx.length) {
+          const features = approx.map((mk) => ({
             type: "Feature" as const,
             properties: {},
-            geometry: { type: "Polygon" as const, coordinates: [ring(m.lng, m.lat, 180)] },
+            geometry: { type: "Polygon" as const, coordinates: [ring(mk.lng, mk.lat, 180)] },
           }));
-          map.addSource("approx", { type: "geojson", data: { type: "FeatureCollection", features } });
-          const before = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
-          map.addLayer({ id: "approx-fill", type: "fill", source: "approx", paint: { "fill-color": "#ff385c", "fill-opacity": 0.08 } }, before);
-          map.addLayer({ id: "approx-line", type: "line", source: "approx", paint: { "line-color": "#ff385c", "line-width": 1.5, "line-opacity": 0.6 } }, before);
-        });
+          m.addSource("approx", { type: "geojson", data: { type: "FeatureCollection", features } });
+          m.addLayer({ id: "approx-fill", type: "fill", source: "approx", paint: { "fill-color": "#ff385c", "fill-opacity": 0.08 } }, before);
+          m.addLayer({ id: "approx-line", type: "line", source: "approx", paint: { "line-color": "#ff385c", "line-width": 1.5, "line-opacity": 0.6 } }, before);
+        }
+
+        // Area names on top of everything, with the count when the area holds anything.
+        const font = m.getStyle().layers.find(
+          (l): l is SymbolLayerSpecification => l.type === "symbol" && Array.isArray(l.layout?.["text-font"]),
+        )?.layout?.["text-font"];
+        if (font) {
+          for (const { level, minzoom, maxzoom, size } of LEVELS) {
+            m.addLayer({
+              id: `areas-label-${level}`,
+              type: "symbol",
+              source: "areas",
+              filter: ["==", ["get", "level"], level] as ExpressionSpecification,
+              minzoom,
+              maxzoom,
+              layout: {
+                "text-font": font,
+                "text-field": [
+                  "case",
+                  [">", ["get", "count"], 0],
+                  ["concat", ["get", "name"], "\n", ["to-string", ["get", "count"]]],
+                  ["get", "name"],
+                ],
+                "text-size": size,
+                "text-line-height": 1.2,
+                "text-padding": 6,
+              },
+              paint: {
+                "text-color": ["case", [">", ["get", "count"], 0], "#222222", "#8a8a8a"],
+                "text-halo-color": "#ffffff",
+                "text-halo-width": 1.6,
+              },
+            });
+          }
+        }
+
+        // Hover highlights the area under the cursor; a click filters to it.
+        let hover: string | undefined;
+        const clear = () => {
+          if (hover) m.setFeatureState({ source: "areas", id: hover }, { hover: false });
+          hover = undefined;
+        };
+        for (const { level } of LEVELS) {
+          const layer = `areas-fill-${level}`;
+          m.on("mousemove", layer, (e) => {
+            const f = e.features?.[0];
+            if (!f || String(f.id) === hover) return;
+            clear();
+            hover = String(f.id);
+            m.setFeatureState({ source: "areas", id: hover }, { hover: true });
+            m.getCanvas().style.cursor = "pointer";
+          });
+          m.on("mouseleave", layer, () => {
+            clear();
+            m.getCanvas().style.cursor = "";
+          });
+          m.on("click", layer, (e) => {
+            const f = e.features?.[0];
+            if (f) go(String(f.properties.id));
+          });
+        }
+      });
 
       // Hover sync with the list: the card's data-property → its pill.
       let active: HTMLElement | undefined;
@@ -160,7 +319,7 @@ export default function Mapa({ markers, embedded = false }: { markers: MapMarker
       detach();
       map?.remove();
     };
-  }, [markers, embedded]);
+  }, [markers, embedded, zona, params, router, pathname]);
 
   // Full page: top bar (64/80 px) and the phone bottom bar (56 px) are outside the map.
   return (

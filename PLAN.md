@@ -67,7 +67,11 @@ data root:  /Volumes/TimeMachine/casaencomu   ← bind-mounted as /data
   prepopulated (Kenobi, 2026-09-04). Once set, out-of-range is flagged, never blocked.
 - Stages: `Nueva`, `Revisando`, `Preseleccionada`, `Visita prevista`, `Descartada`,
   `No disponible`. Anyone can change a stage.
-- Map: MapLibre GL + OpenFreeMap Positron (keyless vector tiles, Airbnb palette via paint overrides), no clustering; exact vs approximate markers; tap → preview.
+- Map: MapLibre GL + OpenFreeMap Positron (keyless vector tiles, Airbnb palette via paint
+  overrides), no clustering; exact vs approximate markers; tap → preview. Barcelona's districts
+  and barris are drawn over it (`public/areas.geojson`, Ajuntament open data, CC BY 4.0), districts
+  below zoom 13.5 and barris above, each labelled with how many properties it holds; clicking one
+  filters the page with `?zona=`.
 - Detail: photos, facts, sources, verbatim description, price history, review matrix, comments,
   timeline.
 - Ratings: one 1–5 per member per dimension — `Ubicación`, `Distribución`, `Luz y vistas`,

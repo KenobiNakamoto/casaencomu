@@ -15,6 +15,7 @@ export type FilterValues = {
   estado: string;
   etapa: string;
   barrio: string;
+  zona: string;
   puntuacion: string;
   orden: string;
   vista: string;
@@ -52,6 +53,7 @@ export function FilterBar({ values: v, neighborhoods, stages }: Props) {
       <input type="hidden" name="precio" id="precio" />
       <input type="hidden" name="q" value={v.q} readOnly />
       <input type="hidden" name="estado" value={v.estado} readOnly />
+      <input type="hidden" name="zona" value={v.zona} readOnly />
       <input type="hidden" name="vista" value={v.vista === "filas" ? "filas" : ""} readOnly />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <label className={label}>

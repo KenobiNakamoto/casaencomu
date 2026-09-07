@@ -200,7 +200,9 @@ Server components read the DB; mutations are server actions.
 - `/propiedades/[id]` — photos, facts, sources, description, price history (from `events`),
   review matrix (6 × members), comments, timeline, stage select.
 - `/mapa` — plain MapLibre GL in a `useEffect` client component (`// ponytail: no react wrapper`);
-  markers from a JSON endpoint; exact = solid, approx = ring; same URL filters.
+  markers as price pills, exact = solid, approx = `≈` and a 180 m halo; same URL filters. District
+  and barri overlays come from `public/areas.geojson`, rebuilt only by `node scripts/build-areas.mjs`;
+  `src/lib/geo.ts` does point-in-polygon for both the counts on the map and the `?zona=` filter.
 - `/comparar?ids=a,b,c` — 2–4 columns; differing rows highlighted; `Sin datos`.
 - `/actividad` — `events` newest first; sets `last_seen_at`.
 - `/ayuda` — bookmarklet, how-to, and a one-line health readout from `/api/health`.
