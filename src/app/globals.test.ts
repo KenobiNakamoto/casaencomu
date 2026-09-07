@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const css = readFileSync(new URL("./globals.css", import.meta.url), "utf8");
@@ -119,7 +120,9 @@ const walk = (dir: string): string[] =>
     return statSync(p).isDirectory() ? walk(p) : /\.tsx?$/.test(e) ? [p] : [];
   });
 
-const SRC = new URL("../", import.meta.url).pathname;
+// `URL.pathname` is percent-encoded, and the canonical checkout lives under a path with spaces
+// and a "ú" in it. `fileURLToPath` is the decode, and it is what `extract.test.ts` already uses.
+const SRC = fileURLToPath(new URL("../", import.meta.url));
 /** Block comments are prose, not classes — this file's own examples live in one. */
 const sources = () =>
   walk(SRC)
