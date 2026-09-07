@@ -4,12 +4,16 @@ _2026-09-04. The unit of work is one GitHub issue = one agent = one branch = one
 owns a file set; two open issues never share a file. `SCAFFOLD.md` § numbers hold the how;
 this file holds the who, the order, and the done-when. Load into GitHub with § 5 below._
 
-## 0. Status (2026-09-04, evening)
+## 0. Status (2026-09-07)
 
-- **Done.** #6–#17 merged to `main` in order (PRs #28–#39); wave B and wave C complete. On `main`:
-  5 test files / 46 tests green, `next build` green, 13 routes + the proxy. Integration test of
-  all branches passed before the merges (journal, 2026-09-04). Feature branches and the
-  `integration` branch are deleted; worktrees removed.
+- **Done.** #6–#17 merged to `main` in order (PRs #28–#39); wave B and wave C complete. Since
+  then, on top of the plan: two themes and the day/night toggle (#53), the generic-portal
+  extractor and four bugs it exposed (#57), three more photo hosts (#59), and this repository
+  layout (#62). 24 PRs merged in total. On `main`: 7 test files / 60 tests green with 3 skipped,
+  `next build` green, 13 routes and the proxy (`src/README.md` lists them).
+- **The database is real.** 23 of the family's 25 links are imported, every field taken from the
+  advertisement by `extract()`. The two that failed are genuinely withdrawn. Repeat it with
+  `pnpm tsx scripts/ingest.mts --reset`.
 - **Open, Kenobi's hand:** #1 domain, #2 Zero Trust, #3 `limactl` grant, #5 area + member list,
   and the go for #4 (~5 min node downtime). On the Air, two commands the agent cannot run
   (permission classifier): add Homebrew's plugin dir to `cliPluginsExtraDirs` in
@@ -25,7 +29,7 @@ this file holds the who, the order, and the done-when. Load into GitHub with § 
 
 | M | Name | Done when |
 |---|---|---|
-| M0 | Prerequisites + spike | `spike/RESULTS.md` filled; #1–#5 closed; VM up after `authrestart`; `TimeMachine` visible in the VM |
+| M0 | Prerequisites + spike | `PORTALS.md` filled; #1–#5 closed; VM up after `authrestart`; `TimeMachine` visible in the VM |
 | M1 | Walking skeleton | phone on 4G → PIN → `Hola <name>`; virtiofs test passes (or the DB fallback is in); `compose down && up` keeps a row; a backup restores on the Pro |
 | M2 | Intake | three real listings imported with photos (bookmarklet where blocked); repeat → "Ya estaba guardada" |
 | M3 | Workspace | two members rate from phones; `/comparar` shows both; map shows all; filters survive reload; budget typed → `Fuera de presupuesto` chip, none before |
@@ -65,7 +69,7 @@ Columns: **owner** (K = Kenobi's hand, A = agent, A+Air = agent over `ssh air`),
 | 3 | `limactl` Full Disk Access on the Air, enable `com.kenobi.umbrel` | K (VNC) | — | — | S | `ssh air 'colima status'` after `authrestart` = Running |
 | 4 | Mount `TimeMachine` into Colima (§ 8.0) | A+Air, K approves ~5 min node downtime | `~/.local/bin/umbrel-up.sh` on the Air; then run `00_docs/refresh-from-air.sh` | #3 | S | `docker run --rm -v /Volumes/TimeMachine:/tm alpine ls /tm` lists the volume |
 | 5 | Confirm area and member email list | K | — | — | S | emails in the Access policy (#18); never in the repo |
-| 6 | Portal spike (§ 0b) from Pro and Air | A (+Air) | `spike/RESULTS.md`, `src/lib/__fixtures__/*.html` | — | M | RESULTS table complete for the 3 portals; fixtures trimmed to JSON-LD / `og:*` / blob / `<img>` tags — no agent contact blocks |
+| 6 | Portal spike (§ 0b) from Pro and Air | A (+Air) | `PORTALS.md`, `src/lib/__fixtures__/*.html` | — | M | RESULTS table complete for the 3 portals; fixtures trimmed to JSON-LD / `og:*` / blob / `<img>` tags — no agent contact blocks |
 
 ### E1 · Foundation — M1 (serial: #7 → #8 → #9)
 

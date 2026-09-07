@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- CasaEnComú nightly backup — SCAFFOLD.md § 8.4. Install: cp to ~/Library/LaunchAgents/ then
+	<!-- CasaEnComú nightly backup — docs/SCAFFOLD.md § 8.4. Install: cp to ~/Library/LaunchAgents/ then
 	     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kenobi.casaencomu-backup.plist
 	     launchd cannot read /Volumes, so the script runs through `ssh localhost` (inherits sshd's Full Disk Access).
 	     launchd does not expand ~, so /bin/sh resolves $HOME for the log; ssh's remote shell expands ~ for the script. -->

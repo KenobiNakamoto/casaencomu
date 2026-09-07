@@ -1,10 +1,10 @@
 #!/bin/zsh
-# Build on this Mac (arm64, like the Air), ship the image over ssh, start it there. SCAFFOLD.md § 7.
+# Build on this Mac (arm64, like the Air), ship the image over ssh, start it there. docs/SCAFFOLD.md § 7.
 # `air` is an ssh alias from ~/.ssh/config; the Air's real hostname never appears here.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-ssh air 'test -f ~/srv/casaencomu/.env' || { echo "deploy: ~/srv/casaencomu/.env is missing on the Air — create it first (SCAFFOLD.md § 8.3)" >&2; exit 1; }
+ssh air 'test -f ~/srv/casaencomu/.env' || { echo "deploy: ~/srv/casaencomu/.env is missing on the Air — create it first (docs/SCAFFOLD.md § 8.3)" >&2; exit 1; }
 ssh air 'docker compose version >/dev/null 2>&1' || { echo "deploy: 'docker compose' is not available on the Air — install the compose plugin first" >&2; exit 1; }
 docker info >/dev/null 2>&1 || { echo "deploy: no Docker daemon on this Mac — start Docker Desktop (or colima start)" >&2; exit 1; }
 

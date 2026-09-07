@@ -1,4 +1,4 @@
-# CasaEnComú — SCAFFOLD.md § 7. On the Air this file lives in ~/srv/casaencomu next to .env (deploy.sh copies it).
+# CasaEnComú — docs/SCAFFOLD.md § 7. On the Air this file lives in ~/srv/casaencomu next to .env (deploy.sh copies it).
 name: casaencomu
 services:
   web:

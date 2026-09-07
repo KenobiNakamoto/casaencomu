@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Nightly encrypted dump of casa.db to iCloud Drive on the Air. SCAFFOLD.md § 8.4.
+# Nightly encrypted dump of casa.db to iCloud Drive on the Air. docs/SCAFFOLD.md § 8.4.
 # Installed at ~/.local/bin/casaencomu-backup.sh; launched by com.kenobi.casaencomu-backup.plist through
 # `ssh localhost` (launchd cannot read /Volumes). `-n` prints the three steps and exits 0, no side effects.
 set -euo pipefail
@@ -19,7 +19,7 @@ if [ "${1:-}" = "-n" ]; then
   exit 0
 fi
 
-[ -s "$PASS" ] || { echo "$(date '+%FT%T') ERROR: passphrase file $PASS is missing or empty — see SCAFFOLD.md § 8.4" >&2; exit 1; }
+[ -s "$PASS" ] || { echo "$(date '+%FT%T') ERROR: passphrase file $PASS is missing or empty — see docs/SCAFFOLD.md § 8.4" >&2; exit 1; }
 mkdir -p "$DEST"
 
 rm -f "$DATA/latest.db"   # VACUUM INTO refuses an existing target

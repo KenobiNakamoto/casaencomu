@@ -22,7 +22,7 @@ From an empty folder to v1 on the Air. Steps in order; each ends with a check. C
 |---|---|---|
 | P1 | A domain on Cloudflare DNS (register at cost, or move a zone) | dash.cloudflare.com |
 | P2 | Zero Trust account, free plan; note the team name | one.dash.cloudflare.com |
-| P3 | `limactl` Full Disk Access on the Air, then enable `com.kenobi.umbrel` | VNC → System Settings; steps in `AIR-SERVER.md` "Reboot survival" |
+| P3 | `limactl` Full Disk Access on the Air, then enable `com.kenobi.umbrel` | VNC → System Settings; steps in `00_docs/AIR-SERVER.md` "Reboot survival" |
 | P4 | Mount `TimeMachine` into Colima (§ 8.0) | `ssh air` — ~5 min node downtime |
 | P5 | Confirm area, member email list (budget is set in the app later, never seeded) | — |
 
@@ -32,7 +32,7 @@ Check: `ssh air 'colima status'` after an `authrestart` shows the VM running and
 ## 0b. Spike — half a day
 
 ```sh
-mkdir -p spike && cd spike
+mkdir -p _local/spike && cd _local/spike
 UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128 Safari/537.36'
 for u in "$IDEALISTA_URL" "$FOTOCASA_URL" "$HABITACLIA_URL"; do
   n=$(echo "$u" | md5); curl -sSL -A "$UA" -o "$n.html" -w "$n %{http_code} %{url_effective}\n" "$u"
@@ -42,7 +42,7 @@ grep -o 'property="og:[a-z:]*" content="[^"]*"' *.html | head -20
 ```
 
 Run from the Pro **and** the Air. Open each page in Safari → Web Inspector too. Record in
-`spike/RESULTS.md`:
+`PORTALS.md`:
 
 | portal | fetch Pro | fetch Air | JSON-LD | other blob | photo host + pattern | hotlink? | lat/lng precision | removed marker |
 |---|---|---|---|---|---|---|---|---|
@@ -63,18 +63,21 @@ pnpm add -D vitest tsx
 ```
 
 `.gitignore` add: `.env`, `.env.*.local`, `node_modules`, `node_modules.nosync`, `.next`,
-`data/`, `spike/*.html`, `memory/`. `.dockerignore`: `node_modules*`, `.next`, `.git`,
-`memory`, `spike`, `data`.
+`data/`, `_local/`, `memory/`. `.dockerignore`: `node_modules*`, `.next`, `.git`, `memory`,
+`_local`, `_archive`, `docs`, `data`.
 
 `next.config.ts`: `output: 'standalone'`, `serverExternalPackages: ['@libsql/client', 'sharp']`.
 
-Tree (v1):
+Tree (v1) — the map with a line per entry is `README.md`:
 
 ```
 CasaEnComú/
-  CLAUDE.md PLAN.md SCAFFOLD.md memory/ _archive/ spike/RESULTS.md
+  README.md CLAUDE.md DESIGN.md      ← front door · agent brief · palette
+  docs/  PLAN.md SCAFFOLD.md WORKPLAN.md PORTALS.md PRIOR-ART.md
   package.json next.config.ts vitest.config.ts compose.yaml Dockerfile deploy.sh .env.example
   air/casaencomu-backup.sh  air/com.kenobi.casaencomu-backup.plist     ← installed by hand on the Air
+  scripts/ingest.mts scripts/build-areas.mjs
+  public/areas.geojson
   src/
     proxy.ts                 ← Access JWT → x-user-email   (Next 16's name for middleware)
     instrumentation.ts       ← schema.sql at boot + hourly recheck loop
@@ -82,11 +85,12 @@ CasaEnComú/
       layout.tsx page.tsx    ← redirect /propiedades
       propiedades/page.tsx propiedades/[id]/page.tsx mapa/page.tsx comparar/page.tsx
       actividad/page.tsx ayuda/page.tsx
-      api/capture/route.ts api/import/route.ts api/photos/[id]/route.ts api/health/route.ts
+      api/capture/route.ts api/import/route.ts api/photos/[id]/route.ts api/markers/route.ts api/health/route.ts
     lib/
       db.ts schema.sql auth.ts url.ts extract.ts photos.ts changes.ts recheck.ts bookmarklet.ts
       __fixtures__/
     components/
+  _local/ memory/ _archive/ data/    ← never committed
 ```
 
 Check: `pnpm dev` serves; `pnpm test` is green on zero tests.
@@ -215,18 +219,12 @@ Server components read the DB; mutations are server actions.
   `useSyncExternalStore`. Roles and hexes: `DESIGN.md`. Never write a raw hex in a component.
 
 
-### What each portal actually serves (measured 2026-09-07)
+### What each portal actually serves
 
-| Portal | Server fetch (`/api/import`) | Where the facts are |
-|---|---|---|
-| Idealista | **403, DataDome** | the `adMultimediasInfo` blob; browser only |
-| Fotocasa / Habitaclia | 200 | their own blobs |
-| Housfy | 200, but an empty SPA shell (410 once withdrawn) | the rendered text; browser only |
-| Vivalta | 200 | `og:description` + the summary line. A withdrawn ad answers **200 with the agency home page** |
-| iad España | 200 | a schema.org `Apartment` + `Offer` graph |
-
-Two of the five cannot be read by a server fetch, which is what the bookmarklet is for. Never
-work around the block: a page Idealista refuses is collected in a real browser or not at all.
+`PORTALS.md` holds the measured table: which portals answer a server fetch, where each one keeps
+the facts, the photo hosts, and what a withdrawn ad looks like. Two of the five can only be read
+in a real browser, which is what the bookmarklet is for. Never work around the block: a page
+Idealista refuses is collected in a real browser or not at all.
 
 ### Filling a dev database from real ads
 
@@ -422,7 +420,7 @@ sqlite3 /tmp/restore.db 'pragma integrity_check; select count(*) from users;'
 
 | phase | criterion |
 |---|---|
-| 0 | `spike/RESULTS.md` filled; P1–P5 done; VM up after `authrestart`; `TimeMachine` visible in the VM |
+| 0 | `PORTALS.md` filled; P1–P5 done; VM up after `authrestart`; `TimeMachine` visible in the VM |
 | 1 | phone on 4G → PIN → `Hola <name>`; virtiofs test passes (or the DB fallback is in place); `docker compose down && up` keeps the row; a backup restores on the Pro |
 | 2 | three real listings imported (bookmarklet where blocked) with photos; repeat → "Ya estaba guardada" |
 | 3 | two members rate from their phones; `/comparar` shows both; map shows all; filters survive reload; budget typed in the app → `Fuera de presupuesto` chip appears, and none before |
