@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Budget } from "@/lib/settings";
-import { BudgetChip, StageChip } from "./chip";
+import { Badge, StageBadge } from "./chip";
 import { fmtEur, fmtNum } from "./format";
 
 /** One row of the list query. */
@@ -14,6 +14,9 @@ export type Listed = {
   neighborhood: string | null;
   cover_id: string | null;
   family_avg: number | null;
+  lat: number | null;
+  lng: number | null;
+  precision: "exact" | "approx" | "none";
 };
 
 export const outOfBudget = (price: number | null, budget: Budget | null) =>
@@ -23,35 +26,50 @@ export function Cover({ id, className }: { id: string | null; className: string 
   // ponytail: plain <img>; next/image would refetch the authenticated route without the Access cookie
   // eslint-disable-next-line @next/next/no-img-element
   if (id) return <img src={`/api/photos/${id}`} alt="" loading="lazy" className={`${className} object-cover`} />;
-  return <div className={`${className} bg-zinc-200`} aria-hidden />;
+  return (
+    <div className={`${className} flex items-center justify-center bg-surface-strong text-muted-soft`} aria-hidden>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 11l9-8 9 8" />
+        <path d="M5 10v10h5v-6h4v6h5V10" />
+      </svg>
+    </div>
+  );
 }
 
+const score = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/** Airbnb-style card: the photo is the card; text sits below with no border. */
 export function PropertyCard({ p, budget }: { p: Listed; budget: Budget | null }) {
+  const meta = [p.neighborhood, p.area_m2 !== null && fmtNum(p.area_m2, "m²"), p.rooms !== null && `${p.rooms} hab.`]
+    .filter(Boolean)
+    .join(" · ");
+  const perM2 = p.price_eur !== null && p.area_m2 ? fmtEur(Math.round(p.price_eur / p.area_m2)) : null;
   return (
-    <li className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+    <li data-property={p.id} className="group">
       <Link href={`/propiedades/${p.id}`} className="block">
-        <Cover id={p.cover_id} className="aspect-[4/3] w-full" />
-        <div className="space-y-1.5 p-3">
-          <h2 className="line-clamp-2 font-medium leading-snug">{p.title}</h2>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-lg font-semibold">{fmtEur(p.price_eur, "Sin precio")}</span>
-            {outOfBudget(p.price_eur, budget) && <BudgetChip />}
+        <div className="relative aspect-[20/19] overflow-hidden rounded-card bg-surface-soft">
+          <Cover id={p.cover_id} className="h-full w-full transition duration-300 group-hover:scale-[1.03]" />
+          <div className="absolute left-3 top-3">
+            <StageBadge stage={p.stage} />
           </div>
-          <p className="text-sm text-zinc-600">
-            {[
-              p.area_m2 !== null && fmtNum(p.area_m2, "m²"),
-              p.rooms !== null && `${p.rooms} hab.`,
-              p.neighborhood,
-            ]
-              .filter(Boolean)
-              .join(" · ") || "Sin datos"}
+          {p.family_avg !== null && (
+            <div className="absolute right-3 top-3">
+              <Badge>★ {score(p.family_avg)}</Badge>
+            </div>
+          )}
+          {outOfBudget(p.price_eur, budget) && (
+            <div className="absolute bottom-3 left-3">
+              <Badge className="text-error">Fuera de presupuesto</Badge>
+            </div>
+          )}
+        </div>
+        <div className="mt-3 space-y-0.5">
+          <h2 className="truncate text-[15px] font-medium text-ink">{p.title}</h2>
+          <p className="truncate text-sm text-muted">{meta || "Sin datos"}</p>
+          <p className="text-[15px] text-ink">
+            <span className="font-semibold">{fmtEur(p.price_eur, "Sin precio")}</span>
+            {perM2 && <span className="text-muted"> · {perM2}/m²</span>}
           </p>
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <StageChip stage={p.stage} />
-            <span className="text-sm text-zinc-600">
-              {p.family_avg !== null ? `★ ${p.family_avg.toLocaleString("es-ES")}` : "Sin valorar"}
-            </span>
-          </div>
         </div>
       </Link>
     </li>

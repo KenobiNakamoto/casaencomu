@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Cover } from "@/components/propiedades/card";
 import { Chip, StageChip } from "@/components/propiedades/chip";
+import { input } from "@/components/propiedades/filter-bar";
 import { fmtDate, fmtDateTime, fmtEur, fmtNum, SIN_DATOS, siNo } from "@/components/propiedades/format";
 import { RatingForm } from "@/components/propiedades/rating-form";
 import { currentUser } from "@/lib/auth";
@@ -74,10 +75,12 @@ function describe(kind: string, p: Record<string, unknown>) {
   }
 }
 
-const h2 = "text-lg font-semibold";
-const section = "space-y-3";
-const button = "h-11 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white";
-const cell = "border-b border-zinc-100 py-1.5 pr-3 align-top";
+const h2 = "text-[22px] font-medium leading-tight";
+const section = "space-y-4 py-8";
+const primary = "h-12 w-full rounded-lg bg-rausch px-6 text-base font-medium text-white transition hover:bg-rausch-active";
+const cell = "border-b border-hairline-soft py-2 pr-3 align-top";
+const initial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
+const score = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 export default async function PropiedadPage({
   params,
@@ -118,11 +121,9 @@ export default async function PropiedadPage({
   const memberRows = members.rows as unknown as Member[];
   const m = matrix(ratingRows, memberRows.map((u) => u.id), DIMENSIONS);
   const family = familyAverage(ratingRows);
+  const perM2 = p.price_eur !== null && p.area_m2 ? fmtEur(Math.round(p.price_eur / p.area_m2)) : null;
 
   const facts: [string, string][] = [
-    ["Precio", fmtEur(p.price_eur)],
-    ["Honorarios", fmtEur(p.fees_eur)],
-    ["€/m²", p.price_eur !== null && p.area_m2 ? `${fmtEur(Math.round(p.price_eur / p.area_m2))}/m²` : SIN_DATOS],
     ["Superficie", fmtNum(p.area_m2, "m²")],
     ["Habitaciones", fmtNum(p.rooms)],
     ["Baños", fmtNum(p.bathrooms)],
@@ -132,229 +133,278 @@ export default async function PropiedadPage({
     ["Parking", siNo(p.parking)],
     ["Estado", p.condition ?? SIN_DATOS],
     ["Certificado energético", p.energy_rating ?? SIN_DATOS],
+    ["Honorarios", fmtEur(p.fees_eur)],
     ["Barrio", p.neighborhood ?? SIN_DATOS],
     ["Dirección", p.address_text ? `${p.address_text} ${PRECISION[p.address_precision] ?? ""}`.trim() : SIN_DATOS],
   ];
+  const summary = [p.neighborhood, p.area_m2 !== null && fmtNum(p.area_m2, "m²"), p.rooms !== null && `${p.rooms} hab.`, p.bathrooms !== null && `${p.bathrooms} baños`]
+    .filter(Boolean)
+    .join(" · ");
+
+  // Photo grid on md+: 1 large + up to 4; fewer photos get a narrower grid.
+  const n = photoIds.length;
+  const shown = n >= 5 ? 5 : n >= 3 ? 3 : n;
+  const gridCols = n >= 5 ? "md:grid-cols-4 md:grid-rows-2" : n >= 3 ? "md:grid-cols-3 md:grid-rows-2" : "md:grid-cols-2 md:grid-rows-1";
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-4">
-      <Link href="/propiedades" className="text-sm text-zinc-600 underline">
-        ← Propiedades
+    <div className="mx-auto max-w-[1120px] px-4 py-5 sm:px-6 lg:px-10">
+      <Link href="/propiedades" className="inline-flex h-9 items-center gap-1.5 rounded-full px-2 text-sm font-medium text-ink transition hover:bg-surface-soft">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M15 5l-7 7 7 7" />
+        </svg>
+        Propiedades
       </Link>
 
       {(Array.isArray(sp.dup) ? sp.dup[0] : sp.dup) === "1" && (
-        <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Ya estaba guardada.</p>
+        <p className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Ya estaba guardada.</p>
       )}
 
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold leading-tight">{p.title}</h1>
-          <div className="flex flex-wrap items-center gap-2 text-zinc-600">
-            <span className="text-xl font-semibold text-zinc-900">{fmtEur(p.price_eur, "Sin precio")}</span>
-            {p.neighborhood && <span>· {p.neighborhood}</span>}
-            <StageChip stage={p.stage} />
-            <span>· {family !== null ? `★ ${family.toLocaleString("es-ES")}` : "Sin valorar"}</span>
-          </div>
+      <header className="mt-4 space-y-1">
+        <h1 className="text-[22px] font-medium leading-tight sm:text-[26px]">{p.title}</h1>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] text-body">
+          {summary && <span>{summary}</span>}
+          <StageChip stage={p.stage} />
+          <span className="text-muted">{family !== null ? `★ ${score(family)}` : "Sin valorar"}</span>
         </div>
-        <form action={setStageAction.bind(null, p.id)} className="flex items-end gap-2">
-          <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600">
-            Etapa
-            {/* key: React resets the form after the action but never re-applies a changed defaultValue on a <select> */}
-            <select key={p.stage} name="etapa" defaultValue={p.stage} className="h-11 rounded-md border border-zinc-300 px-2 text-sm text-zinc-900">
-              {STAGES.map((s) => (
-                <option key={s} value={s}>
-                  {STAGE_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="submit" className={button}>
-            Cambiar
-          </button>
-        </form>
       </header>
 
-      <section className={section}>
-        {photoIds.length === 0 ? (
-          <p className="text-sm text-zinc-600">Sin fotos.</p>
-        ) : (
-          <div className="flex snap-x gap-2 overflow-x-auto pb-2">
+      {photoIds.length > 0 && (
+        <section className="mt-5">
+          <div className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 no-scrollbar md:hidden">
             {photoIds.map((pid) => (
-              <Cover key={pid} id={pid} className="h-56 w-auto shrink-0 snap-start rounded-md sm:h-72" />
+              <Cover key={pid} id={pid} className="aspect-[4/3] w-[86vw] shrink-0 snap-center rounded-card" />
             ))}
           </div>
-        )}
-      </section>
-
-      <section className={section}>
-        <h2 className={h2}>Datos</h2>
-        <table className="w-full text-sm">
-          <tbody>
-            {facts.map(([k, val]) => (
-              <tr key={k}>
-                <th scope="row" className={`${cell} w-44 text-left font-medium text-zinc-600`}>
-                  {k}
-                </th>
-                <td className={cell}>{val}</td>
-              </tr>
+          <div className={`hidden gap-2 overflow-hidden rounded-card md:grid md:h-[420px] ${gridCols}`}>
+            {photoIds.slice(0, shown).map((pid, i) => (
+              <Cover key={pid} id={pid} className={`h-full w-full ${i === 0 && n >= 3 ? "col-span-2 row-span-2" : ""}`} />
             ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section className={section}>
-        <h2 className={h2}>Fuentes</h2>
-        {sourceRows.length === 0 ? (
-          <p className="text-sm text-zinc-600">{SIN_DATOS}</p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {sourceRows.map((s) => {
-              const check = s.via === "bookmarklet" || s.availability === "unknown";
-              return (
-                <li key={s.url_original} className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium capitalize">{s.portal}</span>
-                  {/^https?:\/\//.test(s.url_original) && (
-                    <a href={s.url_original} target="_blank" rel="noopener noreferrer" className="underline">
-                      Ver anuncio
-                    </a>
-                  )}
-                  <span className="text-zinc-600">vía {s.via === "bookmarklet" ? "marcador" : s.via}</span>
-                  <Chip tone={s.availability === "active" ? "green" : s.availability === "unknown" ? "amber" : "red"}>
-                    {AVAILABILITY[s.availability] ?? s.availability}
-                  </Chip>
-                  <span className="text-zinc-600">Comprobado: {s.last_checked_at ? fmtDateTime(s.last_checked_at) : "nunca"}</span>
-                  {check && (
-                    <span className="text-amber-800">
-                      <Chip tone="amber">Comprobar</Chip> Abre el anuncio y vuelve a pulsar el marcador.
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      <section className={section}>
-        <h2 className={h2}>Descripción</h2>
-        {p.description ? (
-          <p className="whitespace-pre-line text-sm leading-relaxed">{p.description}</p>
-        ) : (
-          <p className="text-sm text-zinc-600">Sin descripción.</p>
-        )}
-      </section>
-
-      <section className={section}>
-        <h2 className={h2}>Historial de precio</h2>
-        {priceHistory.length === 0 ? (
-          <p className="text-sm text-zinc-600">Sin cambios de precio.</p>
-        ) : (
-          <ul className="space-y-1 text-sm">
-            {priceHistory.map((e, i) => (
-              <li key={i}>
-                <span className="text-zinc-600">{fmtDate(e.created_at)}:</span> {describe(e.kind, e.payload)}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className={section}>
-        <h2 className={h2}>Valoraciones</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                <th className={`${cell} text-left font-medium text-zinc-600`}>Dimensión</th>
-                {memberRows.map((u) => (
-                  <th key={u.id} className={`${cell} text-center font-medium ${u.id === user.id ? "text-zinc-900" : "text-zinc-600"}`}>
-                    {u.name}
-                  </th>
+          </div>
+          {n > shown && (
+            <details className="mt-3">
+              <summary className="inline-flex h-10 cursor-pointer items-center rounded-lg border border-ink px-4 text-sm font-medium text-ink transition hover:bg-surface-soft">
+                Ver todas las fotos ({n})
+              </summary>
+              <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
+                {photoIds.map((pid) => (
+                  <Cover key={pid} id={pid} className="aspect-[4/3] w-full rounded-lg" />
                 ))}
-                <th className={`${cell} text-center font-medium text-zinc-600`}>Media</th>
-              </tr>
-            </thead>
-            <tbody>
-              {DIMENSIONS.map((dim) => {
-                const dimRows = ratingRows.filter((r) => r.dimension === dim);
-                return (
-                  <tr key={dim}>
-                    <th scope="row" className={`${cell} text-left font-normal`}>
-                      {DIMENSION_LABELS[dim]}
+              </div>
+            </details>
+          )}
+        </section>
+      )}
+
+      <div className="mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-16">
+        {/* Side card: price, stage, your rating. Under the header on phones, sticky right rail on lg. */}
+        <aside className="lg:col-start-2 lg:row-start-1 lg:self-start lg:sticky lg:top-28">
+          <div className="space-y-5 rounded-card border border-hairline bg-white p-6 shadow-tier">
+            <div>
+              <p className="text-[22px] font-semibold leading-tight">{fmtEur(p.price_eur, "Sin precio")}</p>
+              <p className="text-sm text-muted">
+                {perM2 ? `${perM2}/m²` : SIN_DATOS}
+                {family !== null && ` · ★ ${score(family)} en familia`}
+              </p>
+            </div>
+            <form action={setStageAction.bind(null, p.id)} className="space-y-2">
+              <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted">
+                Etapa
+                {/* key: React resets the form after the action but never re-applies a changed defaultValue on a <select> */}
+                <select key={p.stage} name="etapa" defaultValue={p.stage} className={input}>
+                  {STAGES.map((s) => (
+                    <option key={s} value={s}>
+                      {STAGE_LABELS[s]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="submit" className={primary}>
+                Guardar etapa
+              </button>
+            </form>
+            <div className="border-t border-hairline-soft pt-5">
+              <p className="mb-3 text-sm font-semibold text-ink">Tu valoración</p>
+              <RatingForm propertyId={p.id} current={m[user.id]} />
+            </div>
+          </div>
+        </aside>
+
+        <div className="mt-8 divide-y divide-hairline-soft lg:col-start-1 lg:row-start-1 lg:mt-0">
+          <section className="space-y-4 pb-8">
+            <h2 className={h2}>Datos</h2>
+            <dl className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+              {facts.map(([k, val]) => (
+                <div key={k} className="flex justify-between gap-4 border-b border-hairline-soft py-2.5 text-sm">
+                  <dt className="text-muted">{k}</dt>
+                  <dd className="text-right font-medium text-ink">{val}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          <section className={section}>
+            <h2 className={h2}>Descripción</h2>
+            {p.description ? (
+              <p className="whitespace-pre-line text-[15px] leading-relaxed text-body">{p.description}</p>
+            ) : (
+              <p className="text-sm text-muted">Sin descripción.</p>
+            )}
+          </section>
+
+          <section className={section}>
+            <h2 className={h2}>Fuentes</h2>
+            {sourceRows.length === 0 ? (
+              <p className="text-sm text-muted">{SIN_DATOS}</p>
+            ) : (
+              <ul className="space-y-3 text-sm">
+                {sourceRows.map((s) => {
+                  const check = s.via === "bookmarklet" || s.availability === "unknown";
+                  return (
+                    <li key={s.url_original} className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium capitalize text-ink">{s.portal}</span>
+                      {/^https?:\/\//.test(s.url_original) && (
+                        <a href={s.url_original} target="_blank" rel="noopener noreferrer" className="font-medium text-ink underline underline-offset-4">
+                          Ver anuncio
+                        </a>
+                      )}
+                      <span className="text-muted">vía {s.via === "bookmarklet" ? "marcador" : s.via}</span>
+                      <Chip tone={s.availability === "active" ? "green" : s.availability === "unknown" ? "amber" : "red"}>
+                        {AVAILABILITY[s.availability] ?? s.availability}
+                      </Chip>
+                      <span className="text-muted">Comprobado: {s.last_checked_at ? fmtDateTime(s.last_checked_at) : "nunca"}</span>
+                      {check && (
+                        <span className="text-amber-800">
+                          <Chip tone="amber">Comprobar</Chip> Abre el anuncio y vuelve a pulsar el marcador.
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section className={section}>
+            <h2 className={h2}>Historial de precio</h2>
+            {priceHistory.length === 0 ? (
+              <p className="text-sm text-muted">Sin cambios de precio.</p>
+            ) : (
+              <ul className="space-y-1 text-sm">
+                {priceHistory.map((e, i) => (
+                  <li key={i}>
+                    <span className="text-muted">{fmtDate(e.created_at)}:</span> {describe(e.kind, e.payload)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className={section}>
+            <h2 className={h2}>Valoraciones</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className={`${cell} text-left font-medium text-muted`}>Dimensión</th>
+                    {memberRows.map((u) => (
+                      <th key={u.id} className={`${cell} text-center font-medium ${u.id === user.id ? "text-ink" : "text-muted"}`}>
+                        {u.name}
+                      </th>
+                    ))}
+                    <th className={`${cell} text-center font-medium text-muted`}>Media</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {DIMENSIONS.map((dim) => {
+                    const dimRows = ratingRows.filter((r) => r.dimension === dim);
+                    return (
+                      <tr key={dim}>
+                        <th scope="row" className={`${cell} text-left font-normal text-body`}>
+                          {DIMENSION_LABELS[dim]}
+                        </th>
+                        {memberRows.map((u) => (
+                          <td key={u.id} className={`${cell} text-center`}>
+                            {m[u.id][dim] ?? "—"}
+                          </td>
+                        ))}
+                        <td className={`${cell} text-center font-medium`}>{familyAverage(dimRows)?.toLocaleString("es-ES") ?? "—"}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr>
+                    <th scope="row" className={`${cell} text-left font-medium`}>
+                      Media
                     </th>
                     {memberRows.map((u) => (
-                      <td key={u.id} className={`${cell} text-center`}>
-                        {m[u.id][dim] ?? "—"}
+                      <td key={u.id} className={`${cell} text-center font-medium`}>
+                        {memberAverage(ratingRows, u.id)?.toLocaleString("es-ES") ?? "—"}
                       </td>
                     ))}
-                    <td className={`${cell} text-center font-medium`}>{familyAverage(dimRows)?.toLocaleString("es-ES") ?? "—"}</td>
+                    <td className={`${cell} text-center font-semibold`}>{family?.toLocaleString("es-ES") ?? "—"}</td>
                   </tr>
-                );
-              })}
-              <tr>
-                <th scope="row" className={`${cell} text-left font-medium`}>
-                  Media
-                </th>
-                {memberRows.map((u) => (
-                  <td key={u.id} className={`${cell} text-center font-medium`}>
-                    {memberAverage(ratingRows, u.id)?.toLocaleString("es-ES") ?? "—"}
-                  </td>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className={section}>
+            <h2 className={h2}>Comentarios</h2>
+            {commentRows.length === 0 ? (
+              <p className="text-sm text-muted">Sin comentarios.</p>
+            ) : (
+              <ul className="space-y-5">
+                {commentRows.map((c, i) => (
+                  <li key={i} className="flex gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-strong text-sm font-semibold text-ink" aria-hidden>
+                      {initial(c.name)}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-sm">
+                        <span className="font-semibold text-ink">{c.name}</span>
+                        <span className="text-muted"> · {fmtDateTime(c.created_at)}</span>
+                      </div>
+                      <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-body">{c.body}</p>
+                    </div>
+                  </li>
                 ))}
-                <td className={`${cell} text-center font-semibold`}>{family?.toLocaleString("es-ES") ?? "—"}</td>
-              </tr>
-            </tbody>
-          </table>
+              </ul>
+            )}
+            <form action={commentAction.bind(null, p.id)} className="space-y-3">
+              <textarea
+                name="body"
+                required
+                rows={3}
+                maxLength={4000}
+                placeholder="Escribe un comentario…"
+                className="w-full rounded-lg border border-hairline p-3 text-sm transition focus:border-ink focus:outline-none"
+              />
+              <button type="submit" className="h-12 rounded-lg bg-ink px-6 text-base font-medium text-white transition hover:bg-black">
+                Comentar
+              </button>
+            </form>
+          </section>
+
+          <section className={section}>
+            <h2 className={h2}>Actividad</h2>
+            {eventRows.length === 0 ? (
+              <p className="text-sm text-muted">Sin actividad.</p>
+            ) : (
+              <ol className="relative space-y-4 border-l border-hairline pl-5 text-sm">
+                {eventRows.map((e, i) => (
+                  <li key={i} className="relative">
+                    <span className="absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-rausch" aria-hidden />
+                    <div className="text-muted">
+                      {fmtDateTime(e.created_at)}
+                      {e.actor && ` · ${e.actor}`}
+                    </div>
+                    <div className="text-body">{describe(e.kind, e.payload)}</div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
         </div>
-        <h3 className="pt-2 font-medium">Tu valoración</h3>
-        <RatingForm propertyId={p.id} current={m[user.id]} />
-      </section>
-
-      <section className={section}>
-        <h2 className={h2}>Comentarios</h2>
-        {commentRows.length === 0 ? (
-          <p className="text-sm text-zinc-600">Sin comentarios.</p>
-        ) : (
-          <ul className="space-y-3">
-            {commentRows.map((c, i) => (
-              <li key={i} className="rounded-md bg-zinc-50 p-3 text-sm">
-                <div className="mb-1 text-xs text-zinc-600">
-                  <span className="font-medium text-zinc-900">{c.name}</span> · {fmtDateTime(c.created_at)}
-                </div>
-                <p className="whitespace-pre-line">{c.body}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-        <form action={commentAction.bind(null, p.id)} className="space-y-2">
-          <textarea
-            name="body"
-            required
-            rows={3}
-            maxLength={4000}
-            placeholder="Escribe un comentario…"
-            className="w-full rounded-md border border-zinc-300 p-2 text-sm"
-          />
-          <button type="submit" className={button}>
-            Comentar
-          </button>
-        </form>
-      </section>
-
-      <section className={section}>
-        <h2 className={h2}>Actividad</h2>
-        {eventRows.length === 0 ? (
-          <p className="text-sm text-zinc-600">Sin actividad.</p>
-        ) : (
-          <ol className="space-y-1 text-sm">
-            {eventRows.map((e, i) => (
-              <li key={i}>
-                <span className="text-zinc-600">{fmtDateTime(e.created_at)}</span> · {describe(e.kind, e.payload)}
-                {e.actor && <span className="text-zinc-600"> · {e.actor}</span>}
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+      </div>
     </div>
   );
 }

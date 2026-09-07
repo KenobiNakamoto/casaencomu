@@ -1,6 +1,8 @@
 import Link from "next/link";
+import Mapa, { type MapMarker } from "@/components/mapa/Mapa";
 import { PropertyCard, type Listed } from "@/components/propiedades/card";
-import { FilterBar, type FilterValues } from "@/components/propiedades/filter-bar";
+import { STAGE_DOT } from "@/components/propiedades/chip";
+import { FilterBar, input, type FilterValues } from "@/components/propiedades/filter-bar";
 import { fmtEur } from "@/components/propiedades/format";
 import { RowsTable } from "@/components/propiedades/rows";
 import { db } from "@/lib/db";
@@ -19,10 +21,10 @@ const ORDER: Record<string, string> = {
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 const posInt = (s: string) => (/^\d+$/.test(s) ? Number(s) : null);
 
-const field = "h-10 w-28 rounded-md border border-zinc-300 px-2 text-sm";
-const button = "h-10 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white";
-const chipLink = (active: boolean) =>
-  `rounded-full border px-3 py-1 text-sm ${active ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300 text-zinc-700"}`;
+const pill = (active: boolean) =>
+  `flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 text-sm transition ${
+    active ? "border-ink bg-ink font-medium text-white" : "border-hairline text-body hover:border-ink"
+  }`;
 
 export default async function PropiedadesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
@@ -61,6 +63,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
 
   const sql = `SELECT * FROM (
       SELECT p.id, p.title, p.price_eur, p.area_m2, p.rooms, p.stage, p.neighborhood, p.created_at,
+        p.lat, p.lng, p.address_precision AS precision,
         (SELECT id FROM photos WHERE property_id = p.id ORDER BY position LIMIT 1) AS cover_id,
         (SELECT ROUND(AVG(score), 1) FROM ratings WHERE property_id = p.id) AS family_avg
       FROM properties p ${where.length ? "WHERE " + where.join(" AND ") : ""}
@@ -80,6 +83,22 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   const countByStage = Object.fromEntries(counts.rows.map((r) => [String(r.stage), Number(r.n)]));
   const total = Object.values(countByStage).reduce((a, b) => a + b, 0);
   const neighborhoods = barrios.rows.map((r) => String(r.neighborhood));
+  const markers: MapMarker[] = items
+    .filter((p) => p.lat !== null && p.lng !== null && p.precision !== "none")
+    .map((p) => ({
+      id: p.id,
+      lat: p.lat as number,
+      lng: p.lng as number,
+      precision: p.precision as "exact" | "approx",
+      price_eur: p.price_eur,
+      title: p.title,
+      rooms: p.rooms,
+      area_m2: p.area_m2,
+      neighborhood: p.neighborhood,
+      stage: p.stage as Stage,
+      cover: p.cover_id ? `/api/photos/${p.cover_id}` : null,
+    }));
+  const activeFilters = [precio && (v.precioMin || v.precioMax), v.hab, v.m2, v.barrio, v.puntuacion].filter(Boolean).length;
 
   // Links that keep the live filters and change one key.
   const current: Record<string, string> = {
@@ -98,85 +117,139 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
     const s = q.toString();
     return s ? `/propiedades?${s}` : "/propiedades";
   };
+  const mapHref = v.etapa ? `/mapa?etapa=${v.etapa}` : "/mapa";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-4">
-      <h1 className="text-2xl font-semibold">Propiedades</h1>
-
+    <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10">
       {first(sp.dup) === "1" && (
-        <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Ya estaba guardada.</p>
+        <p className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Ya estaba guardada.</p>
       )}
-      {first(sp.error) && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{first(sp.error)}</p>}
+      {first(sp.error) && <p className="mt-4 rounded-lg bg-rausch-tint px-4 py-3 text-sm text-error">{first(sp.error)}</p>}
 
-      <div className="flex flex-wrap gap-6">
-        <form method="post" action="/api/import" className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600">
-            Añadir enlace
+      {/* Toolbar: the "search bar" adds a listing; filters sit behind one pill. */}
+      <div className="flex flex-wrap items-center gap-3 py-4 md:py-6">
+        <form method="post" action="/api/import" className="flex h-14 min-w-0 flex-1 items-center rounded-full border border-hairline bg-white pl-5 pr-2 shadow-tier transition focus-within:border-ink sm:h-16 sm:pl-6">
+          <label className="flex min-w-0 flex-1 flex-col justify-center">
+            <span className="text-xs font-semibold text-ink">Añadir enlace</span>
             <input
               type="url"
               name="url"
               required
-              placeholder="https://www.idealista.com/inmueble/…"
-              className="h-10 w-72 rounded-md border border-zinc-300 px-2 text-sm"
+              placeholder="Pega un anuncio de Idealista, Fotocasa o Habitaclia"
+              className="w-full truncate bg-transparent text-sm text-ink placeholder:text-muted-soft focus:outline-none"
             />
           </label>
-          <button type="submit" className={button}>
-            Añadir
+          <button
+            type="submit"
+            aria-label="Añadir"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rausch text-white transition hover:bg-rausch-active sm:h-12 sm:w-12"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+              <path d="M12 5v14M5 12h14" />
+            </svg>
           </button>
         </form>
 
-        <form action={setBudgetAction} className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600">
-            Presupuesto mín.
-            <input type="number" name="min" min={0} step={1000} inputMode="numeric" required defaultValue={budget?.min} className={field} />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600">
-            Presupuesto máx.
-            <input type="number" name="max" min={0} step={1000} inputMode="numeric" required defaultValue={budget?.max} className={field} />
-          </label>
-          <button type="submit" className={button}>
-            Guardar
-          </button>
-          <span className="h-10 leading-10 text-sm text-zinc-600">
-            {budget ? `${fmtEur(budget.min)} – ${fmtEur(budget.max)}` : "Sin presupuesto"}
-          </span>
-        </form>
+        <details className="group w-full md:w-auto">
+          <summary className="flex h-12 w-fit cursor-pointer items-center gap-2 rounded-full border border-hairline px-4 text-sm font-medium text-ink transition hover:border-ink group-open:border-ink">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+              <circle cx="16" cy="7" r="2" />
+              <circle cx="10" cy="17" r="2" />
+            </svg>
+            Filtros
+            {activeFilters > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1.5 text-xs font-semibold text-white">{activeFilters}</span>
+            )}
+          </summary>
+          <div className="mt-3 w-full space-y-6 rounded-card border border-hairline bg-white p-5 shadow-tier md:absolute md:left-4 md:right-4 md:z-10 md:mt-2 md:w-auto lg:left-10 lg:right-10">
+            <FilterBar values={v} neighborhoods={neighborhoods} stages={STAGES.map((s) => [s, STAGE_LABELS[s]])} />
+            <form action={setBudgetAction} className="border-t border-hairline-soft pt-5">
+              <p className="mb-3 text-sm font-semibold text-ink">Presupuesto familiar</p>
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted">
+                  Mínimo
+                  <input type="number" name="min" min={0} step={1000} inputMode="numeric" required defaultValue={budget?.min} placeholder="€" className={`${input} w-36`} />
+                </label>
+                <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted">
+                  Máximo
+                  <input type="number" name="max" min={0} step={1000} inputMode="numeric" required defaultValue={budget?.max} placeholder="€" className={`${input} w-36`} />
+                </label>
+                <button type="submit" className="h-12 rounded-lg border border-ink px-5 text-sm font-medium text-ink transition hover:bg-surface-soft">
+                  Guardar
+                </button>
+              </div>
+            </form>
+          </div>
+        </details>
       </div>
 
-      <FilterBar values={v} neighborhoods={neighborhoods} stages={STAGES.map((s) => [s, STAGE_LABELS[s]])} />
-
-      <nav className="flex flex-wrap items-center gap-2" aria-label="Etapas">
-        <Link href={href({ etapa: "" })} className={chipLink(v.etapa === "")}>
-          Todas ({total})
+      {/* Stage strip + result line + view toggle */}
+      <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10" aria-label="Etapas">
+        <Link href={href({ etapa: "" })} className={pill(v.etapa === "")}>
+          Todas <span className={v.etapa === "" ? "text-white/70" : "text-muted"}>{total}</span>
         </Link>
         {STAGES.map((s) => (
-          <Link key={s} href={href({ etapa: s })} className={chipLink(v.etapa === s)}>
-            {STAGE_LABELS[s]} ({countByStage[s] ?? 0})
+          <Link key={s} href={href({ etapa: s })} className={pill(v.etapa === s)}>
+            <span className={`h-2 w-2 rounded-full ${STAGE_DOT[s]}`} aria-hidden />
+            {STAGE_LABELS[s]} <span className={v.etapa === s ? "text-white/70" : "text-muted"}>{countByStage[s] ?? 0}</span>
           </Link>
         ))}
-        <span className="ml-auto flex gap-1 text-sm">
-          <Link href={href({ vista: "" })} className={chipLink(v.vista === "galeria")}>
-            Galería
-          </Link>
-          <Link href={href({ vista: "filas" })} className={chipLink(v.vista === "filas")}>
-            Filas
-          </Link>
-        </span>
       </nav>
 
-      {items.length === 0 ? (
-        <p className="py-12 text-center text-zinc-600">
-          {total === 0 ? "Todavía no hay propiedades. Añade un enlace o usa el marcador." : "Ninguna propiedad coincide con los filtros."}
+      <div className="flex flex-wrap items-center justify-between gap-3 py-4">
+        <p className="text-sm text-muted">
+          <span className="font-medium text-ink">{items.length}</span> {items.length === 1 ? "propiedad" : "propiedades"}
+          {budget ? ` · Presupuesto ${fmtEur(budget.min)} – ${fmtEur(budget.max)}` : " · Sin presupuesto"}
         </p>
-      ) : v.vista === "filas" ? (
-        <RowsTable items={items} budget={budget} />
-      ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((p) => (
-            <PropertyCard key={p.id} p={p} budget={budget} />
-          ))}
-        </ul>
-      )}
+        <div className="flex rounded-full border border-hairline p-0.5 text-sm">
+          <Link href={href({ vista: "" })} className={`rounded-full px-3 py-1 ${v.vista === "galeria" ? "bg-ink font-medium text-white" : "text-body"}`}>
+            Galería
+          </Link>
+          <Link href={href({ vista: "filas" })} className={`rounded-full px-3 py-1 ${v.vista === "filas" ? "bg-ink font-medium text-white" : "text-body"}`}>
+            Filas
+          </Link>
+        </div>
+      </div>
+
+      {/* Desktop: cards left, sticky map right. Phone: list, and a floating pill to the map. */}
+      <div className="pb-10 split:grid split:grid-cols-[minmax(0,1fr)_minmax(380px,42%)] split:gap-8">
+        <section>
+          {items.length === 0 ? (
+            <div className="rounded-card border border-hairline px-6 py-16 text-center">
+              <p className="text-lg font-medium text-ink">
+                {total === 0 ? "Todavía no hay propiedades" : "Ninguna propiedad coincide con los filtros"}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {total === 0 ? "Pega un enlace arriba o usa el marcador desde Ayuda." : "Prueba a quitar algún filtro."}
+              </p>
+            </div>
+          ) : v.vista === "filas" ? (
+            <RowsTable items={items} budget={budget} />
+          ) : (
+            <ul className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 split:grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3">
+              {items.map((p) => (
+                <PropertyCard key={p.id} p={p} budget={budget} />
+              ))}
+            </ul>
+          )}
+        </section>
+        <aside className="hidden split:block">
+          <div className="sticky top-[104px] h-[calc(100dvh-128px)] overflow-hidden rounded-card border border-hairline">
+            <Mapa markers={markers} embedded />
+          </div>
+        </aside>
+      </div>
+
+      <Link
+        href={mapHref}
+        className="fixed bottom-20 left-1/2 z-10 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-white shadow-tier transition hover:bg-black split:hidden"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />
+        </svg>
+        Mapa
+      </Link>
     </div>
   );
 }

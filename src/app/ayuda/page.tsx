@@ -12,57 +12,58 @@ export default async function AyudaPage() {
   // React 19 rewrites any `javascript:` href to a throw, so the anchor is emitted as raw HTML.
   // Safe: buildBookmarklet percent-encodes the code, so no quote or angle bracket reaches the attribute.
   const link =
-    `<a href="${bookmarklet}" class="inline-block rounded-lg bg-zinc-900 px-4 py-3 text-white select-none">` +
+    `<a href="${bookmarklet}" class="inline-flex h-12 items-center gap-2 rounded-lg bg-rausch px-5 font-medium text-white select-none">` +
     "📌 Guardar en CasaEnComú</a>";
 
+  const h2 = "text-lg font-medium";
   return (
-    <div className="mx-auto max-w-2xl space-y-10 px-4 py-6">
-      <h1 className="text-2xl font-semibold">Ayuda</h1>
+    <div className="mx-auto max-w-2xl divide-y divide-hairline-soft px-4 py-6 sm:px-6">
+      <h1 className="pb-6 text-[22px] font-medium">Ayuda</h1>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Guardar desde el navegador</h2>
-        <p>Arrástralo a la barra de marcadores (no hagas clic aquí):</p>
+      <section className="space-y-3 py-8">
+        <h2 className={h2}>Guardar desde el navegador</h2>
+        <p className="text-body">Arrástralo a la barra de marcadores (no hagas clic aquí):</p>
         <p dangerouslySetInnerHTML={{ __html: link }} />
-        <p className="text-sm text-zinc-600">
+        <p className="text-sm text-muted">
           Después, abre un anuncio y pulsa el marcador. Se abre una pestaña con el piso guardado.
         </p>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">En el iPhone (Safari)</h2>
-        <ol className="list-decimal space-y-2 pl-5">
+      <section className="space-y-3 py-8">
+        <h2 className={h2}>En el iPhone (Safari)</h2>
+        <ol className="list-decimal space-y-2 pl-5 text-body">
           <li>Guarda cualquier página en Favoritos: botón Compartir → «Añadir marcador».</li>
           <li>Abre Marcadores → «Editar» y toca ese marcador.</li>
           <li>Cámbiale el nombre a «Guardar en CasaEnComú» y sustituye la dirección por el código de abajo.</li>
           <li>Abre un anuncio, toca la barra de direcciones y elige el marcador.</li>
         </ol>
-        <p className="text-sm text-zinc-600">Mantén pulsado el cuadro → «Seleccionar todo» → «Copiar».</p>
+        <p className="text-sm text-muted">Mantén pulsado el cuadro → «Seleccionar todo» → «Copiar».</p>
         {/* ponytail: no select-on-focus client component; long-press → Seleccionar todo works on iOS */}
         <textarea
           readOnly
           value={bookmarklet}
           rows={4}
-          className="w-full rounded-lg border border-zinc-300 p-2 font-mono text-xs break-all"
+          className="w-full rounded-lg border border-hairline p-3 font-mono text-xs break-all focus:border-ink focus:outline-none"
         />
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Cómo añadir un piso</h2>
-        <p>
-          <strong>Fotocasa o Habitaclia:</strong> copia el enlace del anuncio y pégalo en{" "}
-          <Link href="/propiedades" className="underline">
+      <section className="space-y-3 py-8">
+        <h2 className={h2}>Cómo añadir un piso</h2>
+        <p className="text-body">
+          <strong className="text-ink">Fotocasa o Habitaclia:</strong> copia el enlace del anuncio y pégalo en{" "}
+          <Link href="/propiedades" className="font-medium text-ink underline underline-offset-4">
             Propiedades
           </Link>{" "}
           → «Añadir enlace».
         </p>
-        <p>
-          <strong>Idealista:</strong> bloquea al servidor. Abre el anuncio en el navegador y pulsa el marcador.
+        <p className="text-body">
+          <strong className="text-ink">Idealista:</strong> bloquea al servidor. Abre el anuncio en el navegador y pulsa el marcador.
         </p>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Estado</h2>
-        <p className="text-sm text-zinc-600">
+      <section className="space-y-3 py-8">
+        <h2 className={h2}>Estado</h2>
+        <p className="text-sm text-muted">
           Servidor en marcha desde hace {uptimeMin} min · {now}
         </p>
       </section>
