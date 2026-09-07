@@ -3,10 +3,13 @@ import Mapa, { type MapMarker } from "@/components/mapa/Mapa";
 import { PropertyCard, type Listed } from "@/components/propiedades/card";
 import { STAGE_DOT } from "@/components/propiedades/chip";
 import { FilterBar, input, type FilterValues } from "@/components/propiedades/filter-bar";
+import { ActiveFilters, QuickFilters } from "@/components/propiedades/filters-row";
 import { fmtEur } from "@/components/propiedades/format";
 import { RowsTable } from "@/components/propiedades/rows";
+import { SearchBar } from "@/components/propiedades/search-bar";
 import { db } from "@/lib/db";
 import { STAGE_LABELS, STAGES, type Stage } from "@/lib/listing";
+import { HAYSTACK_SQL, isCondition, matchesCondition, matchesQuery } from "@/lib/search";
 import { getBudget } from "@/lib/settings";
 import { setBudgetAction } from "./actions";
 
@@ -33,11 +36,15 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   const precio = first(sp.precio).match(/^(\d*)-(\d*)$/);
   const etapa = first(sp.etapa);
   const puntuacion = first(sp.puntuacion);
+  const estado = first(sp.estado);
   const v: FilterValues = {
+    q: first(sp.q).trim(),
     precioMin: precio?.[1] ?? "",
     precioMax: precio?.[2] ?? "",
     hab: posInt(first(sp.hab)) === null ? "" : first(sp.hab),
+    banos: posInt(first(sp.banos)) === null ? "" : first(sp.banos),
     m2: posInt(first(sp.m2)) === null ? "" : first(sp.m2),
+    estado: isCondition(estado) ? estado : "",
     etapa: STAGES.includes(etapa as Stage) ? etapa : "",
     barrio: first(sp.barrio),
     puntuacion: /^[1-5]$/.test(puntuacion) ? puntuacion : "",
@@ -56,6 +63,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   add("p.price_eur >= ?", posInt(v.precioMin));
   add("p.price_eur <= ?", posInt(v.precioMax));
   add("p.rooms >= ?", posInt(v.hab));
+  add("p.bathrooms >= ?", posInt(v.banos));
   add("p.area_m2 >= ?", posInt(v.m2));
   add("p.stage = ?", v.etapa);
   add("p.neighborhood = ?", v.barrio);
@@ -65,7 +73,8 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
       SELECT p.id, p.title, p.price_eur, p.area_m2, p.rooms, p.stage, p.neighborhood, p.created_at,
         p.lat, p.lng, p.address_precision AS precision,
         (SELECT id FROM photos WHERE property_id = p.id ORDER BY position LIMIT 1) AS cover_id,
-        (SELECT ROUND(AVG(score), 1) FROM ratings WHERE property_id = p.id) AS family_avg
+        (SELECT ROUND(AVG(score), 1) FROM ratings WHERE property_id = p.id) AS family_avg,
+        ${HAYSTACK_SQL} AS haystack
       FROM properties p ${where.length ? "WHERE " + where.join(" AND ") : ""}
     ) ${v.puntuacion ? "WHERE family_avg >= ?" : ""} ORDER BY ${ORDER[v.orden]}`;
 
@@ -79,7 +88,11 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   );
   const budget = await getBudget();
 
-  const items = list.rows as unknown as Listed[];
+  // ponytail: the text filters run here, not in SQL, so "gotic" finds "Gòtic". See src/lib/search.ts.
+  const rows = list.rows as unknown as (Listed & { haystack: string })[];
+  const items = rows.filter(
+    (p) => matchesQuery(p.haystack, v.q) && (!v.estado || matchesCondition(p.haystack, v.estado as Parameters<typeof matchesCondition>[1])),
+  );
   const countByStage = Object.fromEntries(counts.rows.map((r) => [String(r.stage), Number(r.n)]));
   const total = Object.values(countByStage).reduce((a, b) => a + b, 0);
   const neighborhoods = barrios.rows.map((r) => String(r.neighborhood));
@@ -98,13 +111,16 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
       stage: p.stage as Stage,
       cover: p.cover_id ? `/api/photos/${p.cover_id}` : null,
     }));
-  const activeFilters = [precio && (v.precioMin || v.precioMax), v.hab, v.m2, v.barrio, v.puntuacion].filter(Boolean).length;
+  const activeFilters = [precio && (v.precioMin || v.precioMax), v.hab, v.banos, v.m2, v.barrio, v.puntuacion, v.estado, v.q].filter(Boolean).length;
 
   // Links that keep the live filters and change one key.
   const current: Record<string, string> = {
+    q: v.q,
     precio: precio ? `${v.precioMin}-${v.precioMax}` : "",
     hab: v.hab,
+    banos: v.banos,
     m2: v.m2,
+    estado: v.estado,
     etapa: v.etapa,
     barrio: v.barrio,
     puntuacion: v.puntuacion,
@@ -126,29 +142,13 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
       )}
       {first(sp.error) && <p className="mt-4 rounded-lg bg-rausch-tint px-4 py-3 text-sm text-error">{first(sp.error)}</p>}
 
-      {/* Toolbar: the "search bar" adds a listing; filters sit behind one pill. */}
+      {/* Toolbar: the pill searches, the + opens the add-a-link field, filters sit behind one pill. */}
       <div className="flex flex-wrap items-center gap-3 py-4 md:py-6">
-        <form method="post" action="/api/import" className="flex h-14 min-w-0 flex-1 items-center rounded-full border border-hairline bg-white pl-5 pr-2 shadow-tier transition focus-within:border-ink sm:h-16 sm:pl-6">
-          <label className="flex min-w-0 flex-1 flex-col justify-center">
-            <span className="text-xs font-semibold text-ink">Añadir enlace</span>
-            <input
-              type="url"
-              name="url"
-              required
-              placeholder="Pega un anuncio de Idealista, Fotocasa o Habitaclia"
-              className="w-full truncate bg-transparent text-sm text-ink placeholder:text-muted-soft focus:outline-none"
-            />
-          </label>
-          <button
-            type="submit"
-            aria-label="Añadir"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rausch text-white transition hover:bg-rausch-active sm:h-12 sm:w-12"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
-        </form>
+        <SearchBar
+          q={v.q}
+          hidden={Object.fromEntries(Object.entries(current).filter(([k, val]) => k !== "q" && val))}
+          clearHref={href({ q: "" })}
+        />
 
         <details className="group w-full md:w-auto">
           <summary className="flex h-12 w-fit cursor-pointer items-center gap-2 rounded-full border border-hairline px-4 text-sm font-medium text-ink transition hover:border-ink group-open:border-ink">
@@ -183,6 +183,9 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
           </div>
         </details>
       </div>
+
+      <QuickFilters v={v} href={href} />
+      <ActiveFilters v={v} href={href} />
 
       {/* Stage strip + result line + view toggle */}
       <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10" aria-label="Etapas">
