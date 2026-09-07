@@ -31,7 +31,7 @@ export function QuickFilters({ v, href }: { v: FilterValues; href: Href }) {
             href={href({ [param]: active ? "" : value })}
             aria-pressed={active}
             className={`flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border px-3.5 text-sm transition ${
-              active ? "border-emerald-300 bg-emerald-50 font-medium text-emerald-800" : "border-hairline text-body hover:border-ink"
+              active ? "border-secondary bg-secondary-tint font-medium text-ink" : "border-hairline text-body hover:border-ink"
             }`}
           >
             {label}
@@ -68,13 +68,13 @@ export function ActiveFilters({ v, href, zonaLabel }: { v: FilterValues; href: H
       {items.map(({ label, patch }) => (
         <span
           key={label}
-          className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 py-1 pl-3 pr-1 text-sm font-medium text-emerald-800"
+          className="inline-flex items-center gap-1 rounded-full bg-secondary py-1 pl-3 pr-1 text-sm font-medium text-secondary-ink"
         >
           {label}
           <Link
             href={href(patch)}
             aria-label={`Quitar ${label}`}
-            className="grid h-6 w-6 place-items-center rounded-full text-emerald-700 transition hover:bg-emerald-100 hover:text-emerald-900"
+            className="grid h-6 w-6 place-items-center rounded-full text-secondary-ink/70 transition hover:bg-secondary-active hover:text-secondary-ink"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden>
               <path d="M6 6l12 12M18 6L6 18" />

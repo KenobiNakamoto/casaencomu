@@ -103,7 +103,7 @@ export default async function CompararPage({ searchParams }: { searchParams: Sea
         <table className="min-w-full border-collapse">
           <thead>
             <tr>
-              <th className={th + " bg-white"} />
+              <th className={th + " bg-raised"} />
               {props.map((p) => (
                 <td key={p.id} className={td}>
                   {p.cover ? (
@@ -118,7 +118,7 @@ export default async function CompararPage({ searchParams }: { searchParams: Sea
               ))}
             </tr>
             <tr className="border-b border-hairline">
-              <th className={th + " bg-white"}>Título</th>
+              <th className={th + " bg-raised"}>Título</th>
               {props.map((p) => (
                 <td key={p.id} className={td + " font-medium"}>
                   <Link href={`/propiedades/${encodeURIComponent(p.id)}`} className="hover:underline">
@@ -132,7 +132,7 @@ export default async function CompararPage({ searchParams }: { searchParams: Sea
             {ROWS.map(([label, get]) => {
               const cells = props.map(get);
               const differ = cells.some((c) => c !== cells[0]);
-              const bg = differ ? " bg-rausch-tint" : " bg-white";
+              const bg = differ ? " bg-accent-tint" : " bg-raised";
               return (
                 <tr key={label} className={bg}>
                   <th className={th + bg}>{label}</th>

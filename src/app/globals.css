@@ -1,39 +1,134 @@
 @import "tailwindcss";
 
-/* Tokens from the Airbnb design reference (issue #41): one accent, ink text, hairlines, soft radii, one shadow tier. */
-@theme {
+/*
+ * Two themes over one set of names. `@theme inline` makes every utility compile to
+ * `var(--<name>)` instead of a baked hex, so the values below can be swapped at runtime by
+ * flipping `data-theme` on <html>. Palette and roles: DESIGN.md.
+ */
+@theme inline {
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-  --color-rausch: #ff385c;
-  --color-rausch-active: #e00b41;
-  --color-rausch-soft: #ffd1da;
-  --color-rausch-tint: #fff1f4;
-  --color-ink: #222222;
-  --color-body: #3f3f3f;
-  --color-muted: #6a6a6a;
-  --color-muted-soft: #929292;
-  --color-hairline: #dddddd;
-  --color-hairline-soft: #ebebeb;
-  --color-border-strong: #c1c1c1;
-  --color-surface-soft: #f7f7f7;
-  --color-surface-strong: #f2f2f2;
-  --color-error: #c13515;
-  --breakpoint-split: 960px; /* list + map side by side from here, like Airbnb's search page */
+  --color-accent: var(--accent);
+  --color-accent-active: var(--accent-active);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-tint: var(--accent-tint);
+  --color-secondary: var(--secondary);
+  --color-secondary-active: var(--secondary-active);
+  --color-secondary-soft: var(--secondary-soft);
+  --color-secondary-tint: var(--secondary-tint);
+  --color-secondary-ink: var(--secondary-ink);
+  --color-canvas: var(--canvas);
+  --color-raised: var(--raised);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-body: var(--body);
+  --color-muted: var(--muted);
+  --color-muted-soft: var(--muted-soft);
+  --color-hairline: var(--hairline);
+  --color-hairline-soft: var(--hairline-soft);
+  --color-border-strong: var(--border-strong);
+  --color-surface-soft: var(--sunken);
+  --color-surface-strong: var(--surface-strong);
+  --color-error: var(--error);
+  --color-ok: var(--ok);
+  --color-ok-tint: var(--ok-tint);
+  --breakpoint-split: 960px; /* list + map side by side from here */
   --radius-card: 14px;
-  --shadow-tier: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px 0, rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+  --shadow-tier: var(--shadow);
+}
+
+/* Day. `:root` carries the full set; the dark block below only overrides. */
+:root {
+  color-scheme: light;
+  --accent: #e02a1f;
+  --accent-active: #b81f16;
+  --accent-soft: #f7c4bf;
+  --accent-tint: #fdf0ee;
+  --secondary: #e0a800;
+  --secondary-active: #b98b00;
+  --secondary-soft: #f5dd8e;
+  --secondary-tint: #fdf6e0;
+  --secondary-ink: #16161a;
+  --canvas: #fbfaf7;
+  --canvas-far: #f1efe8;
+  --raised: #ffffff;
+  --sunken: #f4f2ec;
+  --surface-strong: #eae7de;
+  --ink: #16161a;
+  --body: #3f3d39;
+  --muted: #6f6c66;
+  --muted-soft: #93908a;
+  --hairline: #e4e1d9;
+  --hairline-soft: #efece5;
+  --border-strong: #c6c2b8;
+  --error: #c13515;
+  --ok: #1a7f4b;
+  --ok-tint: #e6f4ec;
+  --shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px 0, rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+  /* map: paint overrides for the OpenFreeMap Positron basemap */
+  --map-bg: #f6f5f2;
+  --map-building: #edece8;
+  --map-water: #bfdff5;
+  --map-park: #d5ecd2;
+  --map-wood: #dcebd8;
+  --map-label: #4a4842;
+  --map-halo: #ffffff;
+  --pin-bg: #ffffff;
+  --pin-ink: #16161a;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --accent: #ff453a;
+  --accent-active: #ff6b62;
+  --accent-soft: #7a251f;
+  --accent-tint: #2a1512;
+  --secondary: #ffd60a;
+  --secondary-active: #ffe14d;
+  --secondary-soft: #6d5a00;
+  --secondary-tint: #2a2405;
+  --secondary-ink: #16161a;
+  --canvas: #0b0b0d;
+  --canvas-far: #141418;
+  --raised: #17171c;
+  --sunken: #111116;
+  --surface-strong: #23232a;
+  --ink: #f6f5f2;
+  --body: #c9c6bf;
+  --muted: #8f8c85;
+  --muted-soft: #6f6c68;
+  --hairline: #2a2a31;
+  --hairline-soft: #212127;
+  --border-strong: #3c3c45;
+  --error: #ff6b5e;
+  --ok: #4ade80;
+  --ok-tint: #10241a;
+  /* night elevation is a lighter surface plus a hairline; a black shadow is invisible here */
+  --shadow: rgba(255, 255, 255, 0.06) 0 0 0 1px, rgba(0, 0, 0, 0.5) 0 4px 14px 0;
+  --map-bg: #101014;
+  --map-building: #1b1b21;
+  --map-water: #12222f;
+  --map-park: #14241a;
+  --map-wood: #16281c;
+  --map-label: #9a978f;
+  --map-halo: #0b0b0d;
+  --pin-bg: #23232a;
+  --pin-ink: #f6f5f2;
 }
 
 @layer base {
   body {
-    color: var(--color-ink);
+    color: var(--ink);
+    /* the black (or paper) gradient ground; fixed so it does not scroll away */
+    background: linear-gradient(180deg, var(--canvas) 0%, var(--canvas-far) 100%) fixed;
   }
   input,
   select,
   textarea {
-    color: var(--color-ink);
+    color: var(--ink);
   }
   input::placeholder,
   textarea::placeholder {
-    color: var(--color-muted-soft);
+    color: var(--muted-soft);
   }
   summary {
     list-style: none;
@@ -62,8 +157,8 @@
 }
 .pin {
   white-space: nowrap;
-  background: #fff;
-  color: #222;
+  background: var(--pin-bg);
+  color: var(--pin-ink);
   font: 600 13px/1 var(--font-sans);
   padding: 8px 11px;
   border-radius: 9999px;
@@ -72,7 +167,7 @@
 }
 .pin:hover,
 .pin.is-active {
-  background: #222;
+  background: var(--accent);
   color: #fff;
   transform: scale(1.08);
 }
@@ -83,7 +178,8 @@
   border-radius: 14px;
   box-shadow: var(--shadow-tier);
   font: 14px/1.43 var(--font-sans);
-  color: #222;
+  background: var(--raised);
+  color: var(--ink);
 }
 .maplibregl-popup.mini .maplibregl-popup-tip {
   display: none;
@@ -94,8 +190,8 @@
   width: 28px;
   height: 28px;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #222;
+  background: var(--raised);
+  color: var(--ink);
   font-size: 18px;
   line-height: 28px;
 }
@@ -107,12 +203,69 @@
 .maplibregl-ctrl-group button {
   width: 36px;
   height: 36px;
+  background: var(--raised);
+  color: var(--ink);
+}
+.maplibregl-ctrl-group button + button {
+  border-top-color: var(--hairline);
+}
+/* the control glyphs are black SVGs; invert them under the dark theme */
+[data-theme="dark"] .maplibregl-ctrl-icon {
+  filter: invert(1);
 }
 .maplibregl-ctrl-attrib {
   border-radius: 6px;
   font-size: 11px;
-  color: #6a6a6a;
+  background: var(--raised);
+  color: var(--muted);
 }
 .maplibregl-ctrl-attrib a {
   color: inherit;
+}
+
+/*
+ * Theme switch. beui.dev's `theme-toggle` reveal: the incoming theme is clipped to a circle
+ * that grows out of the button. `--wipe-*` are set by the toggle just before the transition;
+ * `prefers-reduced-motion` never reaches this because the toggle applies the theme directly.
+ */
+html[data-wipe]::view-transition-old(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html[data-wipe]::view-transition-new(root) {
+  mix-blend-mode: normal;
+  animation: theme-wipe 520ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes theme-wipe {
+  from {
+    clip-path: circle(0 at var(--wipe-x, 50%) var(--wipe-y, 0));
+  }
+  to {
+    clip-path: circle(var(--wipe-r, 150vmax) at var(--wipe-x, 50%) var(--wipe-y, 0));
+  }
+}
+
+/* Sun in the dark theme, moon in the light one: the icon shows what the click will give you. */
+.theme-icon > svg {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+}
+.theme-icon > [data-icon="sun"] {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.5);
+}
+[data-theme="dark"] .theme-icon > [data-icon="sun"] {
+  opacity: 1;
+  transform: none;
+}
+[data-theme="dark"] .theme-icon > [data-icon="moon"] {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.5);
+}
+@media (prefers-reduced-motion: reduce) {
+  .theme-icon > svg {
+    transition: none;
+  }
 }

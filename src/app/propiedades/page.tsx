@@ -141,9 +141,9 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   return (
     <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10">
       {first(sp.dup) === "1" && (
-        <p className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Ya estaba guardada.</p>
+        <p className="mt-4 rounded-lg bg-ok-tint px-4 py-3 text-sm text-ok">Ya estaba guardada.</p>
       )}
-      {first(sp.error) && <p className="mt-4 rounded-lg bg-rausch-tint px-4 py-3 text-sm text-error">{first(sp.error)}</p>}
+      {first(sp.error) && <p className="mt-4 rounded-lg bg-accent-tint px-4 py-3 text-sm text-error">{first(sp.error)}</p>}
 
       {/* Toolbar: the pill searches, the + opens the add-a-link field, filters sit behind one pill. */}
       <div className="flex flex-wrap items-center gap-3 py-4 md:py-6">
@@ -162,10 +162,10 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
             </svg>
             Filtros
             {activeFilters > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1.5 text-xs font-semibold text-white">{activeFilters}</span>
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1.5 text-xs font-semibold text-canvas">{activeFilters}</span>
             )}
           </summary>
-          <div className="mt-3 w-full space-y-6 rounded-card border border-hairline bg-white p-5 shadow-tier md:absolute md:left-4 md:right-4 md:z-10 md:mt-2 md:w-auto lg:left-10 lg:right-10">
+          <div className="mt-3 w-full space-y-6 rounded-card border border-hairline bg-raised p-5 shadow-tier md:absolute md:left-4 md:right-4 md:z-10 md:mt-2 md:w-auto lg:left-10 lg:right-10">
             <FilterBar values={v} neighborhoods={neighborhoods} stages={STAGES.map((s) => [s, STAGE_LABELS[s]])} />
             <form action={setBudgetAction} className="border-t border-hairline-soft pt-5">
               <p className="mb-3 text-sm font-semibold text-ink">Presupuesto familiar</p>
@@ -197,10 +197,10 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
           {budget ? ` · Presupuesto ${fmtEur(budget.min)} – ${fmtEur(budget.max)}` : " · Sin presupuesto"}
         </p>
         <div className="flex rounded-full border border-hairline p-0.5 text-sm">
-          <Link href={href({ vista: "" })} className={`rounded-full px-3 py-1 ${v.vista === "galeria" ? "bg-ink font-medium text-white" : "text-body"}`}>
+          <Link href={href({ vista: "" })} className={`rounded-full px-3 py-1 ${v.vista === "galeria" ? "bg-ink font-medium text-canvas" : "text-body"}`}>
             Galería
           </Link>
-          <Link href={href({ vista: "filas" })} className={`rounded-full px-3 py-1 ${v.vista === "filas" ? "bg-ink font-medium text-white" : "text-body"}`}>
+          <Link href={href({ vista: "filas" })} className={`rounded-full px-3 py-1 ${v.vista === "filas" ? "bg-ink font-medium text-canvas" : "text-body"}`}>
             Filas
           </Link>
         </div>
@@ -242,7 +242,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
 
       <Link
         href={mapHref}
-        className="fixed bottom-20 left-1/2 z-10 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-white shadow-tier transition hover:bg-black split:hidden"
+        className="fixed bottom-20 left-1/2 z-10 flex h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-canvas shadow-tier transition hover:opacity-90 split:hidden"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" />

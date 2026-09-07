@@ -4,9 +4,9 @@ const TONES = {
   zinc: "bg-surface-strong text-body",
   blue: "bg-sky-100 text-sky-800",
   amber: "bg-amber-100 text-amber-800",
-  green: "bg-emerald-100 text-emerald-800",
+  green: "bg-ok-tint text-ok",
   violet: "bg-violet-100 text-violet-800",
-  red: "bg-rausch-tint text-error",
+  red: "bg-accent-tint text-error",
 } as const;
 type Tone = keyof typeof TONES;
 
@@ -31,10 +31,10 @@ const STAGE_TONE: Record<Stage, Tone> = {
 export const STAGE_DOT: Record<Stage, string> = {
   nueva: "bg-sky-500",
   revisando: "bg-amber-500",
-  preseleccionada: "bg-emerald-500",
+  preseleccionada: "bg-ok",
   visita_prevista: "bg-violet-500",
   descartada: "bg-zinc-400",
-  no_disponible: "bg-rausch",
+  no_disponible: "bg-accent",
 };
 
 export function StageChip({ stage }: { stage: string }) {
@@ -46,7 +46,7 @@ export function StageChip({ stage }: { stage: string }) {
 export function Badge({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-ink shadow-tier ${className}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-raised/95 px-2.5 py-1 text-xs font-semibold text-ink shadow-tier ${className}`}
     >
       {children}
     </span>

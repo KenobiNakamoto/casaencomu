@@ -15,7 +15,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
     if (open) url.current?.focus();
   }, [open]);
 
-  const pill = "h-14 items-center rounded-full border border-hairline bg-white shadow-tier transition focus-within:border-ink sm:h-16";
+  const pill = "h-14 items-center rounded-full border border-hairline bg-raised shadow-tier transition focus-within:border-ink sm:h-16";
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-3" onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
@@ -91,7 +91,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
           onClick={open ? undefined : () => setOpen(true)}
           aria-label={open ? "Guardar el anuncio" : "Añadir un anuncio"}
           aria-expanded={open}
-          className="flex h-10 w-10 shrink-0 items-center justify-center self-center rounded-full bg-rausch text-white transition hover:bg-rausch-active sm:h-12 sm:w-12"
+          className="flex h-10 w-10 shrink-0 items-center justify-center self-center rounded-full bg-accent text-white transition hover:bg-accent-active sm:h-12 sm:w-12"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
             <path d="M12 5v14M5 12h14" />

@@ -18,7 +18,7 @@ export default function NavLinks({ items }: { items: NavItem[] }) {
   return (
     <nav
       aria-label="Principal"
-      className="fixed inset-x-0 bottom-0 z-20 flex border-t border-hairline bg-white pb-[env(safe-area-inset-bottom)] md:static md:inset-auto md:mx-auto md:h-full md:border-0 md:pb-0"
+      className="fixed inset-x-0 bottom-0 z-20 flex border-t border-hairline bg-raised pb-[env(safe-area-inset-bottom)] md:static md:inset-auto md:mx-auto md:h-full md:border-0 md:pb-0"
     >
       {items.map(({ href, label, icon, badge }) => {
         const active = pathname === href || pathname.startsWith(href + "/");
@@ -29,7 +29,7 @@ export default function NavLinks({ items }: { items: NavItem[] }) {
             aria-current={active ? "page" : undefined}
             className={`relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 px-2 text-[10px] font-medium transition md:h-full md:min-h-0 md:flex-none md:flex-row md:gap-0 md:border-b-2 md:px-4 md:text-base ${
               active
-                ? "text-rausch md:border-ink md:font-semibold md:text-ink"
+                ? "text-accent md:border-ink md:font-semibold md:text-ink"
                 : "text-muted md:border-transparent md:hover:text-ink"
             }`}
           >
@@ -38,14 +38,14 @@ export default function NavLinks({ items }: { items: NavItem[] }) {
                 <path d={ICONS[icon]} />
               </svg>
               {badge ? (
-                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rausch px-1 text-[10px] font-semibold leading-none text-white">
+                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-white">
                   {badge}
                 </span>
               ) : null}
             </span>
             <span>{label}</span>
             {badge ? (
-              <span className="ml-1.5 hidden rounded-full bg-rausch px-1.5 py-0.5 text-xs font-semibold leading-none text-white md:inline">
+              <span className="ml-1.5 hidden rounded-full bg-accent px-1.5 py-0.5 text-xs font-semibold leading-none text-white md:inline">
                 {badge}
               </span>
             ) : null}
