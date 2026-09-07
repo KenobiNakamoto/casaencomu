@@ -47,7 +47,8 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 | `photos.ts` | downloads, deduplicates by sha256, resizes to one 800 px JPEG, stores under `DATA_DIR`. 40 per property, not per call | no |
 | `save.ts` | the one way an observation reaches the database. A new source becomes a property; a known source is **refreshed** — freshness only when nothing moved, facts and one event per change when something did | no |
 | `changes.ts` | canonical form and hash of the facts, what changed between two extractions, and the `properties` column allowlist | yes |
-| `recheck.ts` | the 48-hour loop: refetch, compare, write events, mark a listing unavailable | no |
+| `availability.ts` | whether the advertisement is still up — the gone streak, the property's status from all its sources, staleness, and the Spanish for each. Deliberately not a stage | yes |
+| `recheck.ts` | the 48-hour loop: refetch, compare, write events, move the source's availability. Never writes a stage | no |
 | `ratings.ts` | averages and the upsert statement. Deliberately has no `db` import, so the test needs no data directory | yes |
 | `search.ts` | free-text matching and the filter presets, accent-insensitive, in JavaScript over the loaded rows | yes |
 | `geo.ts` | point in polygon for the map's area overlays. Twenty lines, no dependency | yes |
@@ -99,6 +100,8 @@ it to `localStorage.tema`, and `components/use-theme.ts` reads it back through
 | `fetching.test.ts` | a redirect off the allowlist being followed, or an oversized body being read whole |
 | `extract.test.ts` | every portal, live and withdrawn, against saved pages — and a blocked page being called "removed" |
 | `save.test.ts` | a second look at an advertisement erasing a fact it did not observe, or writing a phantom event |
+| `availability.test.ts` | a blocked page counting as evidence that a listing is gone |
+| `migrate.test.ts` | a migration that loses the family's stage, or that cannot run twice |
 | `changes.test.ts` | a price change that produces no event, or a phantom event |
 | `ratings.test.ts` | an average that counts a missing dimension |
 | `auth.test.ts` | a token with the wrong audience, issuer or expiry being accepted |

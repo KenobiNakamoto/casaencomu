@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { availabilityLine } from "@/lib/availability";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { STAGE_LABELS } from "@/lib/listing";
@@ -34,7 +35,9 @@ function line(e: Row) {
     case "price_change":
       return `Precio de ${t}: ${eur(p.from)} → ${eur(p.to)}`;
     case "availability_change":
-      return `${t} ya no está disponible`;
+      // F04: this said "ya no está disponible" for every one of them, the `unknown` warnings
+      // included, which is the opposite of what an unknown outcome means.
+      return availabilityLine(String(p.to ?? ""), t);
     case "facts_change":
       return `Datos actualizados en ${t}`;
     case "stage_change":

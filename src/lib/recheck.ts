@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { InStatement } from "@libsql/client";
+import { nextSourceState, type Outcome, type SourceState } from "./availability";
 import { canonicalFacts, classifyChanges, col, FACT_COLUMNS, factsHash, type Facts } from "./changes";
 import { db } from "./db";
-import { extract } from "./extract";
+import { extractResult } from "./extract";
 import { isAllowedHost } from "./url";
 
 export type FetchedPage = { status: number; finalUrl?: string; html?: string };
@@ -10,7 +11,7 @@ export type FetchPage = (url: string) => Promise<FetchedPage>;
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
-const STALE_MS = 48 * 3_600_000;
+const CHECK_EVERY_MS = 48 * 3_600_000;
 const WARN_AT = 3;
 
 /** One plain GET, redirects followed, 20 s budget. Never retried, never a block bypassed. */
@@ -32,6 +33,7 @@ type Row = {
   via: string;
   facts_json: string;
   consecutive_failures: number;
+  consecutive_gone: number;
   availability: string;
 };
 
@@ -46,9 +48,12 @@ const fetchable = (s: Row) => s.via === "paste" || (isAllowedHost(s.url_original
 
 /**
  * One pass: up to `limit` fetchable sources not checked in 48 h, oldest first, `spacingMs`
- * apart. Success → facts, `properties` and one `events` row per change. 404/410 or a gone
- * marker → `unknown` first, `removed` + stage `no_disponible` on the second in a row. 403,
- * timeout or a challenge → `unknown`, one warning event at three failures in a row.
+ * apart. Success → facts, `properties` and one `events` row per change. Removal evidence →
+ * `unknown` first and `removed` only on a second consecutive scheduled check. Anything we could
+ * not read → `unknown`, one warning at three failures in a row, and never a removal.
+ *
+ * It does not write `properties.stage`. That is the whole point of PIP-02: availability is the
+ * source's business and the stage is the family's.
  */
 export async function runRechecks({
   now = new Date(),
@@ -57,9 +62,10 @@ export async function runRechecks({
   fetchPage: fetchImpl = fetchPage,
 }: { now?: Date; limit?: number; spacingMs?: number; fetchPage?: FetchPage } = {}) {
   const at = now.toISOString();
-  const cutoff = new Date(now.getTime() - STALE_MS).toISOString();
+  const cutoff = new Date(now.getTime() - CHECK_EVERY_MS).toISOString();
   const { rows } = await db.execute({
-    sql: `SELECT id, property_id, portal, portal_ref, url_original, via, facts_json, consecutive_failures, availability
+    sql: `SELECT id, property_id, portal, portal_ref, url_original, via, facts_json,
+            consecutive_failures, consecutive_gone, availability
           FROM sources WHERE availability != 'removed' AND (last_checked_at IS NULL OR last_checked_at < ?)
           ORDER BY last_checked_at ASC`,
     args: [cutoff],
@@ -76,29 +82,60 @@ export async function runRechecks({
     try {
       page = await fetchImpl(s.url_original);
     } catch {
-      /* timeout or network error → unknown below */
+      /* timeout or network error */
     }
-    // 4xx/5xx bodies are never parsed as a listing (an error page with a <title> is not a fact change)
-    const listing = page && page.status < 400 ? extract({ url: s.url_original, ...page }) : null;
-    let prev: Facts | null = null;
-    try {
-      prev = JSON.parse(s.facts_json) as Facts;
-    } catch {
-      /* unreadable facts → nothing to compare against */
-    }
-    const changes = classifyChanges(prev, listing, { status: page?.status, finalUrl: page?.finalUrl });
-    const failures = s.consecutive_failures + 1;
 
-    if (listing) {
-      const facts = canonicalFacts(listing);
-      const stmts: InStatement[] = [
-        {
-          sql: `UPDATE sources SET consecutive_failures = 0, availability = 'active', last_ok_at = ?, last_checked_at = ?,
-                facts_json = ?, facts_hash = ? WHERE id = ?`,
-          args: [at, at, JSON.stringify(facts), factsHash(facts), s.id],
-        },
-      ];
-      const fields = changes.flatMap((c) => (c.kind === "price_change" ? ["price_eur"] : c.kind === "facts_change" ? c.payload.fields : []));
+    // One typed outcome, from the same extractor the import uses. A 4xx/5xx body is never parsed
+    // as a listing: an error page with a <title> is not a fact change.
+    const result = page && page.status < 400 ? extractResult({ url: s.url_original, ...page }) : null;
+    const outcome: Outcome = !page
+      ? "timeout"
+      : result?.kind === "listing"
+        ? "listing"
+        : page.status === 404 || page.status === 410
+          ? "removed"
+          : (result?.kind ?? "unreadable");
+    const listing = result?.kind === "listing" ? result.listing : null;
+
+    const prev: SourceState = {
+      availability: (s.availability === "removed" || s.availability === "unknown" ? s.availability : "active"),
+      consecutive_gone: s.consecutive_gone,
+      consecutive_failures: s.consecutive_failures,
+    };
+    // The hourly loop is the only caller, so every observation here is a scheduled one.
+    const next = nextSourceState(prev, outcome, true);
+
+    let facts: Facts | null = null;
+    let prevFacts: Facts | null = null;
+    try {
+      prevFacts = JSON.parse(s.facts_json) as Facts;
+    } catch {
+      /* unreadable snapshot → nothing to compare against */
+    }
+    const changes = listing ? classifyChanges(prevFacts, listing) : [];
+    if (listing) facts = canonicalFacts(listing);
+
+    const stmts: InStatement[] = [
+      {
+        sql: `UPDATE sources SET availability = ?, consecutive_gone = ?, consecutive_failures = ?,
+              last_check_outcome = ?, last_checked_at = ?${facts ? ", last_ok_at = ?, facts_json = ?, facts_hash = ?" : ""}
+              WHERE id = ?`,
+        args: [
+          next.availability,
+          next.consecutive_gone,
+          next.consecutive_failures,
+          outcome,
+          at,
+          ...(facts ? [at, JSON.stringify(facts), factsHash(facts)] : []),
+          s.id,
+        ],
+      },
+    ];
+
+    if (facts) {
+      const fields = changes.flatMap((c) =>
+        c.kind === "price_change" ? ["price_eur"] : c.kind === "facts_change" ? c.payload.fields : [],
+      );
       const cols = fields.filter((f) => FACT_COLUMNS.has(f));
       if (cols.length) {
         stmts.push({
@@ -107,49 +144,33 @@ export async function runRechecks({
         });
       }
       for (const c of changes) stmts.push(event(s.property_id, c.kind, c.payload, at));
-      await db.batch(stmts, "write");
-      if (changes.length) summary.changed++;
-      console.log(`${label} → active${changes.length ? ` (${changes.map((c) => c.kind).join(", ")})` : ""}`);
-    } else if (changes.some((c) => c.kind === "availability_change")) {
-      // ponytail: the counter does not record the kind of the last failure; any prior failure is the first strike
-      if (s.consecutive_failures >= 1) {
-        await db.batch(
-          [
-            {
-              sql: "UPDATE sources SET availability = 'removed', consecutive_failures = ?, last_checked_at = ? WHERE id = ?",
-              args: [failures, at, s.id],
-            },
-            {
-              sql: "UPDATE properties SET stage = 'no_disponible', updated_at = ? WHERE id = ? AND stage != 'descartada'",
-              args: [at, s.property_id],
-            },
-            event(s.property_id, "availability_change", { to: "removed" }, at),
-          ],
-          "write",
-        );
-        summary.removed++;
-        console.log(`${label} → removed`);
-      } else {
-        await db.execute({
-          sql: "UPDATE sources SET availability = 'unknown', consecutive_failures = ?, last_checked_at = ? WHERE id = ?",
-          args: [failures, at, s.id],
-        });
-        summary.unknown++;
-        console.log(`${label} → gone once (${page?.status}), unknown until confirmed`);
-      }
-    } else {
-      const stmts: InStatement[] = [
-        {
-          sql: "UPDATE sources SET availability = 'unknown', consecutive_failures = ?, last_checked_at = ? WHERE id = ?",
-          args: [failures, at, s.id],
-        },
-      ];
-      // one warning per streak, at exactly the third failure
-      if (failures === WARN_AT) stmts.push(event(s.property_id, "availability_change", { to: "unknown", failures }, at));
-      await db.batch(stmts, "write");
-      summary.unknown++;
-      console.log(`${label} → unknown (${page ? `status ${page.status}` : "timeout or network error"}, failure ${failures})`);
     }
+
+    // The family's stage is never touched here (D07). A portal delisting a home is a fact about
+    // the portal; `preseleccionada` is a fact about the family, and only they may change it.
+    //
+    // What earns a line in the feed, and nothing else does. A source dropping to `unknown` is
+    // ordinary — portals rate-limit, networks fail — so it is not news until it has failed three
+    // times running. Coming back is only news if we had said it was gone.
+    if (next.availability === "removed" && prev.availability !== "removed") {
+      stmts.push(event(s.property_id, "availability_change", { from: prev.availability, to: "removed" }, at));
+    } else if (next.availability === "active" && prev.availability === "removed") {
+      stmts.push(event(s.property_id, "availability_change", { from: "removed", to: "active" }, at));
+    } else if (next.availability === "unknown" && next.consecutive_failures === WARN_AT) {
+      // one warning per streak, at exactly the third unreadable check in a row
+      stmts.push(event(s.property_id, "availability_change", { to: "unknown", failures: WARN_AT }, at));
+    }
+
+    await db.batch(stmts, "write");
+
+    if (next.availability === "removed") summary.removed++;
+    else if (next.availability === "unknown") summary.unknown++;
+    if (changes.length) summary.changed++;
+    console.log(
+      `${label} → ${outcome} / ${next.availability}` +
+        (changes.length ? ` (${changes.map((c) => c.kind).join(", ")})` : "") +
+        (next.consecutive_gone ? ` [gone ${next.consecutive_gone}/2]` : ""),
+    );
   }
 
   console.log(`[recheck] checked=${summary.checked} changed=${summary.changed} removed=${summary.removed} unknown=${summary.unknown}`);

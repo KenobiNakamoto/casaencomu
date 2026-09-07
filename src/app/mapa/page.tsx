@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Mapa, { type MapMarker } from "@/components/mapa/Mapa";
 import { findArea, isIn } from "@/lib/areas";
+import { NOT_REMOVED_SQL } from "@/lib/availability";
 import { db } from "@/lib/db";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -15,7 +16,7 @@ export default async function MapaPage({ searchParams }: { searchParams: SearchP
     where += " AND p.stage = ?";
     args.push(etapa);
   } else if (sp.todas !== "1") {
-    where += " AND p.stage NOT IN ('descartada', 'no_disponible')";
+    where += ` AND p.stage != 'descartada' AND ${NOT_REMOVED_SQL}`;
   }
   const { rows } = await db.execute({
     sql: `SELECT p.id, p.lat, p.lng, p.address_precision AS precision, p.price_eur, p.title, p.rooms, p.area_m2,

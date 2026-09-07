@@ -1,3 +1,4 @@
+import { NOT_REMOVED_SQL } from "@/lib/availability";
 import { db } from "@/lib/db";
 
 /** Markers for `/mapa`: properties with coordinates, filtered by `?etapa=` or `?todas=1`. */
@@ -10,7 +11,7 @@ export async function GET(req: Request) {
     where += " AND p.stage = ?";
     args.push(etapa);
   } else if (q.get("todas") !== "1") {
-    where += " AND p.stage NOT IN ('descartada', 'no_disponible')";
+    where += ` AND p.stage != 'descartada' AND ${NOT_REMOVED_SQL}`;
   }
   const { rows } = await db.execute({
     sql: `SELECT p.id, p.lat, p.lng, p.address_precision AS precision, p.price_eur, p.title,

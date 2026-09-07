@@ -5,6 +5,7 @@ import { Chip, StageChip } from "@/components/propiedades/chip";
 import { input } from "@/components/propiedades/filter-bar";
 import { fmtDate, fmtDateTime, fmtEur, fmtNum, SIN_DATOS, siNo } from "@/components/propiedades/format";
 import { RatingForm } from "@/components/propiedades/rating-form";
+import { availabilityLine, AVAILABILITY_LABEL, isStale, type SourceAvailability } from "@/lib/availability";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { DIMENSION_LABELS, DIMENSIONS, STAGE_LABELS, STAGES, type Stage } from "@/lib/listing";
@@ -32,12 +33,20 @@ type Property = {
   neighborhood: string | null;
   created_at: string;
 };
-type Source = { portal: string; url_original: string; via: string; availability: string; last_checked_at: string | null };
+type Source = {
+  portal: string;
+  url_original: string;
+  via: string;
+  availability: SourceAvailability;
+  /** Last attempt. `last_ok_at` is the last one that actually read the advertisement. */
+  last_checked_at: string | null;
+  last_ok_at: string | null;
+};
 type Event = { kind: string; payload_json: string | null; created_at: string; actor: string | null };
 type Comment = { body: string; created_at: string; name: string };
 type Member = { id: string; name: string };
 
-const AVAILABILITY: Record<string, string> = { active: "Activo", unknown: "Desconocido", gone: "No disponible", removed: "No disponible" };
+const AVAILABILITY: Record<string, string> = AVAILABILITY_LABEL;
 const PRECISION: Record<string, string> = { exact: "(exacta)", approx: "(aproximada)" };
 const stageLabel = (s: unknown) => STAGE_LABELS[s as Stage] ?? String(s ?? "?");
 
@@ -61,7 +70,7 @@ function describe(kind: string, p: Record<string, unknown>) {
     case "price_change":
       return `Precio: ${fmtEur(num(p.from))} → ${fmtEur(num(p.to))}`;
     case "availability_change":
-      return `Disponibilidad: ${AVAILABILITY[String(p.from)] ?? p.from} → ${AVAILABILITY[String(p.to)] ?? p.to}`;
+      return availabilityLine(String(p.to), "Este anuncio").replace("Este anuncio: ", "");
     case "facts_change":
       return "Datos del anuncio actualizados";
     case "stage_change":
@@ -101,7 +110,7 @@ export default async function PropiedadPage({
     [
       { sql: "SELECT * FROM properties WHERE id = ?", args: [id] },
       { sql: "SELECT id FROM photos WHERE property_id = ? ORDER BY position", args: [id] },
-      { sql: "SELECT portal, url_original, via, availability, last_checked_at FROM sources WHERE property_id = ? ORDER BY first_seen_at", args: [id] },
+      { sql: "SELECT portal, url_original, via, availability, last_checked_at, last_ok_at FROM sources WHERE property_id = ? ORDER BY first_seen_at", args: [id] },
       {
         sql: "SELECT e.kind, e.payload_json, e.created_at, u.name AS actor FROM events e LEFT JOIN users u ON u.id = e.actor_id WHERE e.property_id = ? ORDER BY e.created_at DESC",
         args: [id],
@@ -285,7 +294,12 @@ export default async function PropiedadPage({
                       <Chip tone={s.availability === "active" ? "success" : s.availability === "unknown" ? "warning" : "danger"}>
                         {AVAILABILITY[s.availability] ?? s.availability}
                       </Chip>
+                      {s.availability === "active" && isStale(s.last_ok_at, new Date()) && (
+                        <Chip tone="warning">Sin comprobar hace más de 48 h</Chip>
+                      )}
+                      {/* two different facts: when we last tried, and when we last succeeded */}
                       <span className="text-muted">Comprobado: {s.last_checked_at ? fmtDateTime(s.last_checked_at) : "nunca"}</span>
+                      <span className="text-muted">Visto bien: {s.last_ok_at ? fmtDateTime(s.last_ok_at) : "nunca"}</span>
                       {check && (
                         <span className="text-warning-ink">
                           <Chip tone="warning">Comprobar</Chip> Abre el anuncio y vuelve a pulsar el marcador.
