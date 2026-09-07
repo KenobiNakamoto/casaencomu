@@ -214,9 +214,6 @@ Server components read the DB; mutations are server actions.
   and mirrors it to `localStorage.tema`, and `useTheme` reads it back through
   `useSyncExternalStore`. Roles and hexes: `DESIGN.md`. Never write a raw hex in a component.
 
-Filling it for a look: `pnpm tsx scripts/seed.mts [file.json] [--reset]`. The committed
-`scripts/seed.example.json` is fictional; real listings come from a gitignored file passed as an
-argument, because family comments are PII.
 
 Check (manual, two phones): add → rate → compare → map → stage change shows in the other
 member's `Actividad`; both themes survive a reload.
