@@ -1,1 +1,124 @@
 @import "tailwindcss";
+
+/* Tokens from the Airbnb design reference (issue #41): one accent, ink text, hairlines, soft radii, one shadow tier. */
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --color-rausch: #ff385c;
+  --color-rausch-active: #e00b41;
+  --color-rausch-soft: #ffd1da;
+  --color-rausch-tint: #fff1f4;
+  --color-ink: #222222;
+  --color-body: #3f3f3f;
+  --color-muted: #6a6a6a;
+  --color-muted-soft: #929292;
+  --color-hairline: #dddddd;
+  --color-hairline-soft: #ebebeb;
+  --color-border-strong: #c1c1c1;
+  --color-surface-soft: #f7f7f7;
+  --color-surface-strong: #f2f2f2;
+  --color-error: #c13515;
+  --breakpoint-split: 960px; /* list + map side by side from here, like Airbnb's search page */
+  --radius-card: 14px;
+  --shadow-tier: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px 0, rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+}
+
+@layer base {
+  body {
+    color: var(--color-ink);
+  }
+  input,
+  select,
+  textarea {
+    color: var(--color-ink);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-muted-soft);
+  }
+  summary {
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Leaflet: price pills as markers, and the mini-card popup. */
+.pin-wrap {
+  background: none;
+  border: 0;
+}
+.pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  background: #fff;
+  color: #222;
+  font: 600 13px/1 var(--font-sans);
+  padding: 8px 11px;
+  border-radius: 9999px;
+  box-shadow: var(--shadow-tier);
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.pin.is-approx {
+  outline: 1.5px dashed #ff385c;
+  outline-offset: -1.5px;
+}
+.pin:hover,
+.pin.is-active {
+  background: #222;
+  color: #fff;
+  transform: translate(-50%, -50%) scale(1.08);
+}
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: #f2f2f2;
+}
+.leaflet-tile-pane {
+  filter: saturate(0.45) contrast(0.92) brightness(1.06);
+}
+.leaflet-popup.mini .leaflet-popup-content-wrapper {
+  border-radius: 14px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-tier);
+}
+.leaflet-popup.mini .leaflet-popup-content {
+  margin: 0;
+  width: 260px !important;
+  font: 14px/1.43 var(--font-sans);
+  color: #222;
+}
+.leaflet-popup.mini .leaflet-popup-tip-container {
+  display: none;
+}
+.leaflet-popup.mini a.leaflet-popup-close-button {
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #222;
+  font-size: 18px;
+  line-height: 28px;
+  text-align: center;
+}
+.leaflet-bar {
+  border: 0 !important;
+  box-shadow: var(--shadow-tier) !important;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+.leaflet-bar a {
+  color: #222 !important;
+}

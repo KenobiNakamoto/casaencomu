@@ -57,6 +57,8 @@ function ago(iso: string) {
   return new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
 }
 
+const initial = (name: string | null) => (name ?? "?").trim().charAt(0).toUpperCase() || "?";
+
 export default async function ActividadPage() {
   const user = await currentUser();
   const since = user.last_seen_at; // last time this member opened Actividad (null = never)
@@ -78,29 +80,37 @@ export default async function ActividadPage() {
   });
 
   return (
-    <section className="mx-auto max-w-3xl p-4">
-      <h1 className="text-2xl font-semibold">Actividad</h1>
+    <section className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <h1 className="text-[22px] font-medium">Actividad</h1>
       {events.length === 0 ? (
-        <p className="mt-4 text-zinc-600">Todavía no hay actividad.</p>
+        <p className="mt-4 text-muted">Todavía no hay actividad.</p>
       ) : (
-        <ol className="mt-2 divide-y divide-zinc-200">
+        <ol className="mt-4 divide-y divide-hairline-soft">
           {events.map((e) => {
             const isNew = !!since && e.created_at > since && e.actor_id !== user.id;
             return (
               <li key={e.id}>
                 <Link
                   href={`/propiedades/${e.property_id}`}
-                  className="flex min-h-11 items-baseline gap-3 py-3 hover:bg-zinc-50"
+                  className="-mx-3 flex min-h-11 items-start gap-3 rounded-lg px-3 py-3 transition hover:bg-surface-soft"
                 >
-                  <span className="flex-1">
+                  <span
+                    className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                      e.actor ? "bg-surface-strong text-ink" : "bg-rausch-tint text-rausch"
+                    }`}
+                    aria-hidden
+                  >
+                    {e.actor ? initial(e.actor) : "↻"}
+                  </span>
+                  <span className="flex-1 text-[15px] leading-snug">
                     {isNew && (
-                      <span className="mr-2 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">
+                      <span className="mr-2 inline-block rounded-full bg-rausch px-2 py-0.5 align-middle text-[11px] font-semibold text-white">
                         nuevo
                       </span>
                     )}
                     {line(e)}
                   </span>
-                  <time dateTime={e.created_at} className="shrink-0 text-sm text-zinc-500">
+                  <time dateTime={e.created_at} className="shrink-0 pt-0.5 text-sm text-muted">
                     {ago(e.created_at)}
                   </time>
                 </Link>

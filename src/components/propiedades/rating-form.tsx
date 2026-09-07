@@ -6,16 +6,15 @@ type Props = { propertyId: string; current: Record<Dimension, number | null> };
 /** Six groups of five radios, 44 px targets; pre-checked with the member's saved scores. */
 export function RatingForm({ propertyId, current }: Props) {
   return (
-    <form action={rateAction.bind(null, propertyId)} className="space-y-3">
+    <form action={rateAction.bind(null, propertyId)} className="space-y-4">
       {DIMENSIONS.map((dim) => (
-        <fieldset key={dim} className="flex flex-wrap items-center justify-between gap-2">
-          <legend className="sr-only">{DIMENSION_LABELS[dim]}</legend>
-          <span className="text-sm">{DIMENSION_LABELS[dim]}</span>
-          <div className="flex gap-1">
+        <fieldset key={dim} className="space-y-1.5">
+          <legend className="text-sm font-medium text-ink">{DIMENSION_LABELS[dim]}</legend>
+          <div className="flex gap-1.5">
             {[1, 2, 3, 4, 5].map((n) => (
               <label key={n} className="cursor-pointer">
                 <input type="radio" name={dim} value={n} defaultChecked={current[dim] === n} className="peer sr-only" />
-                <span className="flex h-11 w-11 items-center justify-center rounded-md border border-zinc-300 text-sm peer-checked:border-zinc-900 peer-checked:bg-zinc-900 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-sky-500">
+                <span className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-sm font-medium text-ink transition peer-checked:border-ink peer-checked:bg-ink peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-rausch hover:border-ink">
                   {n}
                 </span>
               </label>
@@ -23,7 +22,7 @@ export function RatingForm({ propertyId, current }: Props) {
           </div>
         </fieldset>
       ))}
-      <button type="submit" className="h-11 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white">
+      <button type="submit" className="h-12 w-full rounded-lg bg-rausch px-6 text-base font-medium text-white transition hover:bg-rausch-active">
         Guardar valoración
       </button>
     </form>
