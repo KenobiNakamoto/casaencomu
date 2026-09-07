@@ -15,6 +15,8 @@ _archive/
 # deps / build / runtime data
 node_modules
 node_modules.nosync
+# iCloud renames a colliding directory "node_modules 2"; the plain pattern above misses it
+node_modules[ ]*[0-9]*
 .next
 out/
 data/

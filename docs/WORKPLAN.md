@@ -4,9 +4,14 @@ _2026-09-04. The unit of work is one GitHub issue = one agent = one branch = one
 owns a file set; two open issues never share a file. `SCAFFOLD.md` § numbers hold the how;
 this file holds the who, the order, and the done-when. Load into GitHub with § 5 below._
 
-## 0. Status (2026-09-07, evening)
+## 0. Status — moved
 
-**Read this first. It is the only place that says what to do next.**
+**`docs/STATUS.md` is now the state of the project: what is done, what is not, what is blocked
+and on whom. Read that first.** This file keeps the plan, the file ownership and the order.
+
+What follows is the status as it stood on 2026-09-07, kept because the two lists below — the
+three items only Kenobi can do, and the lessons — are still true and still cost time. Anything
+here that disagrees with `STATUS.md` is out of date.
 
 ### Done
 

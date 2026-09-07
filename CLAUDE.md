@@ -17,20 +17,21 @@ the app keeps facts and photos, deduplicates, maps, compares, lets each member r
 and rechecks price and availability every 48 h. It runs on the MacBook Air inside the Colima VM
 that already hosts umbrelOS, and is reached through Cloudflare Tunnel + Access.
 
-**State (2026-09-07): code complete on `main` — 24 PRs merged, 60 tests (3 skipped), build green. Two themes (`DESIGN.md`). The dev database holds 23 real listings, ingested from the ads themselves with `scripts/ingest.mts`; nothing is hand-written. Nothing deployed: M1 waits on Kenobi's #1–#5, then #18 → #19 → #21 → #20. Status block: `docs/WORKPLAN.md` § 0.**
+**State (2026-09-08): `main` is green — 187 tests (3 skipped), lint, types and build clean. Three of the seven Release A product packages are merged (PIP-01, PIP-02, PIP-03); PIP-04 is in review as PR #76. The dev database holds 23 real listings, ingested from the ads themselves with `scripts/ingest.mts`; nothing is hand-written. Nothing is deployed to a domain — M1 waits on Kenobi's #1, #2 and #5, then #18 → #19 → #21 → #20 — but a password-protected preview runs on the Air over Tailscale. Full state, with what is not done: `docs/STATUS.md`.**
 
 ## Read in this order
 
 1. `README.md` — what the repo holds and where everything is. One page.
 2. `docs/PLAN.md` — plan v3 (ponytail): what is built and what is deliberately cut.
-3. `docs/WORKPLAN.md` — epics, issues with file ownership, waves, milestones. **Agents start here.**
-4. `docs/SCAFFOLD.md` — build and deploy steps, each with its check.
-5. `DESIGN.md` — colour, type and motion. Read it before touching any style.
-6. `src/README.md` — the code map: the two paths through the code, one line per module.
-7. `docs/PORTALS.md` — what each listing site actually serves. Before touching the extractor.
-8. `memory/decisions.md` — why v3 differs from v2 and v1.
-9. `docs/PRIOR-ART.md` — what already exists and why v1 is still built (2026-09-04).
-10. `00_docs/AIR-SERVER.md` (workspace root) — **before any command on the Air.**
+3. `docs/STATUS.md` — **what is actually done, what is not, and what is blocked. Read before you plan anything.**
+4. `docs/WORKPLAN.md` — epics, issues with file ownership, waves, milestones. **Agents start here.**
+5. `docs/SCAFFOLD.md` — build and deploy steps, each with its check.
+6. `DESIGN.md` — colour, type and motion. Read it before touching any style.
+7. `src/README.md` — the code map: the two paths through the code, one line per module.
+8. `docs/PORTALS.md` — what each listing site actually serves. Before touching the extractor.
+9. `memory/decisions.md` — why v3 differs from v2 and v1.
+10. `docs/PRIOR-ART.md` — what already exists and why v1 is still built (2026-09-04).
+11. `00_docs/AIR-SERVER.md` (workspace root) — **before any command on the Air.**
 
 `_archive/` holds v1 and v2 of the plan and the scaffold, superseded and not committed.
 
