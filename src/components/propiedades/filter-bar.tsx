@@ -6,10 +6,13 @@ import Link from "next/link";
 // inputs into `precio=<min>-<max>` and drop empty fields, so the URL carries only live filters.
 
 export type FilterValues = {
+  q: string;
   precioMin: string;
   precioMax: string;
   hab: string;
+  banos: string;
   m2: string;
+  estado: string;
   etapa: string;
   barrio: string;
   puntuacion: string;
@@ -47,6 +50,8 @@ export function FilterBar({ values: v, neighborhoods, stages }: Props) {
   return (
     <form method="get" action="/propiedades" onSubmit={onSubmit} className="space-y-4">
       <input type="hidden" name="precio" id="precio" />
+      <input type="hidden" name="q" value={v.q} readOnly />
+      <input type="hidden" name="estado" value={v.estado} readOnly />
       <input type="hidden" name="vista" value={v.vista === "filas" ? "filas" : ""} readOnly />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <label className={label}>
@@ -60,6 +65,10 @@ export function FilterBar({ values: v, neighborhoods, stages }: Props) {
         <label className={label}>
           Hab. mín.
           <input name="hab" type="number" min={0} inputMode="numeric" defaultValue={v.hab} className={input} />
+        </label>
+        <label className={label}>
+          Baños mín.
+          <input name="banos" type="number" min={0} inputMode="numeric" defaultValue={v.banos} className={input} />
         </label>
         <label className={label}>
           m² mín.
