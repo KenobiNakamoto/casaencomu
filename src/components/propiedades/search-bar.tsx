@@ -34,7 +34,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
             type="text"
             defaultValue={q}
             placeholder="Barrio, precio, m², palabras del anuncio…"
-            className="w-full truncate bg-transparent text-sm text-ink placeholder:text-muted-soft focus:outline-none"
+            className="w-full truncate bg-transparent text-ink placeholder:text-placeholder"
           />
         </label>
         <button type="submit" className="sr-only">
@@ -81,7 +81,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
                 name="url"
                 required
                 placeholder="Pega un anuncio de Idealista, Fotocasa o Habitaclia"
-                className="w-full truncate bg-transparent text-sm text-ink placeholder:text-muted-soft focus:outline-none"
+                className="w-full truncate bg-transparent text-ink placeholder:text-placeholder"
               />
             </label>
           </>
@@ -91,7 +91,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
           onClick={open ? undefined : () => setOpen(true)}
           aria-label={open ? "Guardar el anuncio" : "Añadir un anuncio"}
           aria-expanded={open}
-          className="flex h-10 w-10 shrink-0 items-center justify-center self-center rounded-full bg-accent text-white transition hover:bg-accent-active sm:h-12 sm:w-12"
+          className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-full sm:h-12 sm:w-12"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
             <path d="M12 5v14M5 12h14" />

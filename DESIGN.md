@@ -4,31 +4,53 @@ Two themes, one palette. Night is the default look: a black gradient ground with
 yellow secondary and a red accent. Day is the same two hues re-tuned so they hold contrast
 on light paper. Nothing else changes between them — same type, same spacing, same radii.
 
+The values below are the source of truth in prose. The values that **ship** are in
+`src/app/globals.css`, and `src/app/globals.test.ts` reads them from that file and asserts every
+pair that carries text. If this table and the stylesheet disagree, the stylesheet is right and
+this table is stale.
+
 ## Colour
 
-| Role | Night | Day | Used for |
-|---|---|---|---|
-| Canvas | `#0b0b0d` → `#141418` gradient | `#fbfaf7` → `#f1efe8` gradient | the page ground |
-| Raised | `#17171c` | `#ffffff` | cards, header, popovers, inputs |
-| Sunken | `#111116` | `#f4f2ec` | wells, table stripes, empty states |
-| Ink | `#f6f5f2` | `#16161a` | headings, prices |
-| Body | `#c9c6bf` | `#3f3d39` | paragraphs |
-| Muted | `#8f8c85` | `#6f6c66` | metadata, captions |
-| Hairline | `#2a2a31` | `#e4e1d9` | borders and dividers |
-| **Accent (red)** | `#ff453a` | `#e02a1f` | primary buttons, the brand mark, the price pin, destructive states |
-| **Secondary (yellow)** | `#ffd60a` | `#e0a800` | active filters, family score, the "new" badge, map highlights |
-| Error | `#ff6b5e` | `#c13515` | validation |
+| Role | Token | Night | Day | Used for |
+|---|---|---|---|---|
+| Canvas | `--canvas` → `--canvas-far` | `#0b0b0d` → `#141418` | `#fbfaf7` → `#f1efe8` | the page ground |
+| Raised | `--raised` | `#17171c` | `#ffffff` | cards, header, popovers, inputs |
+| Sunken | `--sunken` | `#111116` | `#f4f2ec` | wells, table stripes, empty states |
+| Ink | `--ink` | `#f6f5f2` | `#16161a` | headings, prices |
+| Body | `--body` | `#c9c6bf` | `#3f3d39` | paragraphs |
+| Muted | `--muted` | `#a39f97` | `#68645c` | metadata, captions, placeholders |
+| Hairline | `--hairline` | `#2a2a31` | `#e4e1d9` | decorative dividers |
+| Control border | `--control-border` | `#77747e` | `#8b867d` | the edge of anything you can click or type in |
+| Focus | `--focus` | `#98cbee` | `#245f89` | the focus ring |
+| **Accent (red)** | `--accent` | `#ff453a` | `#e02a1f` | the brand mark, ornament, the price pin |
+| **Action (red)** | `--action-bg` | `#c83a2f` | `#c52b22` | the filled primary button, and only that |
+| **Secondary (yellow)** | `--secondary` | `#ffd60a` | `#e0a800` | the selection edge and map highlight |
+| Selection | `--selection-bg` / `--selection-ink` | `#2a2405` / `#ffe17a` | `#fdf6e0` / `#695200` | a chosen filter or area |
+| Success | `--success-bg` / `--success-ink` | `#10241a` / `#90d3aa` | `#e6f4ec` / `#176b3e` | preseleccionada, source active |
+| Warning | `--warning-bg` / `--warning-ink` | `#302615` / `#f2c86e` | `#fff5dc` / `#815c00` | revisando, cannot check |
+| Danger | `--danger-bg` / `--danger-ink` | `#351c1b` / `#ff938c` | `#fcedeb` / `#b52a22` | no disponible, validation, out of budget |
+| Info | `--info-bg` / `--info-ink` | `#182631` / `#98cbee` | `#eef5fa` / `#245f89` | nueva |
+| Visit | `--visit-bg` / `--visit-ink` | `#292236` / `#c5addf` | `#f4effa` / `#6b4b8a` | visita prevista |
+
+**Accent is not action.** `--accent` is the ornamental red — the mark, a pin, an icon. It is too
+light in night mode to carry white text: white on it measures 3.41:1. Anything with white text on
+a red ground uses `--action-bg`, which measures 5.61:1 in day and 5.12:1 in night. The
+`btn-primary` utility applies the whole set, hover and pressed included; write that, not a colour.
 
 Accent and secondary never appear in the same control. Red asks for a click; yellow marks
-something the family already chose.
-
-Text on accent is always white. Text on secondary is always ink — yellow is too light to
+something the family already chose. Text on secondary is always ink — yellow is too light to
 carry white in either theme.
+
+**Status is never colour alone.** Every stage chip carries a shape beside its word, every error
+carries text. A member who cannot separate the six stage colours still reads six different chips.
 
 ## Type
 
 Plus Jakarta Sans, self-hosted by `next/font`, weights 400/500/600/700. Prices and the
 family score use 600. Nothing is italic. Nothing is uppercase except two-letter labels.
+
+Editable fields are 16 px and never smaller. Below that, iOS Safari zooms the whole page when
+the field takes focus, and the page does not zoom back.
 
 ## Shape and depth
 
@@ -36,13 +58,35 @@ One radius: `--radius-card: 14px`, pills at `9999px`. One shadow tier, defined p
 in night the elevation comes from a lighter surface plus a hairline, not from a black shadow
 nobody can see.
 
+## Reach and focus
+
+Anything you tap has a 44 × 44 px hit area. The visible glyph can be smaller: the `touch-target`
+utility grows the area underneath without moving anything on screen.
+
+The focus ring is 2 px of `--focus` at 2 px offset, declared once in the base layer and never
+animated, so it is on screen the frame the key lands. No component writes `outline-none`.
+
+## Obstructions
+
+Two fixed things overlap the page: the header and, below 1024 px, the bottom navigation. Each has
+one name — `--header-h`, `--nav-bottom-h` — and everything that must clear them reads that name.
+There is no second hard-coded `bottom-20` anywhere.
+
 ## Motion
 
-One rule: 120–180 ms, `ease-out`, on colour and transform only. The single exception is the
-theme switch, which reveals the new theme with a circle wipe from the toggle button through
-the View Transition API, and which is skipped entirely under `prefers-reduced-motion`.
+Tokens: `--duration-fast: 120ms`, `--duration-standard: 180ms`, `--duration-theme: 320ms`,
+`--ease-out`. Colour and transform only; never width, height, margin or top/left.
+
+`prefers-reduced-motion` is honoured once, globally, and it removes the movement itself where the
+movement is the point — the card photo zoom and the map pin scale — not merely the transition that
+carries it. A scale with no transition is still a jump.
 
 ## The distinctive move
 
-The theme switch itself. One button, one circular wipe out of it, the whole page repainted —
-no fade, no cross-dissolve, no second showpiece anywhere else on the page.
+The theme switch. One button, one circular wipe out of it, the whole page repainted — no fade, no
+cross-dissolve, no second showpiece anywhere else on the page.
+
+It has three states, not two: the system's choice, day, night. The wipe is skipped, and the theme
+applied at once, in three cases: reduced motion, a browser without the View Transition API, and a
+visible map. The last one is not a compromise — WebGL canvases snapshot blank, so the wipe would
+reveal a white rectangle where the map is.

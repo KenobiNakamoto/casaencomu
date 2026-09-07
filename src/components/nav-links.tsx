@@ -18,7 +18,7 @@ export default function NavLinks({ items }: { items: NavItem[] }) {
   return (
     <nav
       aria-label="Principal"
-      className="fixed inset-x-0 bottom-0 z-20 flex border-t border-hairline bg-raised pb-[env(safe-area-inset-bottom)] md:static md:inset-auto md:mx-auto md:h-full md:border-0 md:pb-0"
+      className="fixed inset-x-0 bottom-0 z-20 flex border-t border-hairline bg-raised pb-[env(safe-area-inset-bottom)] lg:static lg:inset-auto lg:mx-auto lg:h-full lg:border-0 lg:pb-0"
     >
       {items.map(({ href, label, icon, badge }) => {
         const active = pathname === href || pathname.startsWith(href + "/");
@@ -27,25 +27,25 @@ export default function NavLinks({ items }: { items: NavItem[] }) {
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
-            className={`relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 px-2 text-[10px] font-medium transition md:h-full md:min-h-0 md:flex-none md:flex-row md:gap-0 md:border-b-2 md:px-4 md:text-base ${
+            className={`relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 px-2 text-[10px] font-medium transition lg:h-full lg:min-h-0 lg:flex-none lg:flex-row lg:gap-0 lg:border-b-2 lg:px-4 lg:text-base ${
               active
-                ? "text-accent md:border-ink md:font-semibold md:text-ink"
-                : "text-muted md:border-transparent md:hover:text-ink"
+                ? "text-accent lg:border-ink lg:font-semibold lg:text-ink"
+                : "text-muted lg:border-transparent lg:hover:text-ink"
             }`}
           >
-            <span className="relative md:hidden">
+            <span className="relative lg:hidden">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d={ICONS[icon]} />
               </svg>
               {badge ? (
-                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-white">
+                <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-action px-1 text-[10px] font-semibold leading-none text-on-action">
                   {badge}
                 </span>
               ) : null}
             </span>
             <span>{label}</span>
             {badge ? (
-              <span className="ml-1.5 hidden rounded-full bg-accent px-1.5 py-0.5 text-xs font-semibold leading-none text-white md:inline">
+              <span className="ml-1.5 hidden rounded-full bg-action px-1.5 py-0.5 text-xs font-semibold leading-none text-on-action lg:inline">
                 {badge}
               </span>
             ) : null}

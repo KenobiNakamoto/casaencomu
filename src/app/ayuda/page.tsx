@@ -12,7 +12,7 @@ export default async function AyudaPage() {
   // React 19 rewrites any `javascript:` href to a throw, so the anchor is emitted as raw HTML.
   // Safe: buildBookmarklet percent-encodes the code, so no quote or angle bracket reaches the attribute.
   const link =
-    `<a href="${bookmarklet}" class="inline-flex h-12 items-center gap-2 rounded-lg bg-accent px-5 font-medium text-white select-none">` +
+    `<a href="${bookmarklet}" class="btn-primary inline-flex h-12 items-center gap-2 rounded-lg px-5 font-medium select-none">` +
     "📌 Guardar en CasaEnComú</a>";
 
   const h2 = "text-lg font-medium";
@@ -43,7 +43,7 @@ export default async function AyudaPage() {
           readOnly
           value={bookmarklet}
           rows={4}
-          className="w-full rounded-lg border border-hairline p-3 font-mono text-xs break-all focus:border-ink focus:outline-none"
+          className="w-full rounded-lg border border-control-border p-3 font-mono text-xs break-all focus:border-ink"
         />
       </section>
 

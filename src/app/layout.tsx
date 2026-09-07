@@ -25,11 +25,15 @@ export const viewport: Viewport = {
 };
 
 /**
- * Runs before the first paint, so the stored theme is on <html> when the CSS is applied and
+ * Runs before the first paint, so the resolved theme is on <html> when the CSS is applied and
  * there is no flash of the wrong one. It cannot be a React effect: effects run after paint.
- * ponytail: three lines inline instead of next-themes.
+ * `sistema` (and anything unrecognised) resolves against the system; `light` and `dark` are the
+ * explicit choices version 1 also wrote, so an existing preference still works. If this script
+ * never runs, the `prefers-color-scheme` block in `globals.css` still gives a usable theme.
+ * ponytail: four lines inline instead of next-themes. Mirrors `src/lib/theme.ts`, which is where
+ * the same rules are stated in TypeScript and tested.
  */
-const NO_FLASH = `try{var t=localStorage.getItem("tema");document.documentElement.dataset.theme=t||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}catch(e){}`;
+const NO_FLASH = `try{var t=localStorage.getItem("tema");document.documentElement.dataset.theme=(t==="light"||t==="dark")?t:(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -39,7 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen font-sans text-ink antialiased">
         <Nav />
-        <main className="pb-20 md:pb-0">{children}</main>
+        <main className="pb-[var(--nav-bottom-h)] lg:pb-0">{children}</main>
       </body>
     </html>
   );

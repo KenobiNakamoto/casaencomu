@@ -77,7 +77,7 @@ function describe(kind: string, p: Record<string, unknown>) {
 
 const h2 = "text-[22px] font-medium leading-tight";
 const section = "space-y-4 py-8";
-const primary = "h-12 w-full rounded-lg bg-accent px-6 text-base font-medium text-white transition hover:bg-accent-active";
+const primary = "btn-primary h-12 w-full rounded-lg px-6 text-base font-medium";
 const cell = "border-b border-hairline-soft py-2 pr-3 align-top";
 const initial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 const score = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -268,13 +268,13 @@ export default async function PropiedadPage({
                         </a>
                       )}
                       <span className="text-muted">vía {s.via === "bookmarklet" ? "marcador" : s.via}</span>
-                      <Chip tone={s.availability === "active" ? "green" : s.availability === "unknown" ? "amber" : "red"}>
+                      <Chip tone={s.availability === "active" ? "success" : s.availability === "unknown" ? "warning" : "danger"}>
                         {AVAILABILITY[s.availability] ?? s.availability}
                       </Chip>
                       <span className="text-muted">Comprobado: {s.last_checked_at ? fmtDateTime(s.last_checked_at) : "nunca"}</span>
                       {check && (
-                        <span className="text-amber-800">
-                          <Chip tone="amber">Comprobar</Chip> Abre el anuncio y vuelve a pulsar el marcador.
+                        <span className="text-warning-ink">
+                          <Chip tone="warning">Comprobar</Chip> Abre el anuncio y vuelve a pulsar el marcador.
                         </span>
                       )}
                     </li>
@@ -376,7 +376,7 @@ export default async function PropiedadPage({
                 rows={3}
                 maxLength={4000}
                 placeholder="Escribe un comentario…"
-                className="w-full rounded-lg border border-hairline p-3 text-sm transition focus:border-ink focus:outline-none"
+                className="w-full rounded-lg border border-control-border bg-raised p-3 transition focus:border-ink"
               />
               <button type="submit" className="h-12 rounded-lg bg-ink px-6 text-base font-medium text-canvas transition hover:opacity-90">
                 Comentar

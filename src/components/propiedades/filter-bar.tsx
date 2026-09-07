@@ -28,7 +28,7 @@ type Props = {
 };
 
 const label = "flex flex-col gap-1.5 text-xs font-semibold text-muted";
-export const input = "h-12 w-full rounded-lg border border-hairline bg-raised px-3 text-sm text-ink transition focus:border-ink focus:outline-none";
+export const input = "h-12 w-full rounded-lg border border-control-border bg-raised px-3 text-ink transition focus:border-ink";
 
 function onSubmit(e: React.FormEvent<HTMLFormElement>) {
   const form = e.currentTarget;
