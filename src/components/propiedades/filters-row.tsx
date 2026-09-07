@@ -18,7 +18,7 @@ const PRESETS: { label: string; param: Param; value: string }[] = [
 ];
 
 /** Every filter that gets a bubble, in the order they read best. */
-const CLEARABLE = ["q", "precio", "hab", "banos", "m2", "barrio", "puntuacion", "estado", "etapa"] as const;
+const CLEARABLE = ["q", "precio", "hab", "banos", "m2", "barrio", "zona", "puntuacion", "estado", "etapa"] as const;
 
 export function QuickFilters({ v, href }: { v: FilterValues; href: Href }) {
   return (
@@ -49,7 +49,7 @@ function priceLabel(v: FilterValues) {
   return v.precioMin ? `Desde ${fmtEur(min)}` : `Hasta ${fmtEur(max)}`;
 }
 
-export function ActiveFilters({ v, href }: { v: FilterValues; href: Href }) {
+export function ActiveFilters({ v, href, zonaLabel }: { v: FilterValues; href: Href; zonaLabel?: string }) {
   const items: { label: string; patch: Record<string, string> }[] = [];
   if (v.q) items.push({ label: `“${v.q}”`, patch: { q: "" } });
   if (v.precioMin || v.precioMax) items.push({ label: priceLabel(v), patch: { precio: "" } });
@@ -57,6 +57,7 @@ export function ActiveFilters({ v, href }: { v: FilterValues; href: Href }) {
   if (v.banos) items.push({ label: `${v.banos}+ baños`, patch: { banos: "" } });
   if (v.m2) items.push({ label: `${v.m2}+ m²`, patch: { m2: "" } });
   if (v.barrio) items.push({ label: v.barrio, patch: { barrio: "" } });
+  if (v.zona && zonaLabel) items.push({ label: zonaLabel, patch: { zona: "" } });
   if (v.puntuacion) items.push({ label: `Nota ${v.puntuacion}+`, patch: { puntuacion: "" } });
   if (v.etapa) items.push({ label: STAGE_LABELS[v.etapa as Stage] ?? v.etapa, patch: { etapa: "" } });
   if (v.estado in CONDITIONS) items.push({ label: CONDITIONS[v.estado as keyof typeof CONDITIONS].label, patch: { estado: "" } });

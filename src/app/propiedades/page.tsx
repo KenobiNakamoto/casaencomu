@@ -8,6 +8,7 @@ import { RowsTable } from "@/components/propiedades/rows";
 import { SearchBar } from "@/components/propiedades/search-bar";
 import { db } from "@/lib/db";
 import { STAGE_LABELS, STAGES, type Stage } from "@/lib/listing";
+import { findArea, isIn } from "@/lib/areas";
 import { HAYSTACK_SQL, isCondition, matchesCondition, matchesQuery } from "@/lib/search";
 import { getBudget } from "@/lib/settings";
 import { setBudgetAction } from "./actions";
@@ -31,6 +32,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   const etapa = first(sp.etapa);
   const puntuacion = first(sp.puntuacion);
   const estado = first(sp.estado);
+  const area = await findArea(first(sp.zona));
   const v: FilterValues = {
     q: first(sp.q).trim(),
     precioMin: precio?.[1] ?? "",
@@ -41,6 +43,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
     estado: isCondition(estado) ? estado : "",
     etapa: STAGES.includes(etapa as Stage) ? etapa : "",
     barrio: first(sp.barrio),
+    zona: area?.properties.id ?? "",
     puntuacion: /^[1-5]$/.test(puntuacion) ? puntuacion : "",
     orden: first(sp.orden) in ORDER ? first(sp.orden) : "fecha",
     vista: first(sp.vista) === "filas" ? "filas" : "galeria",
@@ -85,7 +88,10 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   // ponytail: the text filters run here, not in SQL, so "gotic" finds "Gòtic". See src/lib/search.ts.
   const rows = list.rows as unknown as (Listed & { haystack: string })[];
   const items = rows.filter(
-    (p) => matchesQuery(p.haystack, v.q) && (!v.estado || matchesCondition(p.haystack, v.estado as Parameters<typeof matchesCondition>[1])),
+    (p) =>
+      matchesQuery(p.haystack, v.q) &&
+      (!v.estado || matchesCondition(p.haystack, v.estado as Parameters<typeof matchesCondition>[1])) &&
+      (!area || isIn(area, p)),
   );
   const total = Number(counts.rows[0].n);
   const neighborhoods = barrios.rows.map((r) => String(r.neighborhood));
@@ -104,7 +110,9 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
       stage: p.stage as Stage,
       cover: p.cover_id ? `/api/photos/${p.cover_id}` : null,
     }));
-  const activeFilters = [precio && (v.precioMin || v.precioMax), v.hab, v.banos, v.m2, v.barrio, v.puntuacion, v.estado, v.q].filter(Boolean).length;
+  const activeFilters = [precio && (v.precioMin || v.precioMax), v.hab, v.banos, v.m2, v.barrio, v.zona, v.puntuacion, v.estado, v.q].filter(
+    Boolean,
+  ).length;
 
   // Links that keep the live filters and change one key.
   const current: Record<string, string> = {
@@ -116,6 +124,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
     estado: v.estado,
     etapa: v.etapa,
     barrio: v.barrio,
+    zona: v.zona,
     puntuacion: v.puntuacion,
     orden: v.orden === "fecha" ? "" : v.orden,
     vista: v.vista === "filas" ? "filas" : "",
@@ -126,7 +135,8 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
     const s = q.toString();
     return s ? `/propiedades?${s}` : "/propiedades";
   };
-  const mapHref = v.etapa ? `/mapa?etapa=${v.etapa}` : "/mapa";
+  const mapParams = new URLSearchParams(Object.entries({ etapa: v.etapa, zona: v.zona }).filter(([, val]) => val));
+  const mapHref = mapParams.size ? `/mapa?${mapParams}` : "/mapa";
 
   return (
     <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10">
@@ -178,7 +188,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
       </div>
 
       <QuickFilters v={v} href={href} />
-      <ActiveFilters v={v} href={href} />
+      <ActiveFilters v={v} href={href} zonaLabel={area?.properties.name} />
 
       {/* Result line + view toggle */}
       <div className="flex flex-wrap items-center justify-between gap-3 py-4">
@@ -220,7 +230,12 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
         </section>
         <aside className="hidden split:block">
           <div className="sticky top-[104px] h-[calc(100dvh-128px)] overflow-hidden rounded-card border border-hairline">
-            <Mapa markers={markers} embedded />
+            <Mapa
+              markers={markers}
+              embedded
+              zona={v.zona}
+              params={Object.fromEntries(Object.entries(current).filter(([, val]) => val))}
+            />
           </div>
         </aside>
       </div>
