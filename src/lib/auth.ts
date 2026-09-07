@@ -14,6 +14,56 @@ export async function verifyAccessToken(token: string, { jwks, issuer, audience 
   return payload.email;
 }
 
+/**
+ * Constant-time compare of two secrets. Digesting first fixes the length, so the loop
+ * never runs over the password's own bytes and its timing says nothing about them.
+ */
+async function sameSecret(a: string, b: string) {
+  const enc = new TextEncoder();
+  const [x, y] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(a)),
+    crypto.subtle.digest("SHA-256", enc.encode(b)),
+  ]);
+  const [xs, ys] = [new Uint8Array(x), new Uint8Array(y)];
+  let diff = 0;
+  for (let i = 0; i < xs.length; i++) diff |= xs[i] ^ ys[i];
+  return diff === 0;
+}
+
+const LOCAL_PART = /^[a-z0-9](?:[a-z0-9._+-]{0,30}[a-z0-9])?$/;
+
+/**
+ * Preview auth: `Basic base64(user:password)`. The password is shared; the user half
+ * becomes the identity, so each family member keeps their own ratings and activity.
+ * Returns the email, or null for any credential this does not accept.
+ *
+ * ponytail: Basic auth over a tailnet, not a session cookie. The tailnet is the
+ * perimeter; swap in a real login when the app leaves it.
+ */
+export async function previewEmail(header: string | null, password: string): Promise<string | null> {
+  if (!password) return null;
+  const [scheme, encoded] = (header ?? "").split(" ");
+  if (scheme?.toLowerCase() !== "basic" || !encoded) return null;
+
+  let decoded: string;
+  try {
+    decoded = atob(encoded);
+  } catch {
+    return null;
+  }
+
+  // Only the first colon splits: a password may contain one.
+  const sep = decoded.indexOf(":");
+  if (sep < 1) return null;
+  const user = decoded.slice(0, sep).toLowerCase();
+  if (!(await sameSecret(decoded.slice(sep + 1), password))) return null;
+
+  const [local, domain, ...rest] = user.split("@");
+  if (rest.length || !LOCAL_PART.test(local ?? "")) return null;
+  if (domain !== undefined && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) return null;
+  return domain ? user : `${local}@casa.local`;
+}
+
 export type User = {
   id: string;
   email: string;
