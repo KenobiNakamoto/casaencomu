@@ -12,7 +12,8 @@ From an empty folder to v1 on the Air. Steps in order; each ends with a check. C
   `node_modules.nosync` + symlink. Init, commit, push only when Kenobi says.
 - **No PII in the repo.** `memory/` gitignored. `.env.example` has placeholders only.
 - **Spanish UI, hardcoded.** No i18n library.
-- **Stack:** Next.js 16.2, React 19, `@libsql/client` (raw SQL, no ORM), Tailwind 4, zod 4,
+- **Stack:** Next.js 16.2, React 19, `@libsql/client` (raw SQL, no ORM), Tailwind 4 (two themes
+  over `@theme inline` + `data-theme`, see `DESIGN.md`), zod 4,
   vitest, `jose`, `maplibre-gl`, `sharp`. Nothing else until a trigger in `PLAN.md` fires.
 
 ## 0. Prerequisites — Kenobi's hand
@@ -207,9 +208,18 @@ Server components read the DB; mutations are server actions.
 - `/actividad` — `events` newest first; sets `last_seen_at`.
 - `/ayuda` — bookmarklet, how-to, and a one-line health readout from `/api/health`.
 - Mobile: bottom nav with four items; rating targets ≥ 44 px.
+- Themes: `src/app/globals.css` holds both palettes as CSS variables behind `@theme inline`, so
+  every Tailwind colour utility resolves at runtime. `data-theme` on `<html>` picks one; the
+  inline script in `layout.tsx` sets it before the first paint (no flash), `ThemeToggle` writes it
+  and mirrors it to `localStorage.tema`, and `useTheme` reads it back through
+  `useSyncExternalStore`. Roles and hexes: `DESIGN.md`. Never write a raw hex in a component.
+
+Filling it for a look: `pnpm tsx scripts/seed.mts [file.json] [--reset]`. The committed
+`scripts/seed.example.json` is fictional; real listings come from a gitignored file passed as an
+argument, because family comments are PII.
 
 Check (manual, two phones): add → rate → compare → map → stage change shows in the other
-member's `Actividad`.
+member's `Actividad`; both themes survive a reload.
 
 ## 6. Rechecks (Phase 4) — `recheck.ts`, `changes.ts`
 

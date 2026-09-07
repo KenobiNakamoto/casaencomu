@@ -23,6 +23,7 @@ umbrelOS, and is reached through Cloudflare Tunnel + Access.
 
 1. `PLAN.md` — plan v3 (ponytail). Start here.
 2. `SCAFFOLD.md` — build and deploy steps with checks.
+2a. `DESIGN.md` — colour, type and motion. Read it before touching any style.
 2b. `WORKPLAN.md` — epics, issues with file ownership, waves, milestones. Agents start here.
 3. `memory/decisions.md` — why v3 differs from v2 and v1.
 4. `PRIOR-ART.md` — what already exists and why v1 is still built (2026-09-04).

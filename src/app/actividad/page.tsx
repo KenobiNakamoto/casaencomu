@@ -96,7 +96,7 @@ export default async function ActividadPage() {
                 >
                   <span
                     className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-                      e.actor ? "bg-surface-strong text-ink" : "bg-rausch-tint text-rausch"
+                      e.actor ? "bg-surface-strong text-ink" : "bg-accent-tint text-accent"
                     }`}
                     aria-hidden
                   >
@@ -104,7 +104,7 @@ export default async function ActividadPage() {
                   </span>
                   <span className="flex-1 text-[15px] leading-snug">
                     {isNew && (
-                      <span className="mr-2 inline-block rounded-full bg-rausch px-2 py-0.5 align-middle text-[11px] font-semibold text-white">
+                      <span className="mr-2 inline-block rounded-full bg-accent px-2 py-0.5 align-middle text-[11px] font-semibold text-white">
                         nuevo
                       </span>
                     )}

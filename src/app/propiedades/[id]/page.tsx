@@ -77,7 +77,7 @@ function describe(kind: string, p: Record<string, unknown>) {
 
 const h2 = "text-[22px] font-medium leading-tight";
 const section = "space-y-4 py-8";
-const primary = "h-12 w-full rounded-lg bg-rausch px-6 text-base font-medium text-white transition hover:bg-rausch-active";
+const primary = "h-12 w-full rounded-lg bg-accent px-6 text-base font-medium text-white transition hover:bg-accent-active";
 const cell = "border-b border-hairline-soft py-2 pr-3 align-top";
 const initial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 const score = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -156,7 +156,7 @@ export default async function PropiedadPage({
       </Link>
 
       {(Array.isArray(sp.dup) ? sp.dup[0] : sp.dup) === "1" && (
-        <p className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Ya estaba guardada.</p>
+        <p className="mt-4 rounded-lg bg-ok-tint px-4 py-3 text-sm text-ok">Ya estaba guardada.</p>
       )}
 
       <header className="mt-4 space-y-1">
@@ -198,7 +198,7 @@ export default async function PropiedadPage({
       <div className="mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-16">
         {/* Side card: price, stage, your rating. Under the header on phones, sticky right rail on lg. */}
         <aside className="lg:col-start-2 lg:row-start-1 lg:self-start lg:sticky lg:top-28">
-          <div className="space-y-5 rounded-card border border-hairline bg-white p-6 shadow-tier">
+          <div className="space-y-5 rounded-card border border-hairline bg-raised p-6 shadow-tier">
             <div>
               <p className="text-[22px] font-semibold leading-tight">{fmtEur(p.price_eur, "Sin precio")}</p>
               <p className="text-sm text-muted">
@@ -378,7 +378,7 @@ export default async function PropiedadPage({
                 placeholder="Escribe un comentario…"
                 className="w-full rounded-lg border border-hairline p-3 text-sm transition focus:border-ink focus:outline-none"
               />
-              <button type="submit" className="h-12 rounded-lg bg-ink px-6 text-base font-medium text-white transition hover:bg-black">
+              <button type="submit" className="h-12 rounded-lg bg-ink px-6 text-base font-medium text-canvas transition hover:opacity-90">
                 Comentar
               </button>
             </form>
@@ -392,7 +392,7 @@ export default async function PropiedadPage({
               <ol className="relative space-y-4 border-l border-hairline pl-5 text-sm">
                 {eventRows.map((e, i) => (
                   <li key={i} className="relative">
-                    <span className="absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-rausch" aria-hidden />
+                    <span className="absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-raised bg-accent" aria-hidden />
                     <div className="text-muted">
                       {fmtDateTime(e.created_at)}
                       {e.actor && ` · ${e.actor}`}

@@ -28,7 +28,7 @@ type Props = {
 };
 
 const label = "flex flex-col gap-1.5 text-xs font-semibold text-muted";
-export const input = "h-12 w-full rounded-lg border border-hairline bg-white px-3 text-sm text-ink transition focus:border-ink focus:outline-none";
+export const input = "h-12 w-full rounded-lg border border-hairline bg-raised px-3 text-sm text-ink transition focus:border-ink focus:outline-none";
 
 function onSubmit(e: React.FormEvent<HTMLFormElement>) {
   const form = e.currentTarget;
@@ -122,7 +122,7 @@ export function FilterBar({ values: v, neighborhoods, stages }: Props) {
         <Link href={v.vista === "filas" ? "/propiedades?vista=filas" : "/propiedades"} className="text-sm font-medium text-ink underline underline-offset-4">
           Quitar filtros
         </Link>
-        <button type="submit" className="h-12 rounded-lg bg-ink px-6 text-base font-medium text-white transition hover:bg-black">
+        <button type="submit" className="h-12 rounded-lg bg-ink px-6 text-base font-medium text-canvas transition hover:opacity-90">
           Mostrar resultados
         </button>
       </div>

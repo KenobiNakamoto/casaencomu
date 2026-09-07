@@ -6,6 +6,7 @@ import type { ExpressionSpecification, Map as MLMap, SymbolLayerSpecification } 
 import "maplibre-gl/dist/maplibre-gl.css";
 import { areaCoords, countByArea, type AreaLevel, type Areas } from "@/lib/geo";
 import { STAGE_LABELS, type Stage } from "@/lib/listing";
+import { useTheme } from "../use-theme";
 
 export type MapMarker = {
   id: string;
@@ -26,18 +27,27 @@ const BARCELONA: [number, number] = [2.1686, 41.3874]; // [lng, lat]
 // maplibre-gl stays on 5.x: 6.x loads its worker as a separate ES module whose relative import of
 // maplibre-gl-shared.mjs 404s once Turbopack copies both files under hashed names.
 const STYLE = "https://tiles.openfreemap.org/styles/positron";
-// Airbnb's palette on top of Positron: one warm ground, blue water, green parks. Unknown layer ids are skipped.
-const PAINT: Record<string, Record<string, string>> = {
-  background: { "background-color": "#f6f5f2" },
-  landuse_residential: { "fill-color": "#f6f5f2" },
-  building: { "fill-color": "#edece8" },
-  water: { "fill-color": "#bfdff5" },
-  waterway: { "line-color": "#bfdff5" },
-  park: { "fill-color": "#d5ecd2" },
-  landcover_wood: { "fill-color": "#dcebd8" },
-};
+/** One read of the live theme tokens; see DESIGN.md. Called after `data-theme` is on <html>. */
+const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+/** Our palette on top of Positron, per theme. Unknown layer ids are skipped. */
+const paint = (): Record<string, Record<string, string>> => ({
+  background: { "background-color": css("--map-bg") },
+  landuse_residential: { "fill-color": css("--map-bg") },
+  building: { "fill-color": css("--map-building") },
+  water: { "fill-color": css("--map-water") },
+  waterway: { "line-color": css("--map-water") },
+  park: { "fill-color": css("--map-park") },
+  landcover_wood: { "fill-color": css("--map-wood") },
+});
+
 // Positron labels prefer `name_en` ("OLD TOWN"); the family reads the local names.
 const LOCAL_NAME: ExpressionSpecification = ["coalesce", ["get", "name:latin"], ["get", "name"]];
+/*
+ * ponytail: a theme change rebuilds the map instead of re-styling it in place — it happens once
+ * in a while, and the effect below already tears down cleanly.
+ */
+
 /** Districts while the whole city is in view, barris once you are looking at streets. */
 const ZOOM_SPLIT = 13.5;
 const LEVELS: { level: AreaLevel; minzoom: number; maxzoom: number; size: number; width: number }[] = [
@@ -67,16 +77,16 @@ function card(m: MapMarker) {
     .map((s) => esc(String(s)))
     .join(" · ");
   const href = `/propiedades/${encodeURIComponent(m.id)}`;
-  return `<a href="${href}" style="display:block;color:#222;text-decoration:none">
+  return `<a href="${href}" style="display:block;color:var(--ink);text-decoration:none">
     ${
       m.cover
         ? `<img src="${esc(m.cover)}" alt="" onerror="this.remove()" style="display:block;width:100%;aspect-ratio:4/3;object-fit:cover">`
-        : `<div style="width:100%;aspect-ratio:4/3;background:#f2f2f2"></div>`
+        : `<div style="width:100%;aspect-ratio:4/3;background:var(--surface-strong)"></div>`
     }
     <div style="padding:12px 14px 14px">
       <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.title)}</div>
-      <div style="color:#6a6a6a;font-size:13px;margin-top:2px">${meta || "Sin datos"}</div>
-      <div style="margin-top:6px"><strong>${price}</strong> <span style="color:#6a6a6a;font-size:13px">· ${STAGE_LABELS[m.stage] ?? esc(m.stage)}</span></div>
+      <div style="color:var(--muted);font-size:13px;margin-top:2px">${meta || "Sin datos"}</div>
+      <div style="margin-top:6px"><strong>${price}</strong> <span style="color:var(--muted);font-size:13px">· ${STAGE_LABELS[m.stage] ?? esc(m.stage)}</span></div>
     </div>
   </a>`;
 }
@@ -101,8 +111,12 @@ export default function Mapa({
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
+  const theme = useTheme();
 
   useEffect(() => {
+    // read once per build; `theme` in the deps is what makes a switch rebuild with new colours
+    const PAINTS = paint();
+    const accent = css("--accent");
     let map: MLMap | undefined;
     let cancelled = false;
     let detach = () => {};
@@ -124,7 +138,7 @@ export default function Mapa({
       map.setStyle(STYLE, {
         transformStyle: (_, s) => {
           for (const l of s.layers) {
-            if (PAINT[l.id]) Object.assign((l.paint ??= {}), PAINT[l.id]);
+            if (PAINTS[l.id]) Object.assign((l.paint ??= {}), PAINTS[l.id]);
             if (l.type === "symbol" && l.layout && JSON.stringify(l.layout["text-field"] ?? "").includes("name"))
               l.layout["text-field"] = LOCAL_NAME;
           }
@@ -192,7 +206,7 @@ export default function Mapa({
               minzoom,
               maxzoom,
               paint: {
-                "fill-color": "#ff385c",
+                "fill-color": accent,
                 // Outline only at rest: filling every area at once tints the whole city.
                 "fill-opacity": [
                   "case",
@@ -215,7 +229,7 @@ export default function Mapa({
               minzoom,
               maxzoom,
               paint: {
-                "line-color": "#ff385c",
+                "line-color": accent,
                 "line-width": ["case", ["==", ["get", "id"], zona], width + 1, width] as ExpressionSpecification,
                 "line-opacity": ["case", ["==", ["get", "id"], zona], 0.9, 0.4] as ExpressionSpecification,
               },
@@ -232,8 +246,8 @@ export default function Mapa({
             geometry: { type: "Polygon" as const, coordinates: [ring(mk.lng, mk.lat, 180)] },
           }));
           m.addSource("approx", { type: "geojson", data: { type: "FeatureCollection", features } });
-          m.addLayer({ id: "approx-fill", type: "fill", source: "approx", paint: { "fill-color": "#ff385c", "fill-opacity": 0.08 } }, before);
-          m.addLayer({ id: "approx-line", type: "line", source: "approx", paint: { "line-color": "#ff385c", "line-width": 1.5, "line-opacity": 0.6 } }, before);
+          m.addLayer({ id: "approx-fill", type: "fill", source: "approx", paint: { "fill-color": accent, "fill-opacity": 0.08 } }, before);
+          m.addLayer({ id: "approx-line", type: "line", source: "approx", paint: { "line-color": accent, "line-width": 1.5, "line-opacity": 0.6 } }, before);
         }
 
         // Area names on top of everything, with the count when the area holds anything.
@@ -262,8 +276,8 @@ export default function Mapa({
                 "text-padding": 6,
               },
               paint: {
-                "text-color": ["case", [">", ["get", "count"], 0], "#222222", "#8a8a8a"],
-                "text-halo-color": "#ffffff",
+                "text-color": ["case", [">", ["get", "count"], 0], css("--map-label"), css("--muted-soft")],
+                "text-halo-color": css("--map-halo"),
                 "text-halo-width": 1.6,
               },
             });
@@ -319,7 +333,7 @@ export default function Mapa({
       detach();
       map?.remove();
     };
-  }, [markers, embedded, zona, params, router, pathname]);
+  }, [markers, embedded, zona, params, router, pathname, theme]);
 
   // Full page: top bar (64/80 px) and the phone bottom bar (56 px) are outside the map.
   return (

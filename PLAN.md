@@ -67,8 +67,8 @@ data root:  /Volumes/TimeMachine/casaencomu   ← bind-mounted as /data
   prepopulated (Kenobi, 2026-09-04). Once set, out-of-range is flagged, never blocked.
 - Stages: `Nueva`, `Revisando`, `Preseleccionada`, `Visita prevista`, `Descartada`,
   `No disponible`. Anyone can change a stage.
-- Map: MapLibre GL + OpenFreeMap Positron (keyless vector tiles, Airbnb palette via paint
-  overrides), no clustering; exact vs approximate markers; tap → preview. Barcelona's districts
+- Map: MapLibre GL + OpenFreeMap Positron (keyless vector tiles, our palette via paint
+  overrides read from the live theme tokens), no clustering; exact vs approximate markers; tap → preview. Barcelona's districts
   and barris are drawn over it (`public/areas.geojson`, Ajuntament open data, CC BY 4.0), districts
   below zoom 13.5 and barris above, each labelled with how many properties it holds; clicking one
   filters the page with `?zona=`.
@@ -79,6 +79,8 @@ data root:  /Volumes/TimeMachine/casaencomu   ← bind-mounted as /data
 - Compare: 2–4 columns; differing rows highlighted; `Sin datos` for nulls.
 - `Actividad`: `events` newest first; unread badge from `users.last_seen_at`.
 - Mobile: bottom nav, full-screen map/list switch, ≥ 44 px rating targets.
+- Themes: day and night, switched by a toggle in the header and remembered in `localStorage`;
+  first choice follows the system. Palette and roles: `DESIGN.md`.
 
 ## Intake
 
