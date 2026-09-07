@@ -215,6 +215,33 @@ Server components read the DB; mutations are server actions.
   `useSyncExternalStore`. Roles and hexes: `DESIGN.md`. Never write a raw hex in a component.
 
 
+### What each portal actually serves (measured 2026-09-07)
+
+| Portal | Server fetch (`/api/import`) | Where the facts are |
+|---|---|---|
+| Idealista | **403, DataDome** | the `adMultimediasInfo` blob; browser only |
+| Fotocasa / Habitaclia | 200 | their own blobs |
+| Housfy | 200, but an empty SPA shell (410 once withdrawn) | the rendered text; browser only |
+| Vivalta | 200 | `og:description` + the summary line. A withdrawn ad answers **200 with the agency home page** |
+| iad España | 200 | a schema.org `Apartment` + `Offer` graph |
+
+Two of the five cannot be read by a server fetch, which is what the bookmarklet is for. Never
+work around the block: a page Idealista refuses is collected in a real browser or not at all.
+
+### Filling a dev database from real ads
+
+`pnpm tsx scripts/ingest.mts <dir> [--reset]` runs `extract()` and `save()` over saved page
+captures — the same two functions `/api/import` and `/api/capture` call, so nothing is invented.
+A capture is one JSON file per page, in either shape the extractor already accepts:
+`{url, status, html}` for a portal that answers a server fetch, or the bookmarklet shape
+(`{url, title, ld, og, blob, imgs, text}`) for one that does not.
+
+Collecting the browser-only ones in dev is awkward on purpose: a page on `https://` cannot reach
+`http://localhost`, so neither a `fetch` nor a form POST arrives. In production the app is on a
+public HTTPS origin and the bookmarklet just works. For a local run, hand the payload over in a
+URL fragment — navigate the tab to `http://localhost:3000/ayuda#cap=<encoded payload>`, then read
+`location.hash` from that page and post it same-origin.
+
 Check (manual, two phones): add → rate → compare → map → stage change shows in the other
 member's `Actividad`; both themes survive a reload.
 

@@ -172,3 +172,57 @@ describe("extract on a bookmarklet-shaped page (og + blob, no html)", () => {
     expect(l!.photos).toEqual(["https://cdn.example.com/a.jpg", "https://cdn.example.com/b.jpg"]);
   });
 });
+
+// The three smaller portals the family also uses (measured 2026-09-07). Each one publishes its
+// facts differently, which is what the `generic` branch has to cope with:
+// iad España a schema.org @graph, Vivalta a Spanish summary line, Housfy nothing at all until
+// the page has run its JavaScript — so its fixture is a bookmarklet capture, not html.
+describe("generic portals", () => {
+  it("iad España: schema.org Apartment + Offer", () => {
+    const l = extract({
+      url: "https://www.iadespana.es/anuncio/piso-venta-3-habitaciones-barcelona-88m2/r911605",
+      html: fixture("iad"),
+      status: 200,
+    });
+    expect(l).toMatchObject({ price_eur: 485000, area_m2: 88, rooms: 3, bathrooms: 1 });
+    expect(l!.agency).toContain("iad");
+  });
+
+  it("Vivalta: the summary line and og:description", () => {
+    const l = extract({ url: "https://www.vivalta.es/es/ref-7688_1168", html: fixture("vivalta"), status: 200 });
+    // 587.007 € · 87 m2 · 3 Habitaciones · 2 Baños, and "Ascensor" only in og:description
+    expect(l).toMatchObject({ price_eur: 587007, area_m2: 87, rooms: 3, bathrooms: 2, lift: true });
+    expect(l!.title).toBe("UNA REFORMA INTEGRAL EN PLENA DIAGONAL");
+  });
+
+  it("Vivalta: a withdrawn ad answers 200 with the agency home page", () => {
+    // the page never names ref 7742, so it is not that advertisement
+    expect(extract({ url: "https://www.vivalta.es/es/ref-7742_1168", html: fixture("vivalta-removed"), status: 200 })).toBeNull();
+  });
+
+  it("Housfy: a client-rendered page, read from a bookmarklet capture", () => {
+    const cap = JSON.parse(readFileSync(new URL("./__fixtures__/housfy-capture.json", import.meta.url), "utf8"));
+    const l = extract({
+      url: cap.url,
+      title: cap.title,
+      og: JSON.parse(cap.og),
+      ld: JSON.parse(cap.ld),
+      imgs: JSON.parse(cap.imgs),
+      text: cap.text,
+      status: 200,
+    });
+    // no og, no JSON-LD: the title comes from `document.title` alone
+    expect(l).toMatchObject({ price_eur: 500000, area_m2: 83, rooms: 4, bathrooms: 2, lift: true, neighborhood: "Eixample" });
+    expect(l!.title).toBe("Piso en venta en Calle Consell de cent, Eixample, Barcelona");
+  });
+
+  it("m² is matched when a newline follows it", () => {
+    // `m(?:²|2)\\b` never matches `83 m²\\n`: there is no word boundary after `²`
+    const l = extract({
+      url: "https://example.com/p/123456",
+      title: "Piso en venta en Calle X, Zona, Ciudad",
+      text: "400.000 €\n83 m²\n3 Habs.\n1 Baño\nRef: 123456",
+    });
+    expect(l).toMatchObject({ area_m2: 83, rooms: 3, bathrooms: 1, price_eur: 400000 });
+  });
+});

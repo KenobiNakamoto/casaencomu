@@ -11,6 +11,8 @@ import { isAllowedImageHost, normalizeUrl, type Portal } from "./url";
  */
 export type Page = {
   url: string;
+  /** `document.title`, sent by the bookmarklet. The only title a page with no og and no JSON-LD has. */
+  title?: string;
   finalUrl?: string;
   status?: number;
   html?: string;
@@ -23,7 +25,7 @@ export type Page = {
 
 // removed markers (spike/RESULTS.md): idealista 404 + body text, fotocasa 302 → ?propertyNotFound, habitaclia 301 → ?state=1
 const GONE_URL = /[?&](propertyNotFound|state=1)(?:&|$)/;
-const GONE_TEXT = /Lo sentimos, este anuncio ya no está publicado|imagen-no-disponible301|\?propertyNotFound/;
+const GONE_TEXT = /Lo sentimos, este anuncio ya no está publicado|imagen-no-disponible301|\?propertyNotFound|Esta página ya no está disponible/;
 // DataDome challenge page. Never bypassed: recognised and returned as null.
 const BLOCKED = /captcha-delivery\.com/;
 
@@ -40,6 +42,17 @@ const PHOTO_KEY: Partial<Record<Portal, RegExp>> = {
   fotocasa: /\/ads\/([0-9a-f-]{36})/i,
   habitaclia: /_([0-9a-f-]{36})[A-Z]*\.jpe?g$/i,
 };
+
+// schema.org types a portal may hang the dwelling off. Several small portals publish a @graph.
+const PLACE_TYPES = new Set([
+  "Apartment", "House", "Residence", "SingleFamilyResidence", "Accommodation", "Product", "RealEstateListing",
+]);
+/** A price in Spanish digit grouping, never a rate: `500.000 €` yes, `1.688 €/mes` and `€/m²` no. */
+const PRICE = /(\d[\d.]{4,})\s*€(?!\s*\/)/;
+// `\b` binds to the digit, not to `²`: after `²` there is no word boundary, so `83 m²\n` would miss
+const AREA = /(\d[\d.]*)\s*m(?:²|2\b)/i;
+const ROOMS = /(\d+)\s*(?:hab\b|habs?\b|habitacion|dormitorio)/i;
+const BATHS = /(\d+)\s*(?:baños?|banys?|aseos?)\b/i;
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 const decode = (s: string) =>
@@ -93,6 +106,8 @@ const jsJson = (blob: string, key: string): unknown => {
   }
 };
 const title = (s?: string | null) => s?.replace(/\s*(?:—|-|\|)\s*(?:idealista|fotocasa|habitaclia)(?:\.\w+)?\s*$/i, "").trim() || null;
+/** Small portals append their own name and the reference: `… - €500,000 | Housfy`, `… | Ref: 7688`. */
+const untag = (s: string | null) => s?.replace(/\s*[|·]\s*[^|·]{1,28}$/, "").replace(/\s+-\s+€[\d,.]+$/, "").trim() || s;
 
 const ogOf = (html: string) =>
   Object.fromEntries(
@@ -169,7 +184,12 @@ export function extract(page: Page): Listing | null {
   const thing = ld.find((x) => x && typeof x === "object" && x["@type"] !== "BreadcrumbList");
   const ldImg = thing?.image;
   const out: Partial<Listing> = {
-    title: title(thing?.name) ?? title(og["og:title"]) ?? title(m1(html, /<title[^>]*>([^<]*)<\/title>/)) ?? undefined,
+    title:
+      title(thing?.name) ??
+      title(og["og:title"]) ??
+      title(m1(html, /<title[^>]*>([^<]*)<\/title>/)) ??
+      title(page.title) ??
+      undefined,
     description: thing?.description ?? null,
   };
   const pagePics: (string | undefined | null)[] = [
@@ -221,10 +241,12 @@ export function extract(page: Page): Listing | null {
         lng: num(center?.[2]),
         address_precision: visibility === "EXACT" ? "exact" : visibility ? "approx" : "none",
       });
-      // fullScreenGalleryPics / verticalGalleryPics / picturesWithoutPlans list the same photos (44 × 3 = 132 here)
-      blobPics = [...blob.matchAll(/\{[^{}]*?"isPlan":(true|false)[^{}]*?imageDataService:"([^"]+)"/g)]
-        .filter((m) => m[1] === "false")
-        .map((m) => m[2]);
+      // fullScreenGalleryPics / verticalGalleryPics / picturesWithoutPlans list the same photos.
+      // The keys inside one photo object are not in a stable order between ads, so match the
+      // object and then test `isPlan` inside it rather than assuming `isPlan` comes first.
+      blobPics = [...blob.matchAll(/\{[^{}]*\bimageDataService:"([^"]+)"[^{}]*\}/g)]
+        .filter((m) => !/"isPlan":\s*true/.test(m[0]))
+        .map((m) => m[1]);
       break;
     }
     case "fotocasa": {
@@ -304,8 +326,58 @@ export function extract(page: Page): Listing | null {
       blobPics = imgList.map((i) => i.URLXL ?? i.URLG ?? i.src);
       break;
     }
-    case "generic":
+    case "generic": {
+      out.title = untag(out.title ?? null) ?? out.title;
+      // 1. schema.org. `@graph` is flattened first; iad España publishes Apartment + Offer that way.
+      const graph = ld.flatMap((x) =>
+        x && typeof x === "object" && Array.isArray((x as { "@graph"?: unknown[] })["@graph"])
+          ? ((x as { "@graph": LdThing[] })["@graph"])
+          : [x],
+      ) as (LdThing & Record<string, unknown>)[];
+      const byType = (type: string) => graph.find((x) => x?.["@type"] === type);
+      const place = graph.find((x) => PLACE_TYPES.has(String(x?.["@type"])));
+      const offer = byType("Offer");
+      const addr = place?.address as { streetAddress?: string; addressLocality?: string } | undefined;
+      const size = place?.floorSize as { value?: number } | undefined;
+      const seller = offer?.seller as { name?: string } | undefined;
+
+      // 2. the summary line the smaller portals print — `500.000 € · 83 m² · 4 Habs. · 2 Baños`.
+      // Anchored on the first price so a cookie banner or a mortgage widget cannot supply a number;
+      // the window reaches backwards too, because Vivalta prints the price last.
+      const hay = (og["og:description"] ?? "") + "\n" + text;
+      const at = hay.search(PRICE);
+      const own = at < 0 ? hay.slice(0, 600) : hay.slice(Math.max(0, at - 240), at + 320);
+      // "… en venta en Calle Consell de cent, Eixample, Barcelona": the middle part is the zone.
+      // The og text continues ", con 87 m2, 3 habitaciones…", so the address stops before that.
+      // ponytail: positional, not a gazetteer — wrong only when the portal omits the city.
+      const WHERE = / en (?:venta|alquiler) en ([^,]+(?:,(?!\s*con\b)[^,]+)*)/;
+      const where = (m1(out.title ?? "", WHERE) ?? m1(og["og:description"] ?? "", WHERE) ?? "")
+        .split(/\s*,\s*/)
+        .filter(Boolean);
+      // og:description always describes the listing itself, so features may be read from it
+      // wherever it sits in the page; `own` alone would miss a portal that prints them far apart.
+      const feats = (og["og:description"] ?? "") + "\n" + own;
+
+      Object.assign(out, {
+        price_eur: int(String(offer?.price ?? "").replace(/[^\d.]/g, "")) ?? int(m1(own, PRICE)),
+        area_m2: (typeof size?.value === "number" ? size.value : null) ?? int(m1(own, AREA)),
+        rooms: int(String(place?.numberOfBedrooms ?? "")) ?? int(m1(own, ROOMS)),
+        bathrooms: int(String(place?.numberOfBathroomsTotal ?? "")) ?? int(m1(own, BATHS)),
+        // "sin ascensor" contains "ascensor", so it has to be tested first
+        lift: /sin ascensor/i.test(feats) ? false : /ascensor/i.test(feats) ? true : null,
+        outdoor: m1(feats, /\b(terraza|balcón|balcon|jardín|jardin|patio)\b/i),
+        address_text: addr?.streetAddress ?? (where.length ? where.join(", ") : null),
+        neighborhood: where.length >= 3 ? where[where.length - 2] : (addr?.addressLocality ?? null),
+        agency: seller?.name ?? (byType("RealEstateAgent")?.name as string | undefined) ?? null,
+        description: out.description ?? null,
+      });
+      // A small portal may answer a withdrawn ad with 200 and its own home page rather than a
+      // 404 (Vivalta does). The reference in the URL is the check: a page that never names it is
+      // not that advertisement. Four digits or more, so a plain `/casa/1` is not treated as one.
+      const ref = m1(new URL(page.url).pathname, /(\d{4,})/);
+      if (ref && !text.includes(ref) && !blob.includes(ref)) return null;
       break;
+    }
   }
 
   if (!out.title) return null;
