@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Map as LeafletMap, Marker as LeafletMarker } from "leaflet";
-import "leaflet/dist/leaflet.css";
+import type { ExpressionSpecification, Map as MLMap } from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { STAGE_LABELS, type Stage } from "@/lib/listing";
 
 export type MapMarker = {
@@ -19,9 +19,32 @@ export type MapMarker = {
   cover: string | null;
 };
 
-const BARCELONA: [number, number] = [41.3874, 2.1686];
+const BARCELONA: [number, number] = [2.1686, 41.3874]; // [lng, lat]
+// ponytail: OpenFreeMap is keyless vector tiles; CARTO now watermarks, OSM raster is busy and blurs on Retina.
+// maplibre-gl stays on 5.x: 6.x loads its worker as a separate ES module whose relative import of
+// maplibre-gl-shared.mjs 404s once Turbopack copies both files under hashed names.
+const STYLE = "https://tiles.openfreemap.org/styles/positron";
+// Airbnb's palette on top of Positron: one warm ground, blue water, green parks. Unknown layer ids are skipped.
+const PAINT: Record<string, Record<string, string>> = {
+  background: { "background-color": "#f6f5f2" },
+  landuse_residential: { "fill-color": "#f6f5f2" },
+  building: { "fill-color": "#edece8" },
+  water: { "fill-color": "#bfdff5" },
+  waterway: { "line-color": "#bfdff5" },
+  park: { "fill-color": "#d5ecd2" },
+  landcover_wood: { "fill-color": "#dcebd8" },
+};
+// Positron labels prefer `name_en` ("OLD TOWN"); the family reads the local names.
+const LOCAL_NAME: ExpressionSpecification = ["coalesce", ["get", "name:latin"], ["get", "name"]];
 const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/** 32-point ring of `r` metres around a point; equirectangular is exact enough at 180 m. */
+const ring = (lng: number, lat: number, r: number) =>
+  Array.from({ length: 33 }, (_, i) => {
+    const a = (i / 32) * 2 * Math.PI;
+    return [lng + (r * Math.cos(a)) / (111320 * Math.cos((lat * Math.PI) / 180)), lat + (r * Math.sin(a)) / 111320];
+  });
 
 /** The popup is an Airbnb mini card: photo, title, meta, price. */
 function card(m: MapMarker) {
@@ -46,59 +69,87 @@ function card(m: MapMarker) {
 }
 
 /**
- * Plain Leaflet mounted in an effect. Price pills are the markers; hovering any element with
+ * Plain MapLibre mounted in an effect. Price pills are the markers; hovering any element with
  * `data-property=<id>` on the page (the list cards) highlights that pill.
  */
 export default function Mapa({ markers, embedded = false }: { markers: MapMarker[]; embedded?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let map: LeafletMap | undefined;
+    let map: MLMap | undefined;
     let cancelled = false;
     let detach = () => {};
     (async () => {
-      // ponytail: no react-leaflet; leaflet reads `window` on import, so it loads here, not at the top
-      const L = await import("leaflet");
+      // ponytail: no react wrapper; maplibre reads `window` on import, so it loads here, not at the top
+      const ml = await import("maplibre-gl");
       if (cancelled || !ref.current) return;
-      map = L.map(ref.current, { zoomControl: false });
-      L.control.zoom({ position: "bottomright" }).addTo(map);
-      // ponytail: OSM's keyless tiles, desaturated in CSS (.leaflet-tile-pane) for the calm Airbnb look; CARTO now wants an API key
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).addTo(map);
+      map = new ml.Map({
+        container: ref.current,
+        center: BARCELONA,
+        zoom: 12,
+        minZoom: 9,
+        maxZoom: 18,
+        attributionControl: false,
+        dragRotate: false,
+        pitchWithRotate: false,
+        touchPitch: false,
+      });
+      map.setStyle(STYLE, {
+        transformStyle: (_, s) => {
+          for (const l of s.layers) {
+            if (PAINT[l.id]) Object.assign((l.paint ??= {}), PAINT[l.id]);
+            if (l.type === "symbol" && l.layout && JSON.stringify(l.layout["text-field"] ?? "").includes("name"))
+              l.layout["text-field"] = LOCAL_NAME;
+          }
+          return s;
+        },
+      });
+      map.touchZoomRotate.disableRotation();
+      map.addControl(new ml.NavigationControl({ showCompass: false }), "bottom-right");
+      map.addControl(new ml.AttributionControl({ compact: true }), "bottom-left");
 
-      const group = L.featureGroup().addTo(map);
-      const byId = new Map<string, LeafletMarker>();
+      const byId = new Map<string, HTMLElement>();
+      const bounds = new ml.LngLatBounds();
       for (const m of markers) {
-        if (m.precision === "approx")
-          L.circle([m.lat, m.lng], { radius: 180, color: "#ff385c", weight: 1, fillColor: "#ff385c", fillOpacity: 0.1, interactive: false }).addTo(group);
-        const icon = L.divIcon({
-          className: "pin-wrap",
-          iconSize: [0, 0],
-          html: `<div class="pin${m.precision === "approx" ? " is-approx" : ""}">${m.price_eur == null ? "Sin precio" : esc(eur.format(m.price_eur))}</div>`,
-        });
-        const mk = L.marker([m.lat, m.lng], { icon, riseOnHover: true })
-          .bindPopup(card(m), { className: "mini", minWidth: 260, maxWidth: 260, offset: [0, -14], autoPanPadding: [24, 24] })
-          .addTo(group);
-        byId.set(m.id, mk);
+        const el = document.createElement("div");
+        el.className = "pin-wrap";
+        const price = m.price_eur == null ? "Sin precio" : esc(eur.format(m.price_eur));
+        el.innerHTML = `<div class="pin">${m.precision === "approx" ? "≈ " : ""}${price}</div>`;
+        const popup = new ml.Popup({ className: "mini", maxWidth: "260px", offset: 22, focusAfterOpen: false }).setHTML(card(m));
+        new ml.Marker({ element: el }).setLngLat([m.lng, m.lat]).setPopup(popup).addTo(map);
+        byId.set(m.id, el);
+        bounds.extend([m.lng, m.lat]);
       }
-      // Bounds from the coordinates: a Circle's getBounds() needs a projected map and throws before the first render.
-      if (markers.length) map.fitBounds(L.latLngBounds(markers.map((m) => [m.lat, m.lng] as [number, number])).pad(0.2), { maxZoom: 15 });
-      else map.setView(BARCELONA, 12);
+      if (markers.length) map.fitBounds(bounds, { padding: { top: 72, bottom: 72, left: 90, right: 90 }, maxZoom: 15, duration: 0 });
+
+      // Approximate addresses get a 180 m halo, drawn under the labels.
+      const approx = markers.filter((m) => m.precision === "approx");
+      if (approx.length)
+        map.on("load", () => {
+          if (!map) return;
+          const features = approx.map((m) => ({
+            type: "Feature" as const,
+            properties: {},
+            geometry: { type: "Polygon" as const, coordinates: [ring(m.lng, m.lat, 180)] },
+          }));
+          map.addSource("approx", { type: "geojson", data: { type: "FeatureCollection", features } });
+          const before = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
+          map.addLayer({ id: "approx-fill", type: "fill", source: "approx", paint: { "fill-color": "#ff385c", "fill-opacity": 0.08 } }, before);
+          map.addLayer({ id: "approx-line", type: "line", source: "approx", paint: { "line-color": "#ff385c", "line-width": 1.5, "line-opacity": 0.6 } }, before);
+        });
 
       // Hover sync with the list: the card's data-property → its pill.
-      let active: LeafletMarker | undefined;
-      const set = (mk: LeafletMarker | undefined, on: boolean) => {
-        mk?.getElement()?.querySelector(".pin")?.classList.toggle("is-active", on);
-        mk?.setZIndexOffset(on ? 1000 : 0);
+      let active: HTMLElement | undefined;
+      const set = (el: HTMLElement | undefined, on: boolean) => {
+        el?.querySelector(".pin")?.classList.toggle("is-active", on);
+        if (el) el.style.zIndex = on ? "1" : "";
       };
       const over = (e: Event) => {
         const id = (e.target as Element).closest?.("[data-property]")?.getAttribute("data-property");
-        const mk = id ? byId.get(id) : undefined;
-        if (mk === active) return;
+        const el = id ? byId.get(id) : undefined;
+        if (el === active) return;
         set(active, false);
-        active = mk;
+        active = el;
         set(active, true);
       };
       document.addEventListener("mouseover", over);

@@ -13,7 +13,7 @@ From an empty folder to v1 on the Air. Steps in order; each ends with a check. C
 - **No PII in the repo.** `memory/` gitignored. `.env.example` has placeholders only.
 - **Spanish UI, hardcoded.** No i18n library.
 - **Stack:** Next.js 16.2, React 19, `@libsql/client` (raw SQL, no ORM), Tailwind 4, zod 4,
-  vitest, `jose`, `leaflet`, `sharp`. Nothing else until a trigger in `PLAN.md` fires.
+  vitest, `jose`, `maplibre-gl`, `sharp`. Nothing else until a trigger in `PLAN.md` fires.
 
 ## 0. Prerequisites — Kenobi's hand
 
@@ -57,8 +57,8 @@ cd "$WS/04_Apps/CasaEnComú"
 pnpm create next-app@latest . --ts --app --tailwind --eslint --src-dir --import-alias "@/*" --use-pnpm
 #   refuses a non-empty dir? scaffold into ./tmp, then `rsync -a tmp/ . && rm -rf tmp`
 mv node_modules node_modules.nosync && ln -s node_modules.nosync node_modules
-pnpm add @libsql/client zod jose leaflet sharp
-pnpm add -D vitest tsx @types/leaflet
+pnpm add @libsql/client zod jose maplibre-gl@5 sharp
+pnpm add -D vitest tsx
 ```
 
 `.gitignore` add: `.env`, `.env.*.local`, `node_modules`, `node_modules.nosync`, `.next`,
@@ -199,7 +199,7 @@ Server components read the DB; mutations are server actions.
   `Fuera de presupuesto` chip on out-of-range cards.
 - `/propiedades/[id]` — photos, facts, sources, description, price history (from `events`),
   review matrix (6 × members), comments, timeline, stage select.
-- `/mapa` — plain Leaflet in a `useEffect` client component (`// ponytail: no react-leaflet`);
+- `/mapa` — plain MapLibre GL in a `useEffect` client component (`// ponytail: no react wrapper`);
   markers from a JSON endpoint; exact = solid, approx = ring; same URL filters.
 - `/comparar?ids=a,b,c` — 2–4 columns; differing rows highlighted; `Sin datos`.
 - `/actividad` — `events` newest first; sets `last_seen_at`.

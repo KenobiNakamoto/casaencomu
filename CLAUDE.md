@@ -32,7 +32,7 @@ umbrelOS, and is reached through Cloudflare Tunnel + Access.
 ## Stack
 
 Next.js 16 (App Router, standalone) · React 19 · SQLite via `@libsql/client` with raw SQL and a
-`schema.sql` · Tailwind 4 · zod 4 · vitest · `jose` · Leaflet · `sharp`. One container, one bind
+`schema.sql` · Tailwind 4 · zod 4 · vitest · `jose` · MapLibre GL (OpenFreeMap tiles) · `sharp`. One container, one bind
 mount. **Ponytail is on**: nothing is added until a trigger in `PLAN.md` fires.
 
 ## Rules
