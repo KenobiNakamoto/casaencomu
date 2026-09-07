@@ -29,14 +29,12 @@ export const Listing = z.object({
 });
 export type Listing = z.infer<typeof Listing>;
 
-export const STAGES = [
-  "nueva",
-  "revisando",
-  "preseleccionada",
-  "visita_prevista",
-  "descartada",
-  "no_disponible",
-] as const;
+/**
+ * What the family decided. Availability is deliberately not in this list (decision D07): whether
+ * the advertisement is still up belongs to the source, and a portal delisting a home must not
+ * overwrite `preseleccionada`. `no_disponible` was a stage until migration 3 retired it.
+ */
+export const STAGES = ["nueva", "revisando", "preseleccionada", "visita_prevista", "descartada"] as const;
 export type Stage = (typeof STAGES)[number];
 export const STAGE_LABELS: Record<Stage, string> = {
   nueva: "Nueva",
@@ -44,7 +42,6 @@ export const STAGE_LABELS: Record<Stage, string> = {
   preseleccionada: "Preseleccionada",
   visita_prevista: "Visita prevista",
   descartada: "Descartada",
-  no_disponible: "No disponible",
 };
 
 export const DIMENSIONS = [

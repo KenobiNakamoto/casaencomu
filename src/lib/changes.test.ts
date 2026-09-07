@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { canonicalFacts, classifyChanges, factsHash } from "./changes";
 import { extract } from "./extract";
 
@@ -99,12 +99,17 @@ const seed = async (url: string, portal: string, via: string, ref: string | null
 };
 
 describe("runRechecks against a temp DB", () => {
-  it("price edit → one price_change event, property updated; two 404s → removed + no_disponible", async () => {
+  // One database per file, so each case clears it first: a source left `active` by an earlier
+  // case goes stale on the next clock jump and joins the batch, which makes `checked` a lie.
+  beforeEach(async () => {
     await applySchema();
+    await db.execute("DELETE FROM properties");
+  });
+
+  it("a price edit writes one price_change and leaves the stage alone", async () => {
     const propertyId = await seed(FOTOCASA_URL, "fotocasa", "paste", "190311653");
     await seed("https://www.idealista.com/inmueble/112446118/", "idealista", "bookmarklet", "112446118");
 
-    // 1. the same page with the price edited
     const edited = html.replaceAll("1644999", "1600000");
     const one = await runRechecks({ spacingMs: 0, fetchPage: async () => ({ status: 200, finalUrl: FOTOCASA_URL, html: edited }) });
     expect(one).toEqual({ checked: 1, changed: 1, removed: 0, unknown: 0 }); // the idealista source is skipped
@@ -116,39 +121,61 @@ describe("runRechecks against a temp DB", () => {
     expect(events[0].actor_id).toBeNull();
     const [p] = await rows("SELECT price_eur, rooms, stage FROM properties WHERE id = ?", propertyId);
     expect(p).toMatchObject({ price_eur: 1600000, rooms: 3, stage: "nueva" });
-    const [s] = await rows("SELECT availability, consecutive_failures, last_ok_at, last_checked_at, facts_hash, facts_json FROM sources WHERE property_id = ?", propertyId);
-    expect(s.availability).toBe("active");
-    expect(s.consecutive_failures).toBe(0);
+    const [s] = await rows(
+      "SELECT availability, consecutive_failures, consecutive_gone, last_check_outcome, last_ok_at, last_checked_at, facts_hash, facts_json FROM sources WHERE property_id = ?",
+      propertyId,
+    );
+    expect(s).toMatchObject({ availability: "active", consecutive_failures: 0, consecutive_gone: 0, last_check_outcome: "listing" });
     expect(s.last_ok_at).toBe(s.last_checked_at);
     expect(s.facts_hash).not.toBe(factsHash(prev));
     expect(JSON.parse(String(s.facts_json)).price_eur).toBe(1600000);
 
-    // 2. not stale yet → nothing to do
+    // not stale yet → nothing to do
     expect((await runRechecks({ spacingMs: 0, fetchPage: async () => ({ status: 200, html }) })).checked).toBe(0);
-
-    // 3. first 404 → unknown, no event
-    const gone = async () => ({ status: 404, finalUrl: FOTOCASA_URL, html: "" });
-    const two = await runRechecks({ now: new Date(Date.now() + 49 * H), spacingMs: 0, fetchPage: gone });
-    expect(two).toEqual({ checked: 1, changed: 0, removed: 0, unknown: 1 });
-    let [src] = await rows("SELECT availability, consecutive_failures FROM sources WHERE property_id = ?", propertyId);
-    expect(src).toMatchObject({ availability: "unknown", consecutive_failures: 1 });
-    expect(await rows("SELECT id FROM events WHERE property_id = ? AND kind = 'availability_change'", propertyId)).toHaveLength(0);
-
-    // 4. second 404 → removed, stage no_disponible, one availability_change
-    const three = await runRechecks({ now: new Date(Date.now() + 98 * H), spacingMs: 0, fetchPage: gone });
-    expect(three).toEqual({ checked: 1, changed: 0, removed: 1, unknown: 0 });
-    [src] = await rows("SELECT availability, consecutive_failures FROM sources WHERE property_id = ?", propertyId);
-    expect(src).toMatchObject({ availability: "removed", consecutive_failures: 2 });
-    expect((await rows("SELECT stage FROM properties WHERE id = ?", propertyId))[0].stage).toBe("no_disponible");
-    const av = await rows("SELECT payload_json FROM events WHERE property_id = ? AND kind = 'availability_change'", propertyId);
-    expect(av).toHaveLength(1);
-    expect(JSON.parse(String(av[0].payload_json))).toEqual({ to: "removed" });
-
-    // 5. removed sources are never rechecked again
-    expect((await runRechecks({ now: new Date(Date.now() + 200 * H), spacingMs: 0, fetchPage: gone })).checked).toBe(0);
   });
 
-  it("403 / timeout → unknown, never removed; one warning at the third failure", async () => {
+  it("removes a source only after two scheduled checks agree, and never touches the stage", async () => {
+    const propertyId = await seed(FOTOCASA_URL, "fotocasa", "paste", "190311653");
+    // the family had decided something about this home
+    await db.execute({ sql: "UPDATE properties SET stage = 'preseleccionada' WHERE id = ?", args: [propertyId] });
+    const gone = async () => ({ status: 404, finalUrl: FOTOCASA_URL, html: "" });
+    const stage = async () => (await rows("SELECT stage FROM properties WHERE id = ?", propertyId))[0].stage;
+    const src = async () =>
+      (await rows("SELECT availability, consecutive_gone, consecutive_failures FROM sources WHERE property_id = ?", propertyId))[0];
+
+    // first 404 → uncertain, not gone, and nothing in the feed yet
+    const a = await runRechecks({ now: new Date(Date.now() + 49 * H), spacingMs: 0, fetchPage: gone });
+    expect(a).toMatchObject({ removed: 0, unknown: 1 });
+    expect(await src()).toMatchObject({ availability: "unknown", consecutive_gone: 1, consecutive_failures: 0 });
+    expect(await rows("SELECT id FROM events WHERE property_id = ? AND kind = 'availability_change'", propertyId)).toHaveLength(0);
+
+    // V05, finding F05: a page we could not read is not a strike against the advertisement
+    await runRechecks({
+      now: new Date(Date.now() + 98 * H),
+      spacingMs: 0,
+      fetchPage: async () => ({ status: 403, finalUrl: FOTOCASA_URL, html: "" }),
+    });
+    expect(await src()).toMatchObject({ availability: "unknown", consecutive_gone: 0, consecutive_failures: 1 });
+
+    // so the next 404 is the first strike again, not the second
+    await runRechecks({ now: new Date(Date.now() + 147 * H), spacingMs: 0, fetchPage: gone });
+    expect(await src()).toMatchObject({ availability: "unknown", consecutive_gone: 1 });
+    expect(await stage()).toBe("preseleccionada");
+
+    // two in a row → removed, one event, and the family's decision still stands (V06)
+    const d = await runRechecks({ now: new Date(Date.now() + 196 * H), spacingMs: 0, fetchPage: gone });
+    expect(d).toMatchObject({ removed: 1 });
+    expect(await src()).toMatchObject({ availability: "removed", consecutive_gone: 2 });
+    expect(await stage()).toBe("preseleccionada");
+    const av = await rows("SELECT payload_json FROM events WHERE property_id = ? AND kind = 'availability_change'", propertyId);
+    expect(av).toHaveLength(1);
+    expect(JSON.parse(String(av[0].payload_json))).toEqual({ from: "unknown", to: "removed" });
+
+    // a removed source is never fetched again
+    expect((await runRechecks({ now: new Date(Date.now() + 400 * H), spacingMs: 0, fetchPage: gone })).checked).toBe(0);
+  });
+
+  it("calls a block or a timeout unknown, warns once at the third, and never removes", async () => {
     const url = "https://www.habitaclia.com/comprar-atico-some-slug-barcelona-i8166003810008.htm";
     const propertyId = await seed(url, "habitaclia", "bookmarklet", "8166003810008");
     const blocked = async () => ({ status: 403, finalUrl: url, html: "" });
@@ -157,10 +184,11 @@ describe("runRechecks against a temp DB", () => {
     };
     for (const [i, fetchPage] of [blocked, timeout, blocked, timeout].entries()) {
       const r = await runRechecks({ now: new Date(Date.now() + i * 49 * H), spacingMs: 0, fetchPage });
-      expect(r).toEqual({ checked: 1, changed: 0, removed: 0, unknown: 1 });
+      expect(r).toMatchObject({ checked: 1, removed: 0, unknown: 1 });
     }
-    const [src] = await rows("SELECT availability, consecutive_failures FROM sources WHERE property_id = ?", propertyId);
-    expect(src).toMatchObject({ availability: "unknown", consecutive_failures: 4 });
+    expect(
+      (await rows("SELECT availability, consecutive_failures, consecutive_gone FROM sources WHERE property_id = ?", propertyId))[0],
+    ).toMatchObject({ availability: "unknown", consecutive_failures: 4, consecutive_gone: 0 });
     expect((await rows("SELECT stage FROM properties WHERE id = ?", propertyId))[0].stage).toBe("nueva");
     const warnings = await rows("SELECT payload_json FROM events WHERE property_id = ?", propertyId);
     expect(warnings).toHaveLength(1);

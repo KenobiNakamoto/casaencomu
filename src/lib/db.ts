@@ -1,4 +1,5 @@
-import { createClient } from "@libsql/client";
+import { createClient, type InStatement } from "@libsql/client";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -16,7 +17,14 @@ db.executeMultiple(
  * run the same chain. Each one commits with its own `user_version` in a single write transaction,
  * so a half-applied step cannot exist. Never edit an applied entry; append a new one.
  */
-const MIGRATIONS: { version: number; owner: string; sql: string[] }[] = [
+type Migration = {
+  version: number;
+  owner: string;
+  /** Plain statements, or a function that may read the database first to build them. */
+  sql: InStatement[] | (() => Promise<InStatement[]>);
+};
+
+const MIGRATIONS: Migration[] = [
   {
     version: 2,
     owner: "PIP-01 — import observations",
@@ -31,7 +39,69 @@ const MIGRATIONS: { version: number; owner: string; sql: string[] }[] = [
       "ALTER TABLE photos ADD COLUMN source_url TEXT",
     ],
   },
+  {
+    version: 3,
+    owner: "PIP-02 — availability is not a stage",
+    sql: async () => [
+      // Its own streak. Sharing `consecutive_failures` with blocked pages is finding F05.
+      "ALTER TABLE sources ADD COLUMN consecutive_gone INTEGER NOT NULL DEFAULT 0",
+      // Advances only when a member changes the stage, never when a source is refreshed.
+      "ALTER TABLE properties ADD COLUMN stage_version INTEGER NOT NULL DEFAULT 1",
+      ...(await stageRepairStatements()),
+    ],
+  },
 ];
+
+/**
+ * `no_disponible` was a stage until this migration, so a recheck wrote it over whatever the
+ * family had decided and their decision was gone. It is still in `events`: only a member ever
+ * wrote a `stage_change`, because the recheck changed the column directly without one. Take the
+ * last one they wrote; if there is none we genuinely do not know what they wanted, so it goes
+ * back into the queue as `revisando` rather than being guessed into a decision.
+ *
+ * Exported so it can be tested against a database that actually has such rows — the migration
+ * itself can only run once, on a database this repair has never touched.
+ */
+export async function stageRepairStatements(): Promise<InStatement[]> {
+  const { rows } = await db.execute(
+    `SELECT p.id, (
+       SELECT json_extract(e.payload_json, '$.to') FROM events e
+       WHERE e.property_id = p.id AND e.kind = 'stage_change'
+         AND json_extract(e.payload_json, '$.to') IN
+             ('nueva', 'revisando', 'preseleccionada', 'visita_prevista', 'descartada')
+       ORDER BY e.created_at DESC, e.id DESC LIMIT 1
+     ) AS restored
+     FROM properties p WHERE p.stage = 'no_disponible'`,
+  );
+
+  const at = new Date().toISOString();
+  const stmts: InStatement[] = [];
+  for (const r of rows) {
+    const id = String(r.id);
+    const restored = typeof r.restored === "string" ? r.restored : "revisando";
+    stmts.push(
+      { sql: "UPDATE properties SET stage = ? WHERE id = ?", args: [restored, id] },
+      {
+        sql: `INSERT INTO events (id, property_id, kind, payload_json, actor_id, created_at)
+              VALUES (?, ?, 'stage_change', ?, NULL, ?)`,
+        args: [
+          randomUUID(),
+          id,
+          JSON.stringify({
+            from: "no_disponible",
+            to: restored,
+            nota: r.restored
+              ? "Etapa restaurada: la disponibilidad ya no cambia la etapa"
+              : "Etapa restaurada a Revisando: no había ninguna etapa anterior guardada",
+          }),
+          at,
+        ],
+      },
+    );
+  }
+  if (rows.length) console.log(`[db] restored ${rows.length} stage(s) overwritten by a recheck`);
+  return stmts;
+}
 
 /** Version 1 is `schema.sql`, all of it `IF NOT EXISTS`; `MIGRATIONS` carries every change after it. */
 export async function applySchema() {
@@ -43,7 +113,8 @@ export async function applySchema() {
   for (const m of MIGRATIONS) {
     if ((await at()) >= m.version) continue;
     // A failure here throws and start-up stops: serving on a half-migrated database is worse.
-    await db.batch([...m.sql, `PRAGMA user_version = ${m.version}`], "write");
+    const stmts = typeof m.sql === "function" ? await m.sql() : m.sql;
+    await db.batch([...stmts, `PRAGMA user_version = ${m.version}`], "write");
     console.log(`[db] migrated to version ${m.version} (${m.owner})`);
   }
 }

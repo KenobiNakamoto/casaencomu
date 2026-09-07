@@ -84,7 +84,12 @@ export async function setStageAction(propertyId: string, formData: FormData) {
   const now = new Date().toISOString();
   await db.batch(
     [
-      { sql: "UPDATE properties SET stage = ?, updated_at = ? WHERE id = ?", args: [to, now, propertyId] },
+      {
+        // stage_version advances here and nowhere else: a source refresh must not look like a
+        // decision (doc 05 § 3). PIP-08 uses it to reject a stale form.
+        sql: "UPDATE properties SET stage = ?, stage_version = stage_version + 1, updated_at = ? WHERE id = ?",
+        args: [to, now, propertyId],
+      },
       event(propertyId, "stage_change", { from, to }, user.id, now),
     ],
     "write",

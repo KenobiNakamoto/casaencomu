@@ -1,3 +1,4 @@
+import { AVAILABILITY_LABEL, type SourceAvailability } from "@/lib/availability";
 import { STAGE_LABELS, type Stage } from "@/lib/listing";
 
 /**
@@ -31,7 +32,6 @@ const STAGE_TONE: Record<Stage, Tone> = {
   preseleccionada: "success",
   visita_prevista: "visit",
   descartada: "neutral",
-  no_disponible: "danger",
 };
 
 /**
@@ -44,7 +44,6 @@ const STAGE_MARK: Record<Stage, string> = {
   preseleccionada: "M6 12.5l4 4 8-8.5", // check
   visita_prevista: "M5 7h14v13H5zM5 11h14M9 4v4M15 4v4", // calendar
   descartada: "M7 12h10", // minus
-  no_disponible: "M5 5l14 14M5 19L19 5", // cross
 };
 
 const Mark = ({ stage }: { stage: Stage }) => (
@@ -71,7 +70,6 @@ export const STAGE_DOT: Record<Stage, string> = {
   preseleccionada: "bg-success-ink",
   visita_prevista: "bg-visit-ink",
   descartada: "bg-muted",
-  no_disponible: "bg-danger-ink",
 };
 
 /** White pill that floats on a photo (Airbnb's "Guest favorite" badge). */
@@ -97,3 +95,15 @@ export function StageBadge({ stage }: { stage: string }) {
 }
 
 export const BudgetChip = () => <Chip tone="danger">Fuera de presupuesto</Chip>;
+
+/**
+ * Whether the advertisement is still up. Separate from the stage on purpose (D07), so the two are
+ * never confused: this one says what the portal is doing, the stage says what the family decided.
+ */
+export function AvailabilityChip({ availability, stale }: { availability: SourceAvailability; stale?: boolean }) {
+  if (availability === "active" && !stale) return null; // the ordinary case needs no label
+  if (availability === "active") return <Chip tone="warning">Sin comprobar hace más de 48 h</Chip>;
+  return (
+    <Chip tone={availability === "removed" ? "danger" : "warning"}>{AVAILABILITY_LABEL[availability]}</Chip>
+  );
+}
