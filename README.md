@@ -25,21 +25,34 @@ advertisement itself. The live status block is `docs/WORKPLAN.md` § 0.
 
 ## Run it
 
+Nothing that makes the application *run* is in git, and that is deliberate: the dependencies are
+regenerable, the saved pages belong to the portals, and the photo store is 300 MB that rebuilds in
+about a minute. Four commands take a fresh copy to the state the last session left it in:
+
 ```sh
 pnpm install
 echo 'AUTH_DEV_EMAIL=you@example.com' > .env.local   # development bypass for the Access check
+pnpm tsx scripts/ingest.mts --reset                  # 23 listings with photos, from _local/captures
 pnpm dev                                             # http://localhost:3000
+```
+
+```sh
 pnpm test && pnpm lint && pnpm build                 # what must stay green
 ```
 
-The database and the photos are created under `./data` on first boot. `src/lib/schema.sql` is
+The database and the photo store are created under `./data` on first use. `src/lib/schema.sql` is
 applied at start-up, so there is no migration step.
 
-To fill a development database with real advertisements:
+`_local/captures` holds the saved advertisements, one JSON file each, collected in a real browser.
+With them the database is rebuilt exactly, because every field is read by the application's own
+extractor. Without them the application still runs, with nothing in it, and a listing is added
+with the bookmarklet on `/ayuda`.
 
-```sh
-pnpm tsx scripts/ingest.mts --reset      # reads _local/captures, runs the app's own extractor
-```
+Inside iCloud, rename `node_modules` to `node_modules.nosync` and symlink it, as
+`docs/SCAFFOLD.md` § 1 shows. Otherwise iCloud tries to synchronise a hundred thousand files.
+
+**What to do next** is `docs/WORKPLAN.md` § 0: what is done, what waits on the owner, and the
+order the remaining issues run in.
 
 ## Map
 
