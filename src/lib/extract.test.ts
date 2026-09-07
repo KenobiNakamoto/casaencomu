@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { extract, type Page } from "./extract";
+import { extract, extractResult, type Page } from "./extract";
 import { Listing } from "./listing";
 import { isAllowedImageHost } from "./url";
 
@@ -117,6 +117,43 @@ describe("extract → null on removed or blocked pages", () => {
 
   it("no title anywhere → null", () => {
     expect(extract({ url: "https://example.com/x", html: "<html><body>nada</body></html>" })).toBeNull();
+  });
+});
+
+// Finding F03: the import route called every one of these "ya no está disponible". Only the
+// first group is evidence of that; the rest is evidence that we could not read the page.
+describe("extractResult — why a page yielded no listing", () => {
+  const kind = (p: Page) => extractResult(p).kind;
+  const html = fixture("habitaclia");
+
+  it("calls a withdrawn advertisement removed", () => {
+    for (const f of live) expect(kind({ url: f.url, html: fixture(`${f.name}-removed`) })).toBe("removed");
+    expect(kind({ url: live[2].url, html, status: 404 })).toBe("removed");
+    expect(kind({ url: live[2].url, html, status: 410 })).toBe("removed");
+    expect(kind({ url: live[1].url, html: fixture("fotocasa"), finalUrl: "https://www.fotocasa.es/l?propertyNotFound" })).toBe("removed");
+    // a small portal answering a withdrawn ad with its own home page, status 200
+    expect(kind({ url: "https://www.vivalta.es/es/ref-7742_1168", html: fixture("vivalta-removed"), status: 200 })).toBe("removed");
+  });
+
+  it("calls a block a block, never a removal", () => {
+    expect(kind({ url: live[2].url, html, status: 403 })).toBe("blocked");
+    const challenge = '<html><head><title>idealista.com</title><script src="https://ct.captcha-delivery.com/c.js"></script></head><body></body></html>';
+    expect(kind({ url: live[0].url, html: challenge })).toBe("blocked");
+  });
+
+  it("calls an unfamiliar page unreadable, never a removal", () => {
+    expect(kind({ url: "https://example.com/x", html: "<html><body>nada</body></html>" })).toBe("unreadable");
+  });
+
+  it("reports which fields the observation carried", () => {
+    const r = extractResult({ url: live[1].url, html: fixture("fotocasa") });
+    expect(r.kind).toBe("listing");
+    if (r.kind !== "listing") return;
+    expect(r.presence.price_eur).toBe("present");
+    expect(r.presence.title).toBe("present");
+    // a fixture with no energy rating must say `absent`, not carry a null as if it were observed
+    expect(new Set(Object.values(r.presence))).toEqual(new Set(["present", "absent"]));
+    expect(Object.keys(r.presence)).not.toContain("photos");
   });
 });
 

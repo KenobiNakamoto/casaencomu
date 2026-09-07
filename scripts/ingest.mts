@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { db, applySchema } from "../src/lib/db";
-import { extract, type Page } from "../src/lib/extract";
+import { extractResult, type Page } from "../src/lib/extract";
 import { save } from "../src/lib/save";
 import { normalizeUrl } from "../src/lib/url";
 
@@ -62,33 +62,34 @@ await db.execute({
 const user = (await db.execute({ sql: "SELECT id FROM users WHERE email = ?", args: [email] }))
   .rows[0] as unknown as { id: string };
 
+const OUTCOME = { created: "ok   ", updated: "upd  ", unchanged: "igual" } as const;
 let ok = 0;
 let gone = 0;
 let dup = 0;
 for (const file of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
   const page = asPage(JSON.parse(readFileSync(join(dir, file), "utf8")));
   const norm = normalizeUrl(page.url);
-  const listing = extract(page);
-  if (!listing) {
+  const result = extractResult(page);
+  if (result.kind !== "listing") {
     gone++;
-    console.log(`  ${file.padEnd(30)} — no listing (removed, blocked or unreadable), status ${page.status ?? "?"}`);
+    console.log(`  ${file.padEnd(30)} — ${result.kind}: ${result.reason} (status ${page.status ?? "?"})`);
     continue;
   }
+  const listing = result.listing;
   const r = await save(
     listing,
     { url_original: page.url, url_normalized: norm.normalized, portal: norm.portal, portal_ref: norm.portalRef },
-    user,
-    page.html ? "paste" : "bookmarklet",
+    { user, via: page.html ? "paste" : "bookmarklet", presence: result.presence },
   );
-  if (r.duplicate) dup++;
-  else ok++;
+  if (r.outcome === "created") ok++;
+  else dup++;
   const f = listing;
   console.log(
-    `  ${file.padEnd(30)} ${r.duplicate ? "dup " : "ok  "} ` +
+    `  ${file.padEnd(30)} ${OUTCOME[r.outcome]} ` +
       [f.price_eur && `${f.price_eur} €`, f.area_m2 && `${f.area_m2} m²`, f.rooms && `${f.rooms} hab`,
        f.bathrooms && `${f.bathrooms} ba`, f.lat != null && "geo", `${f.photos.length} fotos`]
         .filter(Boolean)
         .join(" · "),
   );
 }
-console.log(`\n${ok} imported, ${dup} duplicates, ${gone} with no listing`);
+console.log(`\n${ok} imported, ${dup} already known, ${gone} with no listing`);

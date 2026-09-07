@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { currentUser } from "@/lib/auth";
-import { extract } from "@/lib/extract";
+import { extractResult } from "@/lib/extract";
+import { failureMessage, IMPORT_DEADLINE_MS, MAX_CAPTURE_BYTES, successLocation } from "@/lib/intake";
 import { save } from "@/lib/save";
 import { normalizeUrl } from "@/lib/url";
 
@@ -34,12 +35,17 @@ const Form = z.object({
 /** Form POST from the bookmarklet. Arrives with `Origin: null`; the `capture_token` is the CSRF guard. */
 export async function POST(req: Request) {
   const user = await currentUser();
-  const fd = await req.formData();
+  // The body is read before it is parsed, so an oversized capture is refused, not buffered whole.
+  const raw = await req.arrayBuffer();
+  if (raw.byteLength > MAX_CAPTURE_BYTES) return fail(413, "La captura es demasiado grande");
+  const fd = await new Response(raw, { headers: { "content-type": req.headers.get("content-type") ?? "" } }).formData();
   if (fd.get("token") !== user.capture_token) return fail(403, "Marcador no válido. Vuelve a instalarlo desde Ayuda");
 
   const parsed = Form.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return fail(400, "Datos del marcador incompletos");
-  const { url, ld, og, blob, imgs, text } = parsed.data;
+  // `title` is `document.title`: on a page with no og:* and no JSON-LD it is the only title there
+  // is. It was parsed and then dropped before it reached the extractor — finding F01.
+  const { url, title, ld, og, blob, imgs, text } = parsed.data;
 
   let norm: ReturnType<typeof normalizeUrl>;
   try {
@@ -48,17 +54,13 @@ export async function POST(req: Request) {
     return fail(400, "Enlace no válido");
   }
 
-  const listing = extract({ url, ld, og, blob, imgs, text });
-  if (!listing) return fail(422, "No se pudo leer el anuncio");
+  const r = extractResult({ url, title, ld, og, blob, imgs, text });
+  if (r.kind !== "listing") return fail(422, failureMessage(r));
 
-  const { propertyId, duplicate } = await save(
-    listing,
+  const saved = await save(
+    r.listing,
     { url_original: url, url_normalized: norm.normalized, portal: norm.portal, portal_ref: norm.portalRef },
-    user,
-    "bookmarklet",
+    { user, via: "bookmarklet", presence: r.presence, deadline: AbortSignal.timeout(IMPORT_DEADLINE_MS) },
   );
-  return new Response(null, {
-    status: 303,
-    headers: { Location: `/propiedades/${propertyId}${duplicate ? "?dup=1" : ""}` },
-  });
+  return new Response(null, { status: 303, headers: { Location: successLocation(saved) } });
 }

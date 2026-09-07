@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
-import type { InStatement, InValue } from "@libsql/client";
-import { canonicalFacts, classifyChanges, factsHash, type Facts } from "./changes";
+import type { InStatement } from "@libsql/client";
+import { canonicalFacts, classifyChanges, col, FACT_COLUMNS, factsHash, type Facts } from "./changes";
 import { db } from "./db";
 import { extract } from "./extract";
-import { Listing } from "./listing";
 import { isAllowedHost } from "./url";
 
 export type FetchedPage = { status: number; finalUrl?: string; html?: string };
@@ -36,9 +35,6 @@ type Row = {
   availability: string;
 };
 
-// Listing keys are the `properties` columns; the allowlist keeps the dynamic SET safe.
-const FACT_COLUMNS = new Set(Object.keys(Listing.shape).filter((k) => k !== "photos"));
-const col = (k: string, x: unknown): InValue => (typeof x === "boolean" ? (x ? 1 : 0) : ((x ?? null) as InValue));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const event = (propertyId: string, kind: string, payload: unknown, at: string): InStatement => ({
   sql: "INSERT INTO events (id, property_id, kind, payload_json, actor_id, created_at) VALUES (?, ?, ?, ?, NULL, ?)",
@@ -107,7 +103,7 @@ export async function runRechecks({
       if (cols.length) {
         stmts.push({
           sql: `UPDATE properties SET ${cols.map((c) => `${c} = ?`).join(", ")}, updated_at = ? WHERE id = ?`,
-          args: [...cols.map((c) => col(c, (facts as Record<string, unknown>)[c])), at, s.property_id],
+          args: [...cols.map((c) => col((facts as Record<string, unknown>)[c])), at, s.property_id],
         });
       }
       for (const c of changes) stmts.push(event(s.property_id, c.kind, c.payload, at));

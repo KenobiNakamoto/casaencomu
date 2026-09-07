@@ -35,16 +35,18 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 
 | File | Job | Pure? |
 |---|---|---|
-| `db.ts` | the libSQL client, and `applySchema()` which runs `schema.sql` | no |
-| `schema.sql` | the eight tables, all `CREATE TABLE IF NOT EXISTS` | — |
+| `db.ts` | the libSQL client, `applySchema()` which runs `schema.sql`, and the ordered migration chain after it | no |
+| `schema.sql` | the eight tables, all `CREATE TABLE IF NOT EXISTS`. Version 1; everything after it is a migration in `db.ts` | — |
 | `listing.ts` | the zod schema of an extracted listing, plus the stage, dimension and event vocabularies | yes |
 | `auth.ts` | verifies the Access JWT (`jose`); `currentUser()` maps the email to a `users` row | half |
 | `url.ts` | `ALLOWED_HOSTS` (the SSRF guard), `ALLOWED_IMAGE_HOSTS` (the download allowlist), portal detection, the listing reference per portal | yes |
-| `extract.ts` | one extractor for every portal: JSON-LD → OpenGraph → the portal's own blob | yes |
+| `extract.ts` | one extractor for every portal: JSON-LD → OpenGraph → the portal's own blob. `extractResult()` says **why** a page gave nothing — `removed`, `blocked` or `unreadable` — and which fields it carried | yes |
+| `fetching.ts` | every request the server makes outward: https only, no credentials, default port, allowlist on **each redirect hop**, and a streamed byte cap | half |
+| `intake.ts` | what the two intake routes share: the deadlines, the Spanish sentence per failure, and where a form post is sent instead of a JSON body | yes |
 | `bookmarklet.ts` | the bookmarklet source and the exact field list it posts | yes |
-| `photos.ts` | downloads, deduplicates by sha256, resizes to one 800 px JPEG, stores under `DATA_DIR` | no |
-| `save.ts` | writes a property, its source and its photos; detects an exact duplicate by reference | no |
-| `changes.ts` | canonical form and hash of the facts, and what changed between two extractions | yes |
+| `photos.ts` | downloads, deduplicates by sha256, resizes to one 800 px JPEG, stores under `DATA_DIR`. 40 per property, not per call | no |
+| `save.ts` | the one way an observation reaches the database. A new source becomes a property; a known source is **refreshed** — freshness only when nothing moved, facts and one event per change when something did | no |
+| `changes.ts` | canonical form and hash of the facts, what changed between two extractions, and the `properties` column allowlist | yes |
 | `recheck.ts` | the 48-hour loop: refetch, compare, write events, mark a listing unavailable | no |
 | `ratings.ts` | averages and the upsert statement. Deliberately has no `db` import, so the test needs no data directory | yes |
 | `search.ts` | free-text matching and the filter presets, accent-insensitive, in JavaScript over the loaded rows | yes |
@@ -94,7 +96,9 @@ it to `localStorage.tema`, and `components/use-theme.ts` reads it back through
 | File | What would break without it |
 |---|---|
 | `url.test.ts` | the SSRF allowlist, and the reference regular expressions that identify a duplicate |
-| `extract.test.ts` | every portal, live and withdrawn, against saved pages |
+| `fetching.test.ts` | a redirect off the allowlist being followed, or an oversized body being read whole |
+| `extract.test.ts` | every portal, live and withdrawn, against saved pages — and a blocked page being called "removed" |
+| `save.test.ts` | a second look at an advertisement erasing a fact it did not observe, or writing a phantom event |
 | `changes.test.ts` | a price change that produces no event, or a phantom event |
 | `ratings.test.ts` | an average that counts a missing dimension |
 | `auth.test.ts` | a token with the wrong audience, issuer or expiry being accepted |
