@@ -19,3 +19,5 @@ next-env.d.ts
 .DS_Store
 # family chat export (PII, never commit)
 Whatsapp convo familia/
+# saved portal pages for scripts/ingest.mts — third-party content, never commit
+captures/
