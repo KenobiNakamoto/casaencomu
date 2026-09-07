@@ -1,7 +1,19 @@
 // Portal hosts and listing refs, copied from spike/RESULTS.md (2026-09-04).
 
 export const ALLOWED_HOSTS = new Set(["idealista.com", "fotocasa.es", "habitaclia.com"]); // after dropping `www.`
-export const ALLOWED_IMAGE_HOSTS = new Set(["img4.idealista.com", "static.fotocasa.es", "images.habimg.com"]);
+/**
+ * Hosts `savePhotos` is allowed to download from. A download allowlist, not a display filter:
+ * anything else in a page's image list is simply never fetched. That is what keeps a tracking
+ * pixel (`www.facebook.com`) or a static map tile (`api.mapbox.com`) out of the photo store.
+ */
+export const ALLOWED_IMAGE_HOSTS = new Set([
+  "img4.idealista.com",
+  "static.fotocasa.es",
+  "images.habimg.com",
+  "media.mobiliagestion.es", // Vivalta
+  "images.iadespana.es", // iad España
+  "static0.housfy.com", // Housfy — `cms.housfy.com` is site furniture, deliberately not here
+]);
 
 export type Portal = "idealista" | "fotocasa" | "habitaclia" | "generic";
 

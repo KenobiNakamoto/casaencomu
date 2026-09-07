@@ -76,11 +76,18 @@ describe("allowlists", () => {
     expect(isAllowedHost("nope")).toBe(false);
   });
   it("image hosts", () => {
-    expect(ALLOWED_IMAGE_HOSTS.size).toBe(3);
+    expect(ALLOWED_IMAGE_HOSTS.size).toBe(6);
     expect(isAllowedImageHost("https://static.fotocasa.es/images/ads/x?rule=original")).toBe(true);
     expect(isAllowedImageHost("https://img4.idealista.com/blur/WEB_DETAIL/0/x.jpg")).toBe(true);
     expect(isAllowedImageHost("https://images.habimg.com/imgh/1-2/x.jpg")).toBe(true);
+    expect(isAllowedImageHost("https://media.mobiliagestion.es/Portals/x/Images/7688/1-large.jpg")).toBe(true);
+    expect(isAllowedImageHost("https://images.iadespana.es/property/broadcast/2026/05/07/x.jpg")).toBe(true);
+    expect(isAllowedImageHost("https://static0.housfy.com/prod/property-img/987141/x-1200x800.jpg")).toBe(true);
     expect(isAllowedImageHost("https://www.idealista.com/x.jpg")).toBe(false);
     expect(isAllowedImageHost("//images.habimg.com/x.jpg")).toBe(false);
+    // in the same pages' image lists, and never to be fetched
+    expect(isAllowedImageHost("https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/x.png")).toBe(false);
+    expect(isAllowedImageHost("https://www.facebook.com/tr?id=1&ev=PageView")).toBe(false);
+    expect(isAllowedImageHost("https://cms.housfy.com/assets/5e25c115")).toBe(false);
   });
 });
