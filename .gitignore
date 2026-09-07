@@ -17,3 +17,5 @@ next-env.d.ts
 *.tsbuildinfo
 # os
 .DS_Store
+# family chat export (PII, never commit)
+Whatsapp convo familia/
