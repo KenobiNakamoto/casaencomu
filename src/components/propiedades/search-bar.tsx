@@ -31,9 +31,10 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
           <span className="text-xs font-semibold text-ink">Buscar</span>
           <input
             name="q"
-            type="text"
+            type="search"
+            enterKeyHint="search"
             defaultValue={q}
-            placeholder="Barrio, precio, m², palabras del anuncio…"
+            placeholder="Barrio, calle o palabras del anuncio"
             className="w-full truncate bg-transparent text-ink placeholder:text-placeholder"
           />
         </label>

@@ -1,34 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import type { Filters } from "@/lib/filters";
+import { input } from "./format";
 
 // ponytail: the only client component on the list page. Its single job is to fold the two price
 // inputs into `precio=<min>-<max>` and drop empty fields, so the URL carries only live filters.
 
-export type FilterValues = {
-  q: string;
-  precioMin: string;
-  precioMax: string;
-  hab: string;
-  banos: string;
-  m2: string;
-  estado: string;
-  etapa: string;
-  barrio: string;
-  zona: string;
-  puntuacion: string;
-  orden: string;
-  vista: string;
-};
-
 type Props = {
-  values: FilterValues;
+  values: Filters;
   neighborhoods: string[];
   stages: [value: string, label: string][];
 };
 
 const label = "flex flex-col gap-1.5 text-xs font-semibold text-muted";
-export const input = "h-12 w-full rounded-lg border border-control-border bg-raised px-3 text-ink transition focus:border-ink";
 
 function onSubmit(e: React.FormEvent<HTMLFormElement>) {
   const form = e.currentTarget;
@@ -55,6 +40,7 @@ export function FilterBar({ values: v, neighborhoods, stages }: Props) {
       <input type="hidden" name="estado" value={v.estado} readOnly />
       <input type="hidden" name="zona" value={v.zona} readOnly />
       <input type="hidden" name="vista" value={v.vista === "filas" ? "filas" : ""} readOnly />
+      <input type="hidden" name="archivadas" value={v.archivadas} readOnly />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <label className={label}>
           Precio mín.

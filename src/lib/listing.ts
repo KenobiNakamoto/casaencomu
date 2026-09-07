@@ -76,3 +76,19 @@ export type EventKind = (typeof EVENT_KINDS)[number];
 
 export const SETTINGS_KEYS = ["presupuesto_min", "presupuesto_max"] as const;
 export type SettingsKey = (typeof SETTINGS_KEYS)[number];
+
+/**
+ * Either bound alone is a budget. Requiring both meant a family that only knows its ceiling could
+ * not say so, and could never take a figure off again (F30).
+ */
+export type Budget = { min: number | null; max: number | null };
+
+/** `over` is unaffordable. `under` is only worth noticing, so it must not wear the same red (F30). */
+export type Fit = "ok" | "over" | "under";
+
+export function budgetFit(price: number | null, b: Budget | null): Fit {
+  if (b === null || price === null) return "ok";
+  if (b.max !== null && price > b.max) return "over";
+  if (b.min !== null && price < b.min) return "under";
+  return "ok";
+}

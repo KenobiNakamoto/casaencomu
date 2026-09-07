@@ -85,7 +85,7 @@ CasaEnComú/
       layout.tsx page.tsx    ← redirect /propiedades
       propiedades/page.tsx propiedades/[id]/page.tsx mapa/page.tsx comparar/page.tsx
       actividad/page.tsx ayuda/page.tsx
-      api/capture/route.ts api/import/route.ts api/photos/[id]/route.ts api/markers/route.ts api/health/route.ts
+      api/capture/route.ts api/import/route.ts api/photos/[id]/route.ts api/health/route.ts
     lib/
       db.ts schema.sql auth.ts url.ts extract.ts photos.ts changes.ts recheck.ts bookmarklet.ts
       __fixtures__/

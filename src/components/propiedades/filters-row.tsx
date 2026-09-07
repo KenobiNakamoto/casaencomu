@@ -1,26 +1,26 @@
 import Link from "next/link";
 import { STAGE_LABELS, type Stage } from "@/lib/listing";
 import { CONDITIONS } from "@/lib/search";
-import type { FilterValues } from "./filter-bar";
+import type { Filters } from "@/lib/filters";
 import { fmtEur } from "./format";
 
-type Href = (patch: Record<string, string>) => string;
+type Href = (patch?: Record<string, string>) => string;
 type Param = "hab" | "banos" | "m2" | "estado";
 
-/** One click each. Clicking an active one takes it off again. */
+/**
+ * One click each. Clicking an active one takes it off again. Every label carries its `+`, because
+ * these are minimums and `3 hab` read as exactly three (F31).
+ */
 const PRESETS: { label: string; param: Param; value: string }[] = [
-  { label: "2 baños", param: "banos", value: "2" },
-  { label: "3 hab", param: "hab", value: "3" },
-  { label: "4 hab", param: "hab", value: "4" },
-  { label: "80 m²+", param: "m2", value: "80" },
-  { label: "100 m²+", param: "m2", value: "100" },
+  { label: "2+ baños", param: "banos", value: "2" },
+  { label: "3+ hab", param: "hab", value: "3" },
+  { label: "4+ hab", param: "hab", value: "4" },
+  { label: "80+ m²", param: "m2", value: "80" },
+  { label: "100+ m²", param: "m2", value: "100" },
   ...Object.entries(CONDITIONS).map(([value, c]) => ({ label: c.label, param: "estado" as const, value })),
 ];
 
-/** Every filter that gets a bubble, in the order they read best. */
-const CLEARABLE = ["q", "precio", "hab", "banos", "m2", "barrio", "zona", "puntuacion", "estado", "etapa"] as const;
-
-export function QuickFilters({ v, href }: { v: FilterValues; href: Href }) {
+export function QuickFilters({ v, href }: { v: Filters; href: Href }) {
   return (
     <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10" aria-label="Filtros rápidos">
       {PRESETS.map(({ label, param, value }) => {
@@ -42,14 +42,14 @@ export function QuickFilters({ v, href }: { v: FilterValues; href: Href }) {
   );
 }
 
-function priceLabel(v: FilterValues) {
+function priceLabel(v: Filters) {
   const min = Number(v.precioMin);
   const max = Number(v.precioMax);
   if (v.precioMin && v.precioMax) return `${fmtEur(min)} – ${fmtEur(max)}`;
   return v.precioMin ? `Desde ${fmtEur(min)}` : `Hasta ${fmtEur(max)}`;
 }
 
-export function ActiveFilters({ v, href, zonaLabel }: { v: FilterValues; href: Href; zonaLabel?: string }) {
+export function ActiveFilters({ v, href, zonaLabel, clearAllHref }: { v: Filters; href: Href; zonaLabel?: string; clearAllHref: string }) {
   const items: { label: string; patch: Record<string, string> }[] = [];
   if (v.q) items.push({ label: `“${v.q}”`, patch: { q: "" } });
   if (v.precioMin || v.precioMax) items.push({ label: priceLabel(v), patch: { precio: "" } });
@@ -61,6 +61,7 @@ export function ActiveFilters({ v, href, zonaLabel }: { v: FilterValues; href: H
   if (v.puntuacion) items.push({ label: `Nota ${v.puntuacion}+`, patch: { puntuacion: "" } });
   if (v.etapa) items.push({ label: STAGE_LABELS[v.etapa as Stage] ?? v.etapa, patch: { etapa: "" } });
   if (v.estado in CONDITIONS) items.push({ label: CONDITIONS[v.estado as keyof typeof CONDITIONS].label, patch: { estado: "" } });
+  if (v.archivadas) items.push({ label: "Incluye archivadas", patch: { archivadas: "" } });
   if (!items.length) return null;
 
   return (
@@ -84,7 +85,7 @@ export function ActiveFilters({ v, href, zonaLabel }: { v: FilterValues; href: H
       ))}
       {items.length > 1 && (
         <Link
-          href={href(Object.fromEntries(CLEARABLE.map((k) => [k, ""])))}
+          href={clearAllHref}
           className="ml-1 text-sm font-medium text-ink underline underline-offset-4 hover:text-muted"
         >
           Quitar todo
