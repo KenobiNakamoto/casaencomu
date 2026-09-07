@@ -1,4 +1,4 @@
-# CasaEnComú web image — SCAFFOLD.md § 7. Built on the Pro for linux/arm64, loaded on the Air by deploy.sh.
+# CasaEnComú web image — docs/SCAFFOLD.md § 7. Built on the Pro for linux/arm64, loaded on the Air by deploy.sh.
 FROM node:24-bookworm-slim AS deps
 RUN corepack enable
 WORKDIR /app

@@ -1,7 +1,7 @@
 /**
  * Ingest saved page captures through the app's own extractor and `save()`.
  *
- *   pnpm tsx scripts/ingest.mts <dir> [--reset] [--user <email>]
+ *   pnpm tsx scripts/ingest.mts [dir] [--reset] [--user <email>]     # dir defaults to _local/captures
  *
  * A capture is one JSON file holding a page as the app already understands it — either the
  * server-fetch shape (`{url, status, html}`) or the bookmarklet shape
@@ -10,7 +10,7 @@
  *
  * It exists because two of the family's four portals cannot be read by a server fetch —
  * Idealista answers 403 through DataDome, and Housfy serves an empty SPA shell — so their pages
- * have to be collected in a real browser first. See `SCAFFOLD.md` § 5.
+ * have to be collected in a real browser first. What each portal serves: `docs/PORTALS.md`.
  */
 import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
@@ -21,7 +21,7 @@ import { save } from "../src/lib/save";
 import { normalizeUrl } from "../src/lib/url";
 
 const args = process.argv.slice(2);
-const dir = args.find((a) => !a.startsWith("--")) ?? "captures";
+const dir = args.find((a) => !a.startsWith("--")) ?? "_local/captures";
 const reset = args.includes("--reset");
 const email = args[args.indexOf("--user") + 1] ?? "kenobi@example.com";
 

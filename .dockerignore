@@ -2,6 +2,7 @@ node_modules*
 .next
 .git
 memory
-spike
-data
+_local
 _archive
+docs
+data

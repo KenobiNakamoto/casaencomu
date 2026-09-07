@@ -12,29 +12,33 @@ UI copy (which is Spanish).
 ## What this is
 
 A private, Spanish-first web app for one family's home search in Barcelona. Members add listings
-(Idealista, Fotocasa, Habitaclia) with a bookmarklet or a pasted URL; the app keeps facts and
-photos, deduplicates, maps, compares, lets each member rate and comment, and rechecks price and
-availability every 48 h. It runs on the MacBook Air inside the Colima VM that already hosts
-umbrelOS, and is reached through Cloudflare Tunnel + Access.
+(Idealista, Fotocasa, Habitaclia and three smaller portals) with a bookmarklet or a pasted URL;
+the app keeps facts and photos, deduplicates, maps, compares, lets each member rate and comment,
+and rechecks price and availability every 48 h. It runs on the MacBook Air inside the Colima VM
+that already hosts umbrelOS, and is reached through Cloudflare Tunnel + Access.
 
-**State (2026-09-07): code complete on `main` — 17 PRs merged, 55 tests, build green. Two themes (`DESIGN.md`). The dev database is filled by ingesting the real ads through `/api/capture`, never from hand-written facts. Nothing deployed: M1 waits on Kenobi's #1–#5, then #18 → #19 → #21 → #20. Status block: `WORKPLAN.md` § 0.**
+**State (2026-09-07): code complete on `main` — 24 PRs merged, 60 tests (3 skipped), build green. Two themes (`DESIGN.md`). The dev database holds 23 real listings, ingested from the ads themselves with `scripts/ingest.mts`; nothing is hand-written. Nothing deployed: M1 waits on Kenobi's #1–#5, then #18 → #19 → #21 → #20. Status block: `docs/WORKPLAN.md` § 0.**
 
 ## Read in this order
 
-1. `PLAN.md` — plan v3 (ponytail). Start here.
-2. `SCAFFOLD.md` — build and deploy steps with checks.
-2a. `DESIGN.md` — colour, type and motion. Read it before touching any style.
-2b. `WORKPLAN.md` — epics, issues with file ownership, waves, milestones. Agents start here.
-3. `memory/decisions.md` — why v3 differs from v2 and v1.
-4. `PRIOR-ART.md` — what already exists and why v1 is still built (2026-09-04).
-5. `00_docs/AIR-SERVER.md` (workspace root) — **before any command on the Air.**
-6. `_archive/` — v1 and v2 of both documents, superseded.
+1. `README.md` — what the repo holds and where everything is. One page.
+2. `docs/PLAN.md` — plan v3 (ponytail): what is built and what is deliberately cut.
+3. `docs/WORKPLAN.md` — epics, issues with file ownership, waves, milestones. **Agents start here.**
+4. `docs/SCAFFOLD.md` — build and deploy steps, each with its check.
+5. `DESIGN.md` — colour, type and motion. Read it before touching any style.
+6. `src/README.md` — the code map: the two paths through the code, one line per module.
+7. `docs/PORTALS.md` — what each listing site actually serves. Before touching the extractor.
+8. `memory/decisions.md` — why v3 differs from v2 and v1.
+9. `docs/PRIOR-ART.md` — what already exists and why v1 is still built (2026-09-04).
+10. `00_docs/AIR-SERVER.md` (workspace root) — **before any command on the Air.**
+
+`_archive/` holds v1 and v2 of the plan and the scaffold, superseded and not committed.
 
 ## Stack
 
 Next.js 16 (App Router, standalone) · React 19 · SQLite via `@libsql/client` with raw SQL and a
 `schema.sql` · Tailwind 4 · zod 4 · vitest · `jose` · MapLibre GL (OpenFreeMap tiles) · `sharp`. One container, one bind
-mount. **Ponytail is on**: nothing is added until a trigger in `PLAN.md` fires.
+mount. **Ponytail is on**: nothing is added until a trigger in `docs/PLAN.md` fires.
 
 ## Rules
 
@@ -50,6 +54,9 @@ mount. **Ponytail is on**: nothing is added until a trigger in `PLAN.md` fires.
 - **The nightly encrypted dump is the only backup.** Passphrase in 1Password.
 - Repo: private, `KenobiNakamoto/casaencomu` (created 2026-09-04). Work flows issue → branch
   `issue-<n>-<slug>` in a worktree outside iCloud → PR → merge. Commit and push only when asked.
+- **Anything not committed lives in `_local/`, `memory/`, `_archive/` or `data/`.** Page captures,
+  the family's chat export and the untrimmed spike pages are all under `_local/` — one
+  `.gitignore` line, one place to look before sharing anything.
 
 ## The Air's `TimeMachine` volume — decision 2026-09-04 (Kenobi)
 
