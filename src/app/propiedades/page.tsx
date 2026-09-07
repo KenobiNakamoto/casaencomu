@@ -204,7 +204,11 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
       </div>
 
       {/* Desktop: cards left, sticky map right. Phone: list, and a floating pill to the map. */}
-      <div className="pb-10 split:grid split:grid-cols-[minmax(0,1fr)_minmax(380px,42%)] split:gap-8">
+      {/* `data-results` scopes the map's hover and focus sync to the cards, not the whole document. */}
+      <div
+        data-results
+        className="pb-10 split:grid split:grid-cols-[minmax(0,1fr)_minmax(380px,42%)] split:gap-8"
+      >
         <section>
           {items.length === 0 ? (
             <div className="rounded-card border border-hairline px-6 py-16 text-center">
