@@ -67,7 +67,7 @@ data root:  /Volumes/TimeMachine/casaencomu   ← bind-mounted as /data
   prepopulated (Kenobi, 2026-09-04). Once set, out-of-range is flagged, never blocked.
 - Stages: `Nueva`, `Revisando`, `Preseleccionada`, `Visita prevista`, `Descartada`,
   `No disponible`. Anyone can change a stage.
-- Map: Leaflet + OpenStreetMap, no clustering; exact vs approximate markers; tap → preview.
+- Map: MapLibre GL + OpenFreeMap Positron (keyless vector tiles, Airbnb palette via paint overrides), no clustering; exact vs approximate markers; tap → preview.
 - Detail: photos, facts, sources, verbatim description, price history, review matrix, comments,
   timeline.
 - Ratings: one 1–5 per member per dimension — `Ubicación`, `Distribución`, `Luz y vistas`,

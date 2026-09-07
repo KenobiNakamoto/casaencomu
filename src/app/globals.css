@@ -50,75 +50,69 @@
   }
 }
 
-/* Leaflet: price pills as markers, and the mini-card popup. */
+/* MapLibre: price pills as markers, the mini-card popup, and the controls. */
+.maplibregl-map {
+  font-family: var(--font-sans);
+}
 .pin-wrap {
-  background: none;
-  border: 0;
+  cursor: pointer;
+}
+.pin-wrap:hover {
+  z-index: 1;
 }
 .pin {
-  position: absolute;
-  transform: translate(-50%, -50%);
   white-space: nowrap;
   background: #fff;
   color: #222;
   font: 600 13px/1 var(--font-sans);
   padding: 8px 11px;
   border-radius: 9999px;
-  box-shadow: var(--shadow-tier);
-  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.18);
   transition: transform 0.12s ease, background 0.12s ease, color 0.12s ease;
-}
-.pin.is-approx {
-  outline: 1.5px dashed #ff385c;
-  outline-offset: -1.5px;
 }
 .pin:hover,
 .pin.is-active {
   background: #222;
   color: #fff;
-  transform: translate(-50%, -50%) scale(1.08);
+  transform: scale(1.08);
 }
-.leaflet-container {
-  font-family: var(--font-sans);
-  background: #f2f2f2;
-}
-.leaflet-tile-pane {
-  filter: saturate(0.45) contrast(0.92) brightness(1.06);
-}
-.leaflet-popup.mini .leaflet-popup-content-wrapper {
-  border-radius: 14px;
+.maplibregl-popup.mini .maplibregl-popup-content {
+  width: 260px;
   padding: 0;
   overflow: hidden;
+  border-radius: 14px;
   box-shadow: var(--shadow-tier);
-}
-.leaflet-popup.mini .leaflet-popup-content {
-  margin: 0;
-  width: 260px !important;
   font: 14px/1.43 var(--font-sans);
   color: #222;
 }
-.leaflet-popup.mini .leaflet-popup-tip-container {
+.maplibregl-popup.mini .maplibregl-popup-tip {
   display: none;
 }
-.leaflet-popup.mini a.leaflet-popup-close-button {
+.maplibregl-popup.mini .maplibregl-popup-close-button {
   top: 8px;
   right: 8px;
   width: 28px;
   height: 28px;
-  padding: 0;
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.92);
   color: #222;
   font-size: 18px;
   line-height: 28px;
-  text-align: center;
 }
-.leaflet-bar {
-  border: 0 !important;
-  box-shadow: var(--shadow-tier) !important;
-  border-radius: 10px !important;
+.maplibregl-ctrl-group {
   overflow: hidden;
+  border-radius: 10px;
+  box-shadow: var(--shadow-tier) !important;
 }
-.leaflet-bar a {
-  color: #222 !important;
+.maplibregl-ctrl-group button {
+  width: 36px;
+  height: 36px;
+}
+.maplibregl-ctrl-attrib {
+  border-radius: 6px;
+  font-size: 11px;
+  color: #6a6a6a;
+}
+.maplibregl-ctrl-attrib a {
+  color: inherit;
 }
