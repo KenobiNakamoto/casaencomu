@@ -1,0 +1,91 @@
+{
+  "_comment": "Fictional sample for `pnpm tsx scripts/seed.ts`. Real data is passed as an argument from a gitignored file and is never committed.",
+  "members": [
+    { "email": "picard@example.com", "name": "Picard" },
+    { "email": "crusher@example.com", "name": "Crusher" },
+    { "email": "laforge@example.com", "name": "La Forge" }
+  ],
+  "properties": [
+    {
+      "url": "https://www.idealista.com/inmueble/100000001/",
+      "title": "Ático reformado con terraza",
+      "stage": "preseleccionada",
+      "price_eur": 520000,
+      "area_m2": 105,
+      "rooms": 3,
+      "bathrooms": 2,
+      "floor": "Ático",
+      "lift": true,
+      "outdoor": "Terraza de 12 m²",
+      "parking": false,
+      "condition": "Reformado",
+      "energy_rating": "C",
+      "description": "Piso de ejemplo. Reforma reciente, orientación sur, ascensor.",
+      "address_text": "Carrer d'Aribau 100, Barcelona",
+      "address_precision": "exact",
+      "lat": 41.390205,
+      "lng": 2.156836,
+      "neighborhood": "l'Antiga Esquerra de l'Eixample",
+      "agency": "ExampleCorp Inmobiliaria",
+      "created_by": "Picard",
+      "comments": [
+        { "by": "Crusher", "text": "La terraza compensa los metros del salón." },
+        { "by": "La Forge", "text": "Habría que ver el ruido de la calle." }
+      ],
+      "ratings": [
+        { "by": "Picard", "dimension": "ubicacion", "score": 4 },
+        { "by": "Crusher", "dimension": "estado", "score": 5 }
+      ]
+    },
+    {
+      "url": "https://www.idealista.com/inmueble/100000002/",
+      "title": "Piso de 4 habitaciones para reformar",
+      "stage": "revisando",
+      "price_eur": 445000,
+      "area_m2": 118,
+      "rooms": 4,
+      "bathrooms": 1,
+      "floor": "2ª planta",
+      "lift": false,
+      "outdoor": "Balcón",
+      "parking": false,
+      "condition": "A reformar",
+      "energy_rating": "G",
+      "description": "Piso de ejemplo. Necesita reforma integral. Finca sin ascensor.",
+      "address_text": "Carrer de Viladomat 50, Barcelona",
+      "address_precision": "approx",
+      "lat": 41.377205,
+      "lng": 2.157536,
+      "neighborhood": "Sant Antoni",
+      "agency": "Acme Fincas",
+      "created_by": "Crusher",
+      "comments": [{ "by": "Picard", "text": "Buen precio por metro, pero sin ascensor lo descarto." }],
+      "ratings": [{ "by": "La Forge", "dimension": "calidad_precio", "score": 4 }]
+    },
+    {
+      "url": "https://www.fotocasa.es/es/comprar/vivienda/barcelona/ejemplo/100000003/d",
+      "title": "Dúplex con piscina comunitaria",
+      "stage": "descartada",
+      "price_eur": 610000,
+      "area_m2": 132,
+      "rooms": 4,
+      "bathrooms": 3,
+      "floor": "Dúplex",
+      "lift": true,
+      "outdoor": "Piscina comunitaria",
+      "parking": true,
+      "condition": "Buen estado",
+      "energy_rating": "D",
+      "description": "Piso de ejemplo. Dúplex amplio, plaza de aparcamiento incluida.",
+      "address_text": "Carrer Gran de Gràcia 200, Barcelona",
+      "address_precision": "exact",
+      "lat": 41.405505,
+      "lng": 2.152036,
+      "neighborhood": "la Vila de Gràcia",
+      "agency": "Dunder Mifflin Propietats",
+      "created_by": "La Forge",
+      "comments": [{ "by": "Crusher", "text": "Demasiado lejos del colegio." }],
+      "ratings": []
+    }
+  ]
+}
