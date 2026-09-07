@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Mapa, { type MapMarker } from "@/components/mapa/Mapa";
 import { PropertyCard, type Listed } from "@/components/propiedades/card";
-import { STAGE_DOT } from "@/components/propiedades/chip";
 import { FilterBar, input, type FilterValues } from "@/components/propiedades/filter-bar";
 import { ActiveFilters, QuickFilters } from "@/components/propiedades/filters-row";
 import { fmtEur } from "@/components/propiedades/format";
@@ -23,11 +22,6 @@ const ORDER: Record<string, string> = {
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 const posInt = (s: string) => (/^\d+$/.test(s) ? Number(s) : null);
-
-const pill = (active: boolean) =>
-  `flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 text-sm transition ${
-    active ? "border-ink bg-ink font-medium text-white" : "border-hairline text-body hover:border-ink"
-  }`;
 
 export default async function PropiedadesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
@@ -81,7 +75,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   const [list, counts, barrios] = await db.batch(
     [
       { sql, args },
-      "SELECT stage, COUNT(*) AS n FROM properties GROUP BY stage",
+      "SELECT COUNT(*) AS n FROM properties",
       "SELECT DISTINCT neighborhood FROM properties WHERE neighborhood IS NOT NULL ORDER BY neighborhood",
     ],
     "read",
@@ -93,8 +87,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   const items = rows.filter(
     (p) => matchesQuery(p.haystack, v.q) && (!v.estado || matchesCondition(p.haystack, v.estado as Parameters<typeof matchesCondition>[1])),
   );
-  const countByStage = Object.fromEntries(counts.rows.map((r) => [String(r.stage), Number(r.n)]));
-  const total = Object.values(countByStage).reduce((a, b) => a + b, 0);
+  const total = Number(counts.rows[0].n);
   const neighborhoods = barrios.rows.map((r) => String(r.neighborhood));
   const markers: MapMarker[] = items
     .filter((p) => p.lat !== null && p.lng !== null && p.precision !== "none")
@@ -187,19 +180,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
       <QuickFilters v={v} href={href} />
       <ActiveFilters v={v} href={href} />
 
-      {/* Stage strip + result line + view toggle */}
-      <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10" aria-label="Etapas">
-        <Link href={href({ etapa: "" })} className={pill(v.etapa === "")}>
-          Todas <span className={v.etapa === "" ? "text-white/70" : "text-muted"}>{total}</span>
-        </Link>
-        {STAGES.map((s) => (
-          <Link key={s} href={href({ etapa: s })} className={pill(v.etapa === s)}>
-            <span className={`h-2 w-2 rounded-full ${STAGE_DOT[s]}`} aria-hidden />
-            {STAGE_LABELS[s]} <span className={v.etapa === s ? "text-white/70" : "text-muted"}>{countByStage[s] ?? 0}</span>
-          </Link>
-        ))}
-      </nav>
-
+      {/* Result line + view toggle */}
       <div className="flex flex-wrap items-center justify-between gap-3 py-4">
         <p className="text-sm text-muted">
           <span className="font-medium text-ink">{items.length}</span> {items.length === 1 ? "propiedad" : "propiedades"}
