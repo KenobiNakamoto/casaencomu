@@ -23,7 +23,10 @@ import { normalizeUrl } from "../src/lib/url";
 const args = process.argv.slice(2);
 const dir = args.find((a) => !a.startsWith("--")) ?? "_local/captures";
 const reset = args.includes("--reset");
-const email = args[args.indexOf("--user") + 1] ?? "kenobi@example.com";
+// `indexOf` returns -1 when the flag is absent, and `args[0]` is the first positional argument.
+// So `--reset` became the importing user and owned every import event in the Actividad feed.
+const at = args.indexOf("--user");
+const email = (at === -1 ? undefined : args[at + 1]) ?? "kenobi@example.com";
 
 const asPage = (d: Record<string, unknown>): Page => {
   const j = <T,>(v: unknown, fallback: T): T => {
