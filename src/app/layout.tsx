@@ -34,6 +34,14 @@ export const viewport: Viewport = {
  * ponytail: four lines inline instead of next-themes. Mirrors `src/lib/theme.ts`, which is where
  * the same rules are stated in TypeScript and tested.
  */
+/*
+ * A text field matches `:focus-visible` however it was reached, so clicking into one draws the
+ * ring meant for somebody who cannot see where the caret went. This remembers which it was, and
+ * `globals.css` drops the ring for a pointer only. Inline and before paint, like the theme, so
+ * the first click of a session is already answered.
+ */
+const POINTER = `addEventListener("pointerdown",function(){document.documentElement.dataset.pointer=""},true);addEventListener("keydown",function(){delete document.documentElement.dataset.pointer},true)`;
+
 const NO_FLASH = `try{var t=localStorage.getItem("tema");document.documentElement.dataset.theme=(t==="light"||t==="dark")?t:(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -41,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" className={jakarta.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH }} />
+        <script dangerouslySetInnerHTML={{ __html: POINTER }} />
       </head>
       <body className="min-h-screen font-sans text-ink antialiased">
         <Nav />

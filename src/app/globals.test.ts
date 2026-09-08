@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const css = readFileSync(new URL("./globals.css", import.meta.url), "utf8");
+const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), "utf8");
 
 /**
  * The token values are read out of the stylesheet that actually ships, never copied into this
@@ -218,6 +219,21 @@ describe("what components are not allowed to write", () => {
         expect(rule[0], `pointer state with no keyboard equivalent: ${rule[0]}`).toContain("focus-visible");
       }
     }
+  });
+
+  /*
+   * A pointer gets no focus ring on a field it just clicked; a keyboard always gets one. The
+   * dangerous half is the second: one key press must take the mark off again, or a session that
+   * begins with a click has no focus indicator from then on.
+   */
+  it("drops the focus ring for a pointer only, and a key press brings it back", () => {
+    const boot = read("./layout.tsx");
+    expect(boot).toContain('addEventListener("pointerdown"');
+    expect(boot).toContain('addEventListener("keydown"');
+    expect(boot).toContain("delete document.documentElement.dataset.pointer");
+    expect(css).toContain(":root[data-pointer] :is(input, textarea, select):focus-visible");
+    // …and the ring itself is untouched for everyone who did not use a pointer.
+    expect(css).toContain("outline: 2px solid var(--focus)");
   });
 
   // F33: the full desktop navigation starts at 1024px, not at 768px.
