@@ -53,7 +53,7 @@ describe("adding a link keeps what was typed (F16)", () => {
  */
 describe("the add control grows out of its own button", () => {
   it("animates its width and yields the search field on a phone", () => {
-    expect(add).toContain("duration-300");
+    expect(add).toContain("${motion}"); // the width and the icon share one curve, declared once
     expect(add).toContain("hidden sm:flex");
     expect(add).toContain('transitionProperty: "width, background-color, border-color, box-shadow"');
   });
@@ -66,7 +66,7 @@ describe("the add control grows out of its own button", () => {
 
   it("turns the + into an ×, the long way round, and drops the second close button", () => {
     expect(add).toContain("rotate(${open ? 225 : 0}deg)"); // half a turn, then the 45° that makes the ×
-    expect(add).toContain("transition-transform");
+    expect(add).toContain("`transition-transform ${motion}`"); // the same curve the field grows on
     expect(add).toContain('aria-label={open ? "Cerrar" : "Añadir un anuncio"}');
     // One × on the pill. Two buttons that both close is what this replaced.
     expect(add.match(/aria-label="Cerrar"/g) ?? []).toHaveLength(0);

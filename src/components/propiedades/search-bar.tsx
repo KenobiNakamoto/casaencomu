@@ -92,6 +92,11 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
     setState({ kind: "idle" });
   }
 
+  /**
+   * One curve and one duration for the whole control: the field grows and the icon turns on the
+   * same movement, so they read as one thing opening rather than two things animating at once.
+   */
+  const motion = "duration-[400ms] ease-[cubic-bezier(0.65,0,0.35,1)]";
   const pill = "pill h-14 items-center rounded-full border border-hairline bg-raised shadow-tier transition focus-within:border-ink sm:h-16";
 
   return (
@@ -139,7 +144,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
         method="post"
         action="/api/import"
         onSubmit={submit}
-        className={`${pill} flex shrink-0 justify-end pr-2 duration-300 ease-out ${
+        className={`${pill} flex shrink-0 justify-end pr-2 ${motion} ${
           open ? "w-full pl-2 sm:w-[min(520px,52%)]" : "w-14 border-transparent bg-transparent shadow-none sm:w-16"
         }`}
         style={{ transitionProperty: "width, background-color, border-color, box-shadow" }}
@@ -182,7 +187,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
           className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-full transition aria-busy:opacity-60 sm:h-12 sm:w-12"
         >
           {/* A + turned 45° is an ×, so there is one icon, not two. It takes the long way round —
-              half a turn, then the last 45° — on a curve that starts and ends at rest. */}
+              half a turn, then the last 45° — on the same curve as the field beside it. */}
           <svg
             width="20"
             height="20"
@@ -191,7 +196,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
             stroke="currentColor"
             strokeWidth="2.5"
             strokeLinecap="round"
-            className="transition-transform duration-500 ease-[cubic-bezier(0.65,0,0.35,1)]"
+            className={`transition-transform ${motion}`}
             style={{ transform: `rotate(${open ? 225 : 0}deg)` }}
             aria-hidden
           >
