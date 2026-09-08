@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { DIMENSIONS, STAGES, type Dimension, type EventKind, type Stage } from "@/lib/listing";
+import { DIMENSIONS, STAGE_LABELS, STAGES, type Dimension, type EventKind, type Stage } from "@/lib/listing";
 import { UPSERT_RATING_SQL } from "@/lib/ratings";
 import { setBudget } from "@/lib/settings";
 
@@ -55,10 +55,18 @@ export async function rateAction(propertyId: string, formData: FormData) {
   revalidatePath(LIST);
 }
 
-export async function commentAction(propertyId: string, formData: FormData) {
+/**
+ * What a form has to show afterwards. `text` is echoed back so a rejected save leaves the words
+ * in the box: losing what somebody typed is the one failure they cannot undo (F25).
+ */
+export type SaveState = { ok: true } | { ok: false; message: string; text?: string } | null;
+
+export async function commentAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const propertyId = String(formData.get("propertyId") ?? "");
   const user = await currentUser();
-  const body = String(formData.get("body") ?? "").trim().slice(0, 4000);
-  if (!body) return;
+  const raw = String(formData.get("body") ?? "");
+  const body = raw.trim().slice(0, 4000);
+  if (!body) return { ok: false, message: "Escribe algo antes de comentar.", text: raw };
   const now = new Date().toISOString();
   const id = randomUUID();
   await db.batch(
@@ -72,24 +80,45 @@ export async function commentAction(propertyId: string, formData: FormData) {
     "write",
   );
   revalidatePath(detail(propertyId));
+  return { ok: true };
 }
 
-/** Anyone can change a stage. No-op when the stage is unknown or unchanged. */
-export async function setStageAction(propertyId: string, formData: FormData) {
+/**
+ * Anyone can change a stage, but only from the stage they were looking at. The form carries the
+ * `stage_version` it was drawn with, and the update is conditional on it, so two people deciding
+ * at once cannot silently overwrite each other — the second one is told (F25).
+ */
+export async function setStageAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const propertyId = String(formData.get("propertyId") ?? "");
   const user = await currentUser();
   const to = String(formData.get("etapa") ?? "");
-  if (!STAGES.includes(to as Stage)) return;
-  const { rows } = await db.execute({ sql: "SELECT stage FROM properties WHERE id = ?", args: [propertyId] });
+  const seen = Number(formData.get("version"));
+  if (!STAGES.includes(to as Stage)) return { ok: false, message: "Esa etapa no existe." };
+  if (!Number.isInteger(seen)) return { ok: false, message: "Vuelve a cargar la página e inténtalo otra vez." };
+
+  const { rows } = await db.execute({
+    sql: "SELECT stage, stage_version FROM properties WHERE id = ?",
+    args: [propertyId],
+  });
   const from = rows[0]?.stage;
-  if (typeof from !== "string" || from === to) return;
+  if (typeof from !== "string") return { ok: false, message: "Esta propiedad ya no existe." };
+  if (Number(rows[0].stage_version) !== seen) {
+    return {
+      ok: false,
+      message: `Otra persona la ha movido a ${STAGE_LABELS[from as Stage] ?? from} mientras decidías. Míralo y vuelve a elegir.`,
+    };
+  }
+  if (from === to) return { ok: true };
+
   const now = new Date().toISOString();
   await db.batch(
     [
       {
         // stage_version advances here and nowhere else: a source refresh must not look like a
-        // decision (doc 05 § 3). PIP-08 uses it to reject a stale form.
-        sql: "UPDATE properties SET stage = ?, stage_version = stage_version + 1, updated_at = ? WHERE id = ?",
-        args: [to, now, propertyId],
+        // decision (doc 05 § 3). The `WHERE` on it is what makes the check above a real one and
+        // not a guess that another write can slip past.
+        sql: "UPDATE properties SET stage = ?, stage_version = stage_version + 1, updated_at = ? WHERE id = ? AND stage_version = ?",
+        args: [to, now, propertyId, seen],
       },
       event(propertyId, "stage_change", { from, to }, user.id, now),
     ],
@@ -97,4 +126,5 @@ export async function setStageAction(propertyId: string, formData: FormData) {
   );
   revalidatePath(detail(propertyId));
   revalidatePath(LIST);
+  return { ok: true };
 }

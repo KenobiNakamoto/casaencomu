@@ -36,9 +36,21 @@ export function successLocation(r: SaveResult): string {
  * the list, which already renders `?error=`. A JSON caller keeps getting JSON.
  */
 export function failResponse(req: Request, status: number, error: string): Response {
-  const wantsJson = req.headers.get("accept")?.includes("application/json") || isJsonBody(req);
-  if (wantsJson) return Response.json({ error }, { status });
+  if (wantsJson(req)) return Response.json({ error }, { status });
   return new Response(null, { status: 303, headers: { Location: `/propiedades?error=${encodeURIComponent(error)}` } });
 }
 
 export const isJsonBody = (req: Request) => !!req.headers.get("content-type")?.includes("application/json");
+
+const wantsJson = (req: Request) => !!req.headers.get("accept")?.includes("application/json") || isJsonBody(req);
+
+/**
+ * The mirror of `failResponse`. A browser form still gets its 303, because it has nothing to run
+ * the redirect with; the add dialog gets the destination as data, so a failure can stay in the
+ * dialog with the typed URL still in the field (F16).
+ */
+export function successResponse(req: Request, r: SaveResult): Response {
+  const location = successLocation(r);
+  if (wantsJson(req)) return Response.json({ location, outcome: r.outcome });
+  return new Response(null, { status: 303, headers: { Location: location } });
+}

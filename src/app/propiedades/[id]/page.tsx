@@ -2,21 +2,24 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Cover } from "@/components/propiedades/card";
 import { Chip, StageChip } from "@/components/propiedades/chip";
-import { fmtDate, fmtDateTime, fmtEur, fmtNum, input, SIN_DATOS, siNo } from "@/components/propiedades/format";
+import { fmtDate, fmtDateTime, fmtEur, fmtNum, SIN_DATOS, siNo } from "@/components/propiedades/format";
+import { CommentForm } from "@/components/propiedades/comment-form";
 import { RatingForm } from "@/components/propiedades/rating-form";
+import { StageForm } from "@/components/propiedades/stage-form";
 import { availabilityLine, AVAILABILITY_LABEL, isStale, type SourceAvailability } from "@/lib/availability";
 import { CompareToggle, CompareTray } from "@/components/comparar/controls";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { backHref } from "@/lib/filters";
-import { DIMENSION_LABELS, DIMENSIONS, STAGE_LABELS, STAGES, type Stage } from "@/lib/listing";
+import { DIMENSION_LABELS, DIMENSIONS, STAGE_LABELS, type Stage } from "@/lib/listing";
 import { familyAverage, matrix, memberAverage, type RatingRow } from "@/lib/ratings";
-import { commentAction, setStageAction } from "../actions";
+
 
 type Property = {
   id: string;
   title: string;
   stage: string;
+  stage_version: number | null;
   price_eur: number | null;
   fees_eur: number | null;
   area_m2: number | null;
@@ -87,7 +90,6 @@ function describe(kind: string, p: Record<string, unknown>) {
 
 const h2 = "text-[22px] font-medium leading-tight";
 const section = "space-y-4 py-8";
-const primary = "btn-primary h-12 w-full rounded-lg px-6 text-base font-medium";
 const cell = "border-b border-hairline-soft py-2 pr-3 align-top";
 const initial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 const score = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -237,22 +239,7 @@ export default async function PropiedadPage({
                 {family !== null && ` · ★ ${score(family)} en familia`}
               </p>
             </div>
-            <form action={setStageAction.bind(null, p.id)} className="space-y-2">
-              <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted">
-                Etapa
-                {/* key: React resets the form after the action but never re-applies a changed defaultValue on a <select> */}
-                <select key={p.stage} name="etapa" defaultValue={p.stage} className={input}>
-                  {STAGES.map((s) => (
-                    <option key={s} value={s}>
-                      {STAGE_LABELS[s]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button type="submit" className={primary}>
-                Guardar etapa
-              </button>
-            </form>
+            <StageForm propertyId={p.id} stage={p.stage} version={Number(p.stage_version ?? 0)} />
             <div className="border-t border-hairline-soft pt-5">
               <p className="mb-3 text-sm font-semibold text-ink">Tu valoración</p>
               <RatingForm propertyId={p.id} current={m[user.id]} />
@@ -405,19 +392,7 @@ export default async function PropiedadPage({
                 ))}
               </ul>
             )}
-            <form action={commentAction.bind(null, p.id)} className="space-y-3">
-              <textarea
-                name="body"
-                required
-                rows={3}
-                maxLength={4000}
-                placeholder="Escribe un comentario…"
-                className="w-full rounded-lg border border-control-border bg-raised p-3 transition focus:border-ink"
-              />
-              <button type="submit" className="h-12 rounded-lg bg-ink px-6 text-base font-medium text-canvas transition hover:opacity-90">
-                Comentar
-              </button>
-            </form>
+            <CommentForm propertyId={p.id} />
           </section>
 
           <section className={section}>

@@ -65,6 +65,7 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 | `/propiedades` | `app/propiedades/page.tsx` | the list. Filters live in the URL, so a link is a saved search. `lib/filters.ts` decides what they mean |
 | `/propiedades/[id]` | `app/propiedades/[id]/page.tsx` | photos, facts, description, ratings, comments, timeline |
 | `/mapa` | `app/mapa/page.tsx` | the shell; the map itself is `components/mapa/Mapa.tsx`. Reads the same filters as the list |
+| `/ayuda` and route states | `app/{error,not-found,loading}.tsx` | every flow's own error, missing-page and loading screens |
 | `/comparar` | `app/comparar/page.tsx` | 2 to 4 columns, differing rows highlighted. The `ids` in the URL win; the tray is how they get there |
 | `/actividad` | `app/actividad/page.tsx` | the `events` table, newest first |
 | `/ayuda` | `app/ayuda/page.tsx` | the bookmarklet to drag, and how to use it |
