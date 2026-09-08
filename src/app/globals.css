@@ -660,6 +660,11 @@ html[data-wipe]::view-transition-new(root) {
   border-radius: inherit;
   cursor: inherit;
 }
+/* One ring, on the pill. The global rule (F32) would otherwise draw a second one, in the focus
+   colour, around the invisible input that fills it. */
+.compare-box input:focus-visible {
+  outline: none;
+}
 
 /*
  * The mark. `::before` is the plus, which becomes the square; `::after` is the tick. Two layers
@@ -670,7 +675,6 @@ html[data-wipe]::view-transition-new(root) {
   width: 17px;
   height: 17px;
   flex: none;
-  transition: transform var(--motion);
 }
 .compare-mark::before {
   content: "";
@@ -724,23 +728,23 @@ html[data-wipe]::view-transition-new(root) {
     gap: 0;
   }
   /* Open: the word arrives, and the plus turns half a revolution into the square you tick. */
-  .compare-compact .compare-box:hover,
+  .compare-compact.is-open .compare-box,
   .compare-compact .compare-box:has(input:focus-visible) {
     min-height: 40px;
     padding: 0 12px 0 10px;
     gap: 6px;
   }
-  .compare-compact .compare-box:hover .compare-text,
+  .compare-compact.is-open .compare-box .compare-text,
   .compare-compact .compare-box:has(input:focus-visible) .compare-text {
     max-width: 9ch;
     opacity: 1;
   }
-  .compare-compact .compare-box:hover .compare-mark,
-  .compare-compact .compare-box:has(input:focus-visible) .compare-mark {
+  .compare-compact.is-open .compare-box .compare-mark::before,
+  .compare-compact .compare-box:has(input:focus-visible) .compare-mark::before {
     transform: rotate(180deg);
   }
   /* Shut, and not yet chosen: no square, just the plus. */
-  .compare-compact .compare-box:not(:hover):not(:has(input:focus-visible)) .compare-mark::before {
+  .compare-compact:not(.is-open) .compare-box:not(:has(input:focus-visible)) .compare-mark::before {
     border-color: transparent;
     background-size: 11px 1.5px, 1.5px 11px;
   }
@@ -749,7 +753,7 @@ html[data-wipe]::view-transition-new(root) {
    * reads as going behind it rather than as two things disappearing together. The tick does not
    * move — the pill closing around it is what carries it to the right.
    */
-  .compare-compact .compare-box:not(:hover):not(:has(input:focus-visible)):has(input:checked) .compare-mark::before {
+  .compare-compact:not(.is-open) .compare-box:not(:has(input:focus-visible)):has(input:checked) .compare-mark::before {
     transform: scale(0.3);
     opacity: 0;
     background-size: 0 1.5px, 1.5px 0;
@@ -758,7 +762,7 @@ html[data-wipe]::view-transition-new(root) {
   }
   /* …and the tick takes the room the square gave up, rather than sitting in a space that is
      suddenly too big for it. */
-  .compare-compact .compare-box:not(:hover):not(:has(input:focus-visible)):has(input:checked) .compare-mark::after {
+  .compare-compact:not(.is-open) .compare-box:not(:has(input:focus-visible)):has(input:checked) .compare-mark::after {
     transform: scale(1.25);
   }
 }
