@@ -74,11 +74,37 @@ describe("the add control grows out of its own button", () => {
   });
 
   it("puts the focus ring around the pill, not around the field inside it", () => {
-    expect(add).toContain('const pill = "pill ');
+    expect(add).toMatch(/const pill =\s*"pill /); // the class the ring hangs off, however it wraps
     expect(css).toContain(".pill:has(input:focus-visible)");
     expect(css.slice(css.indexOf(".pill:has("))).toMatch(/^[^}]*outline: 2px solid/); // still a ring, just on the pill
     expect(css).toContain(".pill input:focus-visible");
     expect(css).toContain(":focus-visible {"); // the global ring (F32) is still there for everything else
+  });
+
+  /*
+   * The pill answers a submitted link with colour. What makes that honest rather than decorative
+   * is that the verdict is never on a timer: `sent` waits, and `ok`/`bad` are set where the
+   * answer actually arrives. A fixed clock would be inventing one — the server has 25 seconds.
+   */
+  it("shows the verdict when there is one, never on a clock", () => {
+    expect(add).toContain('setFlash("sent")');
+    // The one place `ok` is set is where the server said yes.
+    const ok = add.slice(add.indexOf("if (res.ok && data?.location)"));
+    expect(ok).toContain('setFlash("ok")');
+    expect(add.match(/setFlash\("ok"\)/g) ?? []).toHaveLength(1);
+    // `sent` never becomes a verdict by itself: nothing schedules ok/bad off a timer except the
+    // three answers this browser already has.
+    expect(add).toContain('const answer = (kind: "ok" | "bad") => setTimeout(() => setFlash(kind), SENT_MS)');
+    expect(css).toContain('.pill[data-flash="sent"]::after');
+    expect(css).toContain("@keyframes pill-verdict");
+  });
+
+  it("does not let the browser draw its own bubble over the pill", () => {
+    // `required` is what puts "Please fill out this field" on top of the control. The empty case
+    // is answered by the pill, and by `/api/import`, which refuses a missing url with a 400.
+    expect(add).not.toMatch(/^\s*required$/m);
+    expect(add).toContain('aria-required="true"');
+    expect(add).toContain('message: "Pega el enlace del anuncio."');
   });
 
   it("no longer ships a dialog for it", () => {

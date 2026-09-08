@@ -39,8 +39,12 @@ export const viewport: Viewport = {
  * ring meant for somebody who cannot see where the caret went. This remembers which it was, and
  * `globals.css` drops the ring for a pointer only. Inline and before paint, like the theme, so
  * the first click of a session is already answered.
+ *
+ * Tab, and only Tab, takes the mark off: it is the key that moves focus, and so the one that
+ * means somebody is navigating by keyboard. Typing — Enter included — is not a reason to draw a
+ * ring around the field they are already typing in.
  */
-const POINTER = `addEventListener("pointerdown",function(){document.documentElement.dataset.pointer=""},true);addEventListener("keydown",function(){delete document.documentElement.dataset.pointer},true)`;
+const POINTER = `addEventListener("pointerdown",function(){document.documentElement.dataset.pointer=""},true);addEventListener("keydown",function(e){if(e.key==="Tab")delete document.documentElement.dataset.pointer},true)`;
 
 const NO_FLASH = `try{var t=localStorage.getItem("tema");document.documentElement.dataset.theme=(t==="light"||t==="dark")?t:(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}catch(e){}`;
 

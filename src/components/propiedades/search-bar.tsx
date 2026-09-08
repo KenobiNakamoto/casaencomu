@@ -17,6 +17,16 @@ type State =
 /** After this long the person deserves to be told it has not stalled. */
 const SLOW_MS = 10_000;
 
+/**
+ * The wash inside the pill. `sent` is the accent rising; it then waits, because the answer is the
+ * server's and the server has up to 25 seconds. `ok` and `bad` are the verdict, and they play for
+ * `VERDICT_MS`. When this browser can answer on its own — nothing typed, a portal we cannot fetch
+ * — the wait is only `SENT_MS`, which is the ~700ms the whole thing was asked to be.
+ */
+type Flash = "sent" | "ok" | "bad" | null;
+const SENT_MS = 230;
+const VERDICT_MS = 470;
+
 /** "Idealista", not "idealista": the name opens the sentence. */
 const portalName = (url: string) => {
   try {
@@ -42,6 +52,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [state, setState] = useState<State>({ kind: "idle" });
+  const [flash, setFlash] = useState<Flash>(null);
   const field = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const busy = state.kind === "saving" || state.kind === "slow";
@@ -56,15 +67,35 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
     return () => clearTimeout(t);
   }, [state.kind]);
 
+  useEffect(() => {
+    if (flash !== "ok" && flash !== "bad") return;
+    const t = setTimeout(() => setFlash(null), VERDICT_MS);
+    return () => clearTimeout(t);
+  }, [flash]);
+
+  /** The accent first, then the verdict — never the verdict on its own. */
+  const answer = (kind: "ok" | "bad") => setTimeout(() => setFlash(kind), SENT_MS);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return; // one submission at a time, without disabling the field
+    setFlash("sent");
     const value = url.trim();
-    if (!value) return setState({ kind: "error", message: "Pega el enlace del anuncio." });
-
+    // Three answers this browser already has. They are the reason the pill can say anything in
+    // under a second at all: nothing is sent, so nothing is waited for.
+    if (!value) {
+      answer("bad");
+      return setState({ kind: "error", message: "Pega el enlace del anuncio." });
+    }
     const route = routeFor(value);
-    if (route === "capture") return setState({ kind: "capture", portal: portalName(value) });
-    if (route === "unsupported") return setState({ kind: "unsupported" });
+    if (route === "capture") {
+      answer("bad");
+      return setState({ kind: "capture", portal: portalName(value) });
+    }
+    if (route === "unsupported") {
+      answer("bad");
+      return setState({ kind: "unsupported" });
+    }
 
     setState({ kind: "saving" });
     try {
@@ -75,14 +106,22 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
       });
       const data = (await res.json().catch(() => null)) as { location?: string; error?: string } | null;
       if (res.ok && data?.location) {
-        setOpen(false);
-        setUrl("");
-        setState({ kind: "idle" });
-        router.push(data.location);
+        const to = data.location;
+        setFlash("ok");
+        // The green is the confirmation, so it is worth the half second it takes — after a wait
+        // that can be twenty times longer, and the page it leaves for is the answer anyway.
+        setTimeout(() => {
+          setOpen(false);
+          setUrl("");
+          setState({ kind: "idle" });
+          router.push(to);
+        }, VERDICT_MS);
         return;
       }
+      setFlash("bad");
       setState({ kind: "error", message: data?.error ?? "No se pudo guardar el anuncio." });
     } catch {
+      setFlash("bad");
       setState({ kind: "error", message: "No hay conexión con el servidor. El enlace sigue aquí; inténtalo otra vez." });
     }
   }
@@ -97,7 +136,8 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
    * same movement, so they read as one thing opening rather than two things animating at once.
    */
   const motion = "duration-[400ms] ease-[cubic-bezier(0.65,0,0.35,1)]";
-  const pill = "pill h-14 items-center rounded-full border border-hairline bg-raised shadow-tier transition focus-within:border-ink sm:h-16";
+  const pill =
+    "pill relative h-14 items-center rounded-full border border-hairline bg-raised shadow-tier transition focus-within:border-ink sm:h-16";
 
   return (
     <div className="relative flex min-w-0 flex-1 items-center gap-3" onKeyDown={(e) => e.key === "Escape" && close()}>
@@ -144,6 +184,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
         method="post"
         action="/api/import"
         onSubmit={submit}
+        data-flash={flash || undefined}
         className={`${pill} flex shrink-0 justify-end pr-2 ${motion} ${
           open ? "w-full pl-2 sm:w-[min(520px,52%)]" : "w-14 border-transparent bg-transparent shadow-none sm:w-16"
         }`}
@@ -157,7 +198,9 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
                 ref={field}
                 type="url"
                 name="url"
-                required
+                // Not `required`: that is what draws the browser's own bubble over the pill. The
+                // empty case is answered here, and `/api/import` refuses it too.
+                aria-required="true"
                 value={url}
                 onChange={(e) => {
                   setUrl(e.target.value);

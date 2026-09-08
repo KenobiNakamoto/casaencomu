@@ -930,6 +930,54 @@ html[data-wipe]::view-transition-new(root) {
   outline: none;
 }
 
+/* --- The answer to a submitted link ------------------------------------------------------- */
+
+/*
+ * A wash of colour inside the pill instead of the browser's own validation bubble. Three states,
+ * and the timing is the honest part: `sent` rises and then *holds*, because the server has up to
+ * `IMPORT_DEADLINE_MS` to answer and a fixed clock would be inventing a verdict it does not have.
+ * `ok` and `bad` play only once the answer is real. For a link this browser can reject on its own
+ * — nothing typed, a portal we cannot fetch — the answer is immediate and the whole thing is the
+ * ~700ms it looks like.
+ */
+.pill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 230ms var(--ease-motion);
+}
+.pill[data-flash]::after {
+  background: var(--accent);
+}
+.pill[data-flash="sent"]::after {
+  opacity: 0.1;
+}
+.pill[data-flash="ok"]::after,
+.pill[data-flash="bad"]::after {
+  animation: pill-verdict 470ms var(--ease-motion) both;
+}
+.pill[data-flash="ok"]::after {
+  background: var(--success-ink);
+}
+.pill[data-flash="bad"]::after {
+  background: var(--danger-ink);
+}
+/* Up from where `sent` left it, over the peak, and gone. */
+@keyframes pill-verdict {
+  0% {
+    opacity: 0.1;
+  }
+  45% {
+    opacity: 0.2;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /* --- Add a link: the message under the pill (PIP-08 behaviour, in the old control) ------- */
 
 /* The pill has no room for a sentence, and growing it would move the button under a finger
