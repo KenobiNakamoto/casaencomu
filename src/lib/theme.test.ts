@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { KEY, readPreference, resolve, writePreference } from "./theme";
+import { KEY, readTheme, resolve, writeTheme } from "./theme";
 
 /** A `localStorage` stand-in, plus one that throws the way a private window can. */
 const fake = (initial: Record<string, string> = {}) => {
@@ -7,10 +7,6 @@ const fake = (initial: Record<string, string> = {}) => {
   return {
     getItem: (k: string) => m.get(k) ?? null,
     setItem: (k: string, v: string) => void m.set(k, v),
-    removeItem: (k: string) => void m.delete(k),
-    get size() {
-      return m.size;
-    },
   };
 };
 const hostile = {
@@ -20,40 +16,37 @@ const hostile = {
   setItem() {
     throw new Error("denied");
   },
-  removeItem() {
-    throw new Error("denied");
-  },
 };
 
-describe("theme preference", () => {
-  it("defaults to following the system", () => {
-    expect(readPreference(fake())).toBe("sistema");
+describe("theme choice", () => {
+  it("reports no choice when nothing is stored", () => {
+    expect(readTheme(fake())).toBe(null);
   });
 
-  it("reads a value stored by version 1, which only ever wrote light or dark", () => {
-    expect(readPreference(fake({ [KEY]: "dark" }))).toBe("dark");
-    expect(readPreference(fake({ [KEY]: "light" }))).toBe("light");
+  it("reads the two values it writes", () => {
+    expect(readTheme(fake({ [KEY]: "dark" }))).toBe("dark");
+    expect(readTheme(fake({ [KEY]: "light" }))).toBe("light");
   });
 
-  it("treats anything it does not recognise as sistema", () => {
-    expect(readPreference(fake({ [KEY]: "noche" }))).toBe("sistema");
+  it("treats anything else, including an older sistema, as no choice", () => {
+    expect(readTheme(fake({ [KEY]: "noche" }))).toBe(null);
+    expect(readTheme(fake({ [KEY]: "sistema" }))).toBe(null);
   });
 
-  it("stores sistema as the absence of a choice, so a later default change reaches the user", () => {
-    const s = fake({ [KEY]: "dark" });
-    writePreference("sistema", s);
-    expect(s.size).toBe(0);
-    expect(readPreference(s)).toBe("sistema");
+  it("round-trips a choice", () => {
+    const s = fake();
+    writeTheme("dark", s);
+    expect(readTheme(s)).toBe("dark");
   });
 
   it("never throws when storage is denied", () => {
-    expect(readPreference(hostile)).toBe("sistema");
-    expect(() => writePreference("dark", hostile)).not.toThrow();
+    expect(readTheme(hostile)).toBe(null);
+    expect(() => writeTheme("dark", hostile)).not.toThrow();
   });
 
-  it("resolves sistema against the system, and ignores it for an explicit choice", () => {
-    expect(resolve("sistema", true)).toBe("dark");
-    expect(resolve("sistema", false)).toBe("light");
+  it("falls back to the system only until a choice exists", () => {
+    expect(resolve(null, true)).toBe("dark");
+    expect(resolve(null, false)).toBe("light");
     expect(resolve("light", true)).toBe("light");
     expect(resolve("dark", false)).toBe("dark");
   });

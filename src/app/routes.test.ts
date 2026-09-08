@@ -41,6 +41,40 @@ describe("reduced motion removes the movement, not only its transition (F18)", (
   it("the theme wipe is skipped rather than shortened", () => {
     const toggle = read("../components/theme-toggle.tsx");
     expect(toggle).toContain('matchMedia("(prefers-reduced-motion: reduce)").matches');
-    expect(toggle).toContain("return setPreference(next)");
+    expect(toggle).toContain("return setTheme(next)");
+  });
+
+  // A map on screen used to skip the wipe, and a map is on screen on both pages that have one,
+  // so the animation almost never ran (Kenobi, 2026-09-08).
+  it("runs the wipe even when a map is on screen", () => {
+    const toggle = read("../components/theme-toggle.tsx");
+    expect(toggle).not.toContain("maplibregl-map");
+  });
+});
+
+/**
+ * A 27-inch screen used to leave about 555 px of empty page on each side, and the gallery answered
+ * the extra width with a third column of small cards (Kenobi, 2026-09-08). The page is wider, the
+ * map takes more of it, and two columns is the most the gallery ever shows.
+ */
+describe("the results page uses the width it is given", () => {
+  const page = read("./propiedades/page.tsx");
+
+  it("lets the container grow well past 1440", () => {
+    const max = page.match(/mx-auto max-w-\[(\d+)px\]/);
+    expect(max).toBeTruthy();
+    expect(Number(max![1])).toBeGreaterThan(1440);
+  });
+
+  it("never shows a third column of cards", () => {
+    const ul = page.slice(page.indexOf('<ul className="grid'), page.indexOf('">', page.indexOf('<ul className="grid')));
+    expect(ul).toContain("lg:grid-cols-2");
+    expect(ul).not.toMatch(/grid-cols-[3-9]/);
+  });
+
+  it("gives the map more than the 42% it had", () => {
+    const col = page.match(/split:grid-cols-\[minmax\(0,1fr\)_minmax\((\d+)px,(\d+)%\)\]/);
+    expect(col).toBeTruthy();
+    expect(Number(col![2])).toBeGreaterThan(42);
   });
 });

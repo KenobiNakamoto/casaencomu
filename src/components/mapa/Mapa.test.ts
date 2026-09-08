@@ -62,10 +62,13 @@ describe("F11 — one colour, one meaning", () => {
     expect(pin).not.toContain("--on-action");
   });
 
-  it("rests an area outline on the neutral boundary token", () => {
+  it("rests an area outline on a neutral token", () => {
     const at = src.indexOf("function areaPaint");
     const body = src.slice(at, src.indexOf("\n}", at));
-    expect(body).toContain('css("--map-boundary")');
+    // The resting colour moved from `--map-boundary` to `--map-label` on 2026-09-08: the
+    // boundary token is the same grey the basemap draws streets in, so the outline was invisible.
+    // What F11 asks is that the resting colour be neutral and that red never appear here.
+    expect(body).toMatch(/const edge = css\("--map-(label|boundary)"\)/);
     expect(body).toContain('css("--secondary")');
     expect(body).not.toContain("--accent");
   });
@@ -142,5 +145,32 @@ describe("#80 — a popup keeps the list it was opened from", () => {
 
   it("takes the query from the live params, not from a stale closure", () => {
     expect(src).toContain("popupFor(group, now.current.params)");
+  });
+});
+
+/**
+ * The areas were invisible until the cursor was on them: `fill-opacity` rested at 0, and the
+ * outline was a solid hairline in a grey the basemap also uses for streets, so a district read as
+ * one more road (Kenobi, 2026-09-08).
+ */
+describe("the areas are visible without a cursor on them", () => {
+  const paint = src.slice(src.indexOf("function areaPaint("), src.indexOf("function approxPaint("));
+
+  it("rests on a fill, not on nothing", () => {
+    // The last branch of a `case` is the resting one. Neither theme may rest at zero.
+    const rest = [...paint.matchAll(/const (rest) = night \? ([\d.]+) : ([\d.]+);/g)][0];
+    expect(rest, "the resting fill opacity is no longer declared here").toBeTruthy();
+    expect(Number(rest[2])).toBeGreaterThan(0);
+    expect(Number(rest[3])).toBeGreaterThan(0);
+    expect(paint).toContain("hovered, hover, rest]");
+  });
+
+  it("draws the boundary as a dash, so it cannot be read as a street", () => {
+    expect(paint).toContain('"line-dasharray"');
+  });
+
+  it("keeps the selection colour for hover and selection only", () => {
+    // The resting branch is the last: it must be the neutral token, never `--secondary`.
+    expect(paint).toContain('["case", hovered, mark, selected(zona), mark, edge]');
   });
 });

@@ -27,9 +27,10 @@ export const viewport: Viewport = {
 /**
  * Runs before the first paint, so the resolved theme is on <html> when the CSS is applied and
  * there is no flash of the wrong one. It cannot be a React effect: effects run after paint.
- * `sistema` (and anything unrecognised) resolves against the system; `light` and `dark` are the
- * explicit choices version 1 also wrote, so an existing preference still works. If this script
- * never runs, the `prefers-color-scheme` block in `globals.css` still gives a usable theme.
+ * `light` and `dark` are the only stored values. Anything else, including nothing at all and the
+ * `sistema` an older install may have left, falls back to what the operating system reports —
+ * once, on this load, not as a standing subscription. If this script never runs, the
+ * `prefers-color-scheme` block in `globals.css` still gives a usable theme.
  * ponytail: four lines inline instead of next-themes. Mirrors `src/lib/theme.ts`, which is where
  * the same rules are stated in TypeScript and tested.
  */

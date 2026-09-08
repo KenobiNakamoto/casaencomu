@@ -4,15 +4,13 @@ import { describe, expect, it } from "vitest";
 
 /** Source guards for the states that are hard to reach and easy to lose in a refactor. */
 const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), "utf8");
-const add = read("./propiedades/add-dialog.tsx");
-const dialog = read("./ui/dialog.tsx");
+const add = read("./propiedades/search-bar.tsx");
 const comment = read("./propiedades/comment-form.tsx");
 const stage = read("./propiedades/stage-form.tsx");
-const search = read("./propiedades/search-bar.tsx");
 const actions = read("../app/propiedades/actions.ts");
 const css = read("../app/globals.css");
 
-describe("the add dialog keeps what was typed (F16)", () => {
+describe("adding a link keeps what was typed (F16)", () => {
   it("holds the URL in state, so a failure cannot clear the field", () => {
     expect(add).toContain("value={url}");
     expect(add).toContain("setUrl(e.target.value)");
@@ -22,19 +20,22 @@ describe("the add dialog keeps what was typed (F16)", () => {
 
   it("refuses a second submission without disabling the field", () => {
     expect(add).toContain("if (busy) return;");
-    expect(add).toContain("aria-disabled={busy}");
+    expect(add).toContain("aria-busy={busy}");
     // Nothing is truly disabled: a disabled control loses focus, and the page must stay readable.
     expect(add.match(/(?<!aria-)disabled/g) ?? []).toHaveLength(0);
   });
 
   it("names one honest pending state and no invented progress", () => {
     expect(add).toContain("Guardando propiedad…");
-    expect(add).not.toMatch(/\d+%/);
     expect(add).toContain("SLOW_MS");
+    // No invented progress. Read the status block only: the pill's own width is a percentage.
+    const status = add.slice(add.indexOf('id="add-status"'));
+    expect(status).not.toMatch(/\d+%/);
   });
 
   it("still works before it has hydrated, instead of navigating to a query string", () => {
-    expect(add).toContain('method="post" action="/api/import"');
+    expect(add).toContain('method="post"');
+    expect(add).toContain('action="/api/import"');
   });
 
   it("classifies the link before sending it", () => {
@@ -45,22 +46,27 @@ describe("the add dialog keeps what was typed (F16)", () => {
   });
 });
 
-describe("the dialog is the platform's (F17)", () => {
-  it("uses the native element and its own modal behaviour", () => {
-    expect(dialog).toContain("showModal()");
-    expect(dialog).toContain("<dialog");
-    expect(dialog).not.toContain("keydown");
+/**
+ * The dialog of PIP-08 is gone; the control Kenobi asked for is back (2026-09-08). It grows the
+ * link field leftwards out of a button that never moves, and the message it needs for the states
+ * above sits under the pill rather than inside it.
+ */
+describe("the add control grows out of its own button", () => {
+  it("animates its width and yields the search field on a phone", () => {
+    expect(add).toContain("duration-300");
+    expect(add).toContain("hidden sm:flex");
+    expect(add).toContain('transitionProperty: "width, background-color, border-color, box-shadow"');
   });
 
-  it("returns focus to whatever opened it", () => {
-    expect(dialog).toContain("opener.current = document.activeElement");
-    expect(dialog).toContain("?.focus?.()");
+  it("puts the message below the pill, where it cannot change the field's height", () => {
+    expect(add).toContain('className="add-status"');
+    expect(css).toContain(".add-status {");
+    expect(css).toContain("position: absolute");
   });
 
-  it("the trigger no longer takes the search field's width", () => {
-    expect(search).not.toContain("duration-300");
-    expect(search).not.toContain("hidden sm:flex");
-    expect(css).toContain("flex-shrink: 0");
+  it("no longer ships a dialog for it", () => {
+    expect(add).not.toContain("Dialog");
+    expect(() => read("./ui/dialog.tsx")).toThrow();
   });
 });
 
