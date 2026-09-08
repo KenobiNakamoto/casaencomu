@@ -112,16 +112,28 @@
   --visit-bg: #f4effa;
   --visit-ink: #6b4b8a;
   --shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px 0, rgba(0, 0, 0, 0.1) 0 4px 8px 0;
-  /* map: paint overrides for the OpenFreeMap Positron basemap */
-  --map-bg: #f6f5f2;
-  --map-building: #edece8;
-  --map-water: #bfdff5;
-  --map-park: #d5ecd2;
-  --map-wood: #dcebd8;
-  --map-label: #4a4842;
-  --map-halo: #ffffff;
+  /* map: the full palette, from docs/product-improvement/03-design-motion-map.md § 6.
+   * map-style.ts maps every one of the basemap's 55 layers onto these. */
+  --map-bg: #f4f3ee;
+  --map-building: #e6e3da;
+  --map-water: #c7deeb;
+  --map-park: #dce8d5;
+  --map-wood: #d4e1cc;
+  --map-road-minor: #ffffff;
+  --map-road-major: #ffffff;
+  --map-road-casing: #d8d4cb;
+  --map-path: #ddd8cf;
+  --map-rail: #b5b1aa;
+  --map-boundary: #8c8982;
+  --map-label: #4b4a43;
+  --map-label-secondary: #68665f;
+  --map-water-label: #385971;
+  --map-halo: #f4f3ee;
   --pin-bg: #ffffff;
   --pin-ink: #16161a;
+  --pin-border: #716d65;
+  --pin-selected-bg: #e0a800;
+  --pin-selected-ink: #16161a;
 
   /* spacing (doc 03 § 3) */
   --space-1: 4px;
@@ -192,15 +204,26 @@
   --visit-ink: #c5addf;
   /* night elevation is a lighter surface plus a hairline; a black shadow is invisible here */
   --shadow: rgba(255, 255, 255, 0.06) 0 0 0 1px, rgba(0, 0, 0, 0.5) 0 4px 14px 0;
-  --map-bg: #101014;
-  --map-building: #1b1b21;
-  --map-water: #12222f;
-  --map-park: #14241a;
-  --map-wood: #16281c;
-  --map-label: #9a978f;
-  --map-halo: #0b0b0d;
-  --pin-bg: #23232a;
+  --map-bg: #12151a;
+  --map-building: #242a32;
+  --map-water: #152d3c;
+  --map-park: #1b3029;
+  --map-wood: #20372e;
+  --map-road-minor: #39414c;
+  --map-road-major: #505b69;
+  --map-road-casing: #242a33;
+  --map-path: #353e46;
+  --map-rail: #65717e;
+  --map-boundary: #65707c;
+  --map-label: #d3d8de;
+  --map-label-secondary: #aab3bd;
+  --map-water-label: #a2c6da;
+  --map-halo: #12151a;
+  --pin-bg: #252b34;
   --pin-ink: #f6f5f2;
+  --pin-border: #a39f97;
+  --pin-selected-bg: #ffd60a;
+  --pin-selected-ink: #16161a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -244,15 +267,26 @@
     --visit-bg: #292236;
     --visit-ink: #c5addf;
     --shadow: rgba(255, 255, 255, 0.06) 0 0 0 1px, rgba(0, 0, 0, 0.5) 0 4px 14px 0;
-    --map-bg: #101014;
-    --map-building: #1b1b21;
-    --map-water: #12222f;
-    --map-park: #14241a;
-    --map-wood: #16281c;
-    --map-label: #9a978f;
-    --map-halo: #0b0b0d;
-    --pin-bg: #23232a;
+    --map-bg: #12151a;
+    --map-building: #242a32;
+    --map-water: #152d3c;
+    --map-park: #1b3029;
+    --map-wood: #20372e;
+    --map-road-minor: #39414c;
+    --map-road-major: #505b69;
+    --map-road-casing: #242a33;
+    --map-path: #353e46;
+    --map-rail: #65717e;
+    --map-boundary: #65707c;
+    --map-label: #d3d8de;
+    --map-label-secondary: #aab3bd;
+    --map-water-label: #a2c6da;
+    --map-halo: #12151a;
+    --pin-bg: #252b34;
     --pin-ink: #f6f5f2;
+    --pin-border: #a39f97;
+    --pin-selected-bg: #ffd60a;
+    --pin-selected-ink: #16161a;
   }
 }
 
@@ -340,27 +374,75 @@
 .maplibregl-map {
   font-family: var(--font-sans);
 }
-.pin-wrap {
-  cursor: pointer;
-}
-.pin-wrap:hover {
-  z-index: 1;
-}
+/*
+ * A real <button>, so Tab reaches it and Enter or Space opens the preview (F12). The marker
+ * element is the button itself; there is no wrapper left to hover.
+ */
 .pin {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
   white-space: nowrap;
   background: var(--pin-bg);
   color: var(--pin-ink);
   font: 600 13px/1 var(--font-sans);
   padding: 8px 11px;
   border-radius: 9999px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 0 0 1px var(--pin-border), 0 2px 6px rgba(0, 0, 0, 0.18);
   transition: transform var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
 }
+/*
+ * F11: the selected pin is yellow, not red. Red is the primary action inside the preview, and
+ * one colour cannot mean both "act here" and "this is the one you are looking at".
+ */
 .pin:hover,
+.pin:focus-visible,
 .pin.is-active {
-  background: var(--action-bg);
-  color: var(--on-action);
+  background: var(--pin-selected-bg);
+  color: var(--pin-selected-ink);
   transform: scale(1.08);
+  z-index: 1;
+}
+/* Several homes on one portal centroid: the pin counts them and opens a chooser. */
+.pin-group {
+  min-width: 34px;
+  padding: 9px 10px;
+  text-align: center;
+}
+.chooser {
+  padding: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.chooser-head {
+  padding: 6px 8px 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.chooser-row {
+  display: grid;
+  gap: 1px;
+  padding: 8px;
+  border-radius: 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.chooser-row:hover,
+.chooser-row:focus-visible {
+  background: var(--surface-strong);
+}
+.chooser-price {
+  font-weight: 600;
+}
+.chooser-title {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chooser-where {
+  font-size: 12px;
+  color: var(--muted);
 }
 .maplibregl-popup.mini .maplibregl-popup-content {
   width: 260px;
@@ -391,18 +473,31 @@
   border-radius: 10px;
   box-shadow: var(--shadow-tier) !important;
 }
-.maplibregl-ctrl-group button {
+/*
+ * Two classes, because MapLibre's own 29 px rule has the same specificity and its stylesheet is
+ * imported from the component, so it lands after this one. 44 px is the minimum target (§ 8).
+ */
+.maplibregl-ctrl.maplibregl-ctrl-group button {
   width: 44px;
   height: 44px;
   background: var(--raised);
   color: var(--ink);
 }
+/* The full-extent control is ours, so it carries a glyph rather than a sprite. */
+.ctrl-all {
+  font: 600 15px/1 var(--font-sans);
+}
 .maplibregl-ctrl-group button + button {
   border-top-color: var(--hairline);
 }
-/* the control glyphs are black SVGs; invert them under the dark theme */
+/* the control glyphs are black SVGs; invert them under either route to the dark theme */
 [data-theme="dark"] .maplibregl-ctrl-icon {
   filter: invert(1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .maplibregl-ctrl-icon {
+    filter: invert(1);
+  }
 }
 .maplibregl-ctrl-attrib {
   border-radius: 6px;
