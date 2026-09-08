@@ -28,7 +28,7 @@ export default async function Nav() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-hairline bg-raised">
-      <div className="mx-auto flex h-16 max-w-[2040px] items-center gap-4 px-4 sm:px-6 lg:h-[72px] lg:px-10">
+      <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:h-[72px] lg:px-14">
         <Link href="/propiedades" className="flex shrink-0 items-center gap-2 text-xl font-bold tracking-tight text-accent">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M3 11l9-8 9 8" />

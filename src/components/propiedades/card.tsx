@@ -52,7 +52,7 @@ export function PropertyCard({ p, budget, href, userId }: { p: Listed; budget: B
           from assistive technology: the title below already names the home. */}
       <div className="relative">
         <Link href={href} tabIndex={-1} aria-hidden className="block">
-          <div className="relative aspect-[20/19] overflow-hidden rounded-card bg-surface-soft">
+          <div className="relative aspect-[20/19] overflow-hidden rounded-card bg-surface-soft shadow-lift">
             <Cover id={p.cover_id} className="card-photo h-full w-full transition duration-300 group-hover:scale-[1.03]" />
             <div className="absolute left-3 top-3">
               <StageBadge stage={p.stage} />

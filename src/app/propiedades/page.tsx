@@ -83,7 +83,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   const href = (patch: Record<string, string> = {}) => listHref(v, patch);
 
   return (
-    <div className="mx-auto max-w-[2040px] px-4 sm:px-6 lg:px-10">
+    <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-14">
       {typeof sp.error === "string" && sp.error && (
         <p className="mt-4 rounded-lg bg-accent-tint px-4 py-3 text-sm text-error">{sp.error}</p>
       )}
@@ -108,7 +108,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
               <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1.5 text-xs font-semibold text-canvas">{activeFilters}</span>
             )}
           </summary>
-          <div className="mt-3 w-full space-y-6 rounded-card border border-hairline bg-raised p-5 shadow-tier md:absolute md:left-4 md:right-4 md:z-20 md:mt-2 md:w-auto lg:left-10 lg:right-10">
+          <div className="mt-3 w-full space-y-6 rounded-card border border-hairline bg-raised p-5 shadow-lift md:absolute md:left-4 md:right-4 md:z-20 md:mt-2 md:w-auto lg:left-14 lg:right-14">
             <FilterBar values={v} neighborhoods={neighborhoods} stages={STAGES.map((s) => [s, STAGE_LABELS[s]])} />
             <form action={setBudgetAction} className="border-t border-hairline-soft pt-5">
               <p className="text-sm font-semibold text-ink">Presupuesto familiar</p>
@@ -185,8 +185,8 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
             </ul>
           )}
         </section>
-        <aside className="hidden split:block">
-          <div className="sticky top-[calc(var(--header-h)+24px)] h-[calc(100dvh-var(--header-h)-48px)] overflow-hidden rounded-card border border-hairline">
+        <aside className="map-column hidden split:block">
+          <div className="map-frame rounded-card border border-hairline shadow-lift">
             <Mapa markers={markers} embedded zona={v.zona} params={Object.fromEntries(new URLSearchParams(toQuery(v)))} />
           </div>
         </aside>

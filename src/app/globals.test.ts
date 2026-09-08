@@ -169,6 +169,22 @@ describe("what components are not allowed to write", () => {
     expect(message, "the filters panel covers the add-a-link message").toBeGreaterThan(panel);
   });
 
+  /*
+   * The map grows as the toolbar above it scrolls away. Its bottom edge only stays a fixed
+   * distance off the screen if it grows by exactly the scroll it grows over — one variable used
+   * for both, or the two drift and the map hangs off the bottom again.
+   */
+  it("grows the map by exactly the scroll it grows over", () => {
+    expect(css).toContain("--map-h-rest: calc(var(--map-h-full) - var(--map-grow))");
+    expect(css).toContain("animation-range: 0 var(--map-grow)");
+    const frame = css.slice(css.indexOf(".map-frame {"), css.indexOf("}", css.indexOf(".map-frame {")));
+    // Without scroll-driven animations the map keeps the resting height. Shorter always fits.
+    expect(frame).toContain("height: var(--map-h-rest)");
+    // `cqw` is the map column's own width, so this is a 3:2 upright cap, not a guess in pixels.
+    expect(frame).toContain("max-height: 150cqw");
+    expect(css).toContain("container-type: inline-size");
+  });
+
   // F33: the full desktop navigation starts at 1024px, not at 768px.
   it("the navigation and the layout switch at lg, never at md", () => {
     const nav = sources().filter(([n]) => /^components\/nav|^app\/layout/.test(n));

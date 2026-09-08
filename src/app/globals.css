@@ -64,6 +64,7 @@
   --breakpoint-split: 960px; /* list + map side by side from here */
   --radius-card: 14px;
   --shadow-tier: var(--shadow);
+  --shadow-lift: var(--lift);
 }
 
 /*
@@ -112,6 +113,10 @@
   --visit-bg: #f4effa;
   --visit-ink: #6b4b8a;
   --shadow: rgba(0, 0, 0, 0.02) 0 0 0 1px, rgba(0, 0, 0, 0.04) 0 2px 6px 0, rgba(0, 0, 0, 0.1) 0 4px 8px 0;
+  /* `--shadow` is sized for a chip. A photograph or the map is a hand's width of surface, and the
+     same shadow under it reads as a printing error rather than as height. `--lift` is that shadow
+     at that scale: wider, softer, and further down. */
+  --lift: rgba(0, 0, 0, 0.03) 0 0 0 1px, rgba(0, 0, 0, 0.05) 0 4px 12px -2px, rgba(0, 0, 0, 0.1) 0 14px 26px -8px;
   /* map: the full palette, from docs/product-improvement/03-design-motion-map.md § 6.
    * map-style.ts maps every one of the basemap's 55 layers onto these. */
   --map-bg: #f4f3ee;
@@ -167,6 +172,16 @@
   /* one name per fixed obstruction, so nothing hard-codes a second offset */
   --nav-bottom-h: calc(64px + env(safe-area-inset-bottom));
   --header-h: 64px;
+
+  /* The map beside the results. `--map-gap` is the breathing room above and below it, so there
+     is always ground under the map rather than a frame flush with the bottom of the screen. */
+  --map-gap: 24px;
+  /* How far the toolbar above the results scrolls away before the map is stuck to the header.
+     The map grows by exactly this much over exactly that scroll, so it fills the screen the
+     moment it stops moving and fits the screen at every point before that. */
+  --map-grow: 232px;
+  --map-h-full: calc(100dvh - var(--header-h) - var(--map-gap) * 2);
+  --map-h-rest: calc(var(--map-h-full) - var(--map-grow));
 }
 
 /*
@@ -216,6 +231,7 @@
   --visit-ink: #c5addf;
   /* night elevation is a lighter surface plus a hairline; a black shadow is invisible here */
   --shadow: rgba(255, 255, 255, 0.06) 0 0 0 1px, rgba(0, 0, 0, 0.5) 0 4px 14px 0;
+  --lift: rgba(255, 255, 255, 0.07) 0 0 0 1px, rgba(0, 0, 0, 0.55) 0 14px 30px -10px;
   --map-bg: #12151a;
   --map-building: #242a32;
   --map-water: #152d3c;
@@ -282,6 +298,7 @@
     --visit-bg: #292236;
     --visit-ink: #c5addf;
     --shadow: rgba(255, 255, 255, 0.06) 0 0 0 1px, rgba(0, 0, 0, 0.5) 0 4px 14px 0;
+  --lift: rgba(255, 255, 255, 0.07) 0 0 0 1px, rgba(0, 0, 0, 0.55) 0 14px 30px -10px;
     --map-bg: #12151a;
     --map-building: #242a32;
     --map-water: #152d3c;
@@ -721,6 +738,43 @@ html[data-wipe]::view-transition-new(root) {
 }
 
 /* Motion is opt-out everywhere else in this file; nothing here animates position. */
+
+/* --- The map beside the results ----------------------------------------------------------- */
+
+/*
+ * The map is as tall as the screen has room for, at every scroll position — no more. At rest it
+ * starts below the toolbar, so it is shorter by the height of that toolbar; by the time the
+ * toolbar has scrolled away it has grown into the space, and from there it is stuck under the
+ * header with `--map-gap` of ground beneath it.
+ *
+ * The growth is a scroll-driven animation, so it costs no JavaScript and no scroll listener. A
+ * browser without them keeps the resting height, which is the safe half: shorter always fits,
+ * taller does not.
+ */
+.map-column {
+  /* so `cqw` below means this column's width */
+  container-type: inline-size;
+}
+.map-frame {
+  position: sticky;
+  top: calc(var(--header-h) + var(--map-gap));
+  height: var(--map-h-rest);
+  /* On a very tall screen the map would become a ribbon. 3:2 upright is where it stops. */
+  max-height: 150cqw;
+  overflow: hidden;
+}
+@supports (animation-timeline: scroll()) {
+  .map-frame {
+    animation: map-fill linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 var(--map-grow);
+  }
+  @keyframes map-fill {
+    to {
+      height: var(--map-h-full);
+    }
+  }
+}
 
 /* --- The search / add pill ---------------------------------------------------------------- */
 
