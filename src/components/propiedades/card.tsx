@@ -75,7 +75,7 @@ export function PropertyCard({ p, budget, href, userId }: { p: Listed; budget: B
         {/* The wrapper does the positioning: `.compare-toggle` sets `position: relative` for its
             own message, and that rule wins over a Tailwind utility on the same element. */}
         <div className="absolute bottom-3 right-3 z-10">
-          <CompareToggle userId={userId} id={p.id} label={p.title} />
+          <CompareToggle userId={userId} id={p.id} label={p.title} className="compare-compact" />
         </div>
       </div>
       <Link href={href} className="mt-3 block space-y-0.5">

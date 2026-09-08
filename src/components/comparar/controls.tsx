@@ -40,7 +40,12 @@ export function CompareToggle({
           onChange={() => setFull(flip(id).full)}
           aria-label={`Comparar ${label}`}
         />
-        <span aria-hidden>Comparar</span>
+        {/* The plus, the square and the tick are all this one span; the stylesheet decides which
+            of them you are looking at. The input above is the control. */}
+        <span className="compare-mark" aria-hidden />
+        <span className="compare-text" aria-hidden>
+          Comparar
+        </span>
       </label>
       {full && (
         <span role="status" className="compare-full">

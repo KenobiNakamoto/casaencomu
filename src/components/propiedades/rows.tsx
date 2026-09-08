@@ -35,7 +35,7 @@ function Row({ p, budget, href, userId }: { p: Listed; budget: Budget | null; hr
           {/* On the photograph, as on the card: the wrapper does the positioning, because
               `.compare-toggle` sets its own `position` and that rule wins over a utility. */}
           <div className="absolute bottom-2 right-2 z-10">
-            <CompareToggle userId={userId} id={p.id} label={p.title} />
+            <CompareToggle userId={userId} id={p.id} label={p.title} className="compare-compact" />
           </div>
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
