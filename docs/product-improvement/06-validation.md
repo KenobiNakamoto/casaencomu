@@ -40,7 +40,7 @@ Capture a changed price: exactly one price-change event; baseline price updates;
 
 Return blocked HTML with HTTP 200, a network timeout, an unknown page, a real removal marker, a partial image set, and a photo that exceeds the stream cap without a Content-Length header.
 
-Expect blocked/unreadable versus removed outcomes to differ. Preserve the URL in the add dialog after failure. Stop oversized streams while reading. End within the total deadline. Successful facts remain available when some photos fail, and the result explains the partial photo count. A retry must not create a second home.
+Expect blocked/unreadable versus removed outcomes to differ. Preserve the URL in the add control after failure. Stop oversized streams while reading. End within the total deadline. Successful facts remain available when some photos fail, and the result explains the partial photo count. A retry must not create a second home.
 
 ### V04 — Redirect and URL boundaries
 
