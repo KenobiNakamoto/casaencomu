@@ -185,6 +185,24 @@ export type ExtractResult =
  */
 export type Presence = Record<string, "present" | "absent" | "explicit_null">;
 
+/**
+ * The part of an observation the fill layers read afterwards, kept whether or not the page
+ * parsed. It is the only copy there is of a page the server can never fetch again, so an
+ * advertisement that failed to parse today can still be filled tomorrow without asking anyone.
+ */
+export type Raw = { text?: string; title?: string; ogDescription?: string; finalUrl?: string };
+
+export function rawOf(page: Page): Raw {
+  const html = page.html ?? "";
+  const og = page.og ?? (html ? ogOf(html) : {});
+  return {
+    text: page.text ?? (html ? toText(html) : undefined),
+    title: page.title ?? m1(html, /<title[^>]*>([^<]*)<\/title>/)?.trim() ?? undefined,
+    ogDescription: og["og:description"] || undefined,
+    finalUrl: page.finalUrl,
+  };
+}
+
 const presenceOf = (out: Partial<Listing>): Presence =>
   Object.fromEntries(
     Object.keys(Listing.shape)
@@ -199,7 +217,7 @@ export function extract(page: Page): Listing | null {
 }
 
 export function extractResult(page: Page): ExtractResult {
-  const { portal } = normalizeUrl(page.url);
+  const { portal, portalRef } = normalizeUrl(page.url);
   const html = page.html ?? "";
   if (page.status === 404 || page.status === 410) return { kind: "removed", reason: `status ${page.status}` };
   if (page.status === 403) return { kind: "blocked", reason: "status 403" };
@@ -258,7 +276,10 @@ export function extractResult(page: Page): ExtractResult {
         text,
         /Comentario del anunciante\n([\s\S]+?)(?=\n+(?:Leer comentario completo|Lo sentimos, no es posible traducir|Características básicas)|$)/,
       )
-        ?.replace(/^(?:[^\n.,;!?]{0,20}\n)*/, "")
+        // The language picker sits between the heading and the text. It used to be several short
+        // lines and is now one long one ("Disponible en: Español English Otros idiomas"), so both
+        // shapes are stripped; the browser reader made this path the main one for Idealista.
+        ?.replace(/^(?:(?:Disponible en:[^\n]*|[^\n.,;!?]{0,20})\n)*/, "")
         .trim();
       Object.assign(out, {
         price_eur: int(m1(blob, /^\s*price:\s*(\d+)/m)) ?? int(m1(text, /(\d[\d.]*)\s*€/)),
@@ -405,15 +426,26 @@ export function extractResult(page: Page): ExtractResult {
         agency: seller?.name ?? (byType("RealEstateAgent")?.name as string | undefined) ?? null,
         description: out.description ?? null,
       });
-      // A small portal may answer a withdrawn ad with 200 and its own home page rather than a
-      // 404 (Vivalta does). The reference in the URL is the check: a page that never names it is
-      // not that advertisement. Four digits or more, so a plain `/casa/1` is not treated as one.
-      const ref = m1(new URL(page.url).pathname, /(\d{4,})/);
-      if (ref && !text.includes(ref) && !blob.includes(ref))
-        return { kind: "removed", reason: "the page never names the listing reference" };
       break;
     }
   }
+
+  // A withdrawn advertisement can answer 200 with the site's own home or search page instead of a
+  // 404. Vivalta does it, and so does Idealista when a browser asks — a server only ever sees the
+  // challenge, so this was invisible until the browser reader existed. The reference in the URL
+  // is the check: a page that never names it is not that advertisement.
+  //
+  // Measured 2026-09-09 on both Idealista pages: the live one carries the reference in its blob
+  // and the withdrawn one has no blob at all. `og:*` is deliberately not searched — Vivalta
+  // echoes the requested URL straight back into `og:url`, so a page that knows nothing about the
+  // advertisement would still appear to name it.
+  //
+  // Only applied when a whole page was seen: a hand-built fragment proves nothing by not
+  // containing the reference.
+  const ref = portalRef ?? m1(new URL(page.url).pathname, /(\d{4,})/);
+  const wholePage = html.length > 0 || blob.length > 0 || text.length > 1_000;
+  if (ref && ref.length >= 4 && wholePage && !text.includes(ref) && !blob.includes(ref))
+    return { kind: "removed", reason: "the page never names the listing reference" };
 
   if (!out.title) return { kind: "unreadable", reason: "no title found" };
   out.description ??= og["og:description"] || null; // last resort on every portal: the truncated og text

@@ -50,6 +50,24 @@ const MIGRATIONS: Migration[] = [
       ...(await stageRepairStatements()),
     ],
   },
+  {
+    version: 4,
+    owner: "issue #111 — a link is accepted first and read afterwards",
+    sql: [
+      // The last observation, in the shape the fill layers read: text, og, title, status. Capped
+      // in `save.ts`. It is what lets a later pass retry without asking the person for the page
+      // again — the only copy there is of a page a server can never fetch.
+      "ALTER TABLE sources ADD COLUMN raw_json TEXT",
+      // Which layer produced each field: the portal, the AI reading the page, or the AI deducing.
+      "ALTER TABLE sources ADD COLUMN field_origin_json TEXT NOT NULL DEFAULT '{}'",
+      // NULL = the AI layers have not run on the observation currently stored. A new observation
+      // sets it back to NULL, which is what puts the source back in the queue.
+      "ALTER TABLE sources ADD COLUMN enriched_at TEXT",
+      // 0 while nothing has been read from the advertisement yet: the row exists, the link is
+      // safe, and the title is a placeholder built from the URL. It never goes back to 0.
+      "ALTER TABLE properties ADD COLUMN filled INTEGER NOT NULL DEFAULT 1",
+    ],
+  },
 ];
 
 /**

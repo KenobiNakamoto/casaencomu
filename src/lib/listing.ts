@@ -68,6 +68,7 @@ export const EVENT_KINDS = [
   "price_change",
   "availability_change",
   "facts_change",
+  "enriched",
   "stage_change",
   "comment",
   "rating",

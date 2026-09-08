@@ -1,15 +1,23 @@
 // Portal hosts and listing refs, copied from spike/RESULTS.md (2026-09-04).
 
-export const ALLOWED_HOSTS = new Set(["idealista.com", "fotocasa.es", "habitaclia.com"]); // after dropping `www.`
+/** The three sites with a branch of their own in `extract.ts`. The `portal` label comes from here. */
+export const PORTAL_HOSTS = new Set(["idealista.com", "fotocasa.es", "habitaclia.com"]); // after dropping `www.`
 
 /**
- * What to do with a link before anything is sent. Idealista answers a server fetch with a 403
- * challenge every time, so posting one only rediscovers the block and costs the person ten
- * seconds (F16). The browser decides first, and says which path is open.
- *
- * `SERVER` is deliberately narrower than `ALLOWED_HOSTS`: the allowlist is what the server may
- * fetch at all, this is what is worth fetching. Measured in `docs/PORTALS.md`.
+ * Every site a member may paste, and the only hosts the server will ever fetch. It is the SSRF
+ * guard on `/api/import`, not a list of sites we like. Wider than `PORTAL_HOSTS`: the three small
+ * portals import through the generic branch and have no `portal` label of their own.
  */
+export const ALLOWED_HOSTS = new Set([...PORTAL_HOSTS, "housfy.com", "vivalta.es", "iadespana.es"]);
+
+/**
+ * Which path is expected to fill the record. It no longer refuses anything: a link is accepted
+ * first and read afterwards, so a portal that blocks the server costs the person nothing. Read
+ * it as a forecast, not a gate — `capture` means "a real browser has to open this one".
+ * Measured in `docs/PORTALS.md`.
+ */
+const hostOf = (url: string) => new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+
 export type Route = "server" | "capture" | "unsupported";
 const SERVER = new Set(["fotocasa.es", "habitaclia.com"]);
 const CAPTURE = new Set(["idealista.com", "housfy.com", "vivalta.es", "iadespana.es"]);
@@ -40,6 +48,26 @@ export const ALLOWED_IMAGE_HOSTS = new Set([
 
 export type Portal = "idealista" | "fotocasa" | "habitaclia" | "generic";
 
+/** How a site is named in a sentence a person reads. `iad` is lowercase on its own pages. */
+const SITE_NAMES: Record<string, string> = {
+  "idealista.com": "Idealista",
+  "fotocasa.es": "Fotocasa",
+  "habitaclia.com": "Habitaclia",
+  "housfy.com": "Housfy",
+  "vivalta.es": "Vivalta",
+  "iadespana.es": "iad España",
+};
+
+/** "Idealista", not "idealista": the name opens the sentence. Unknown hosts keep their host. */
+export function siteName(url: string): string {
+  try {
+    const host = hostOf(url);
+    return SITE_NAMES[host] ?? host.split(".")[0].replace(/^./, (c) => c.toUpperCase());
+  } catch {
+    return "El portal";
+  }
+}
+
 // listing ref, matched on the pathname
 const REF: Record<Exclude<Portal, "generic">, RegExp> = {
   idealista: /\/inmueble\/(\d+)\/?$/, // https://www.idealista.com/inmueble/112446118/
@@ -47,13 +75,12 @@ const REF: Record<Exclude<Portal, "generic">, RegExp> = {
   habitaclia: /-i(\d+)\.htm$/, // https://www.habitaclia.com/comprar-<slug>-barcelona-i8166003810008.htm
 };
 
-const hostOf = (url: string) => new URL(url).hostname.toLowerCase().replace(/^www\./, "");
 
 /** Lowercase host, no `www.`, no query or fragment, no trailing slash. Throws on an invalid URL. */
 export function normalizeUrl(url: string): { portal: Portal; portalRef: string | null; normalized: string } {
   const u = new URL(url);
   const host = hostOf(url);
-  const portal: Portal = ALLOWED_HOSTS.has(host) ? (host.split(".")[0] as Portal) : "generic";
+  const portal: Portal = PORTAL_HOSTS.has(host) ? (host.split(".")[0] as Portal) : "generic";
   const path = u.pathname.replace(/\/+$/, "");
   const portalRef = portal === "generic" ? null : (path.match(REF[portal])?.[1] ?? null);
   return { portal, portalRef, normalized: `${u.protocol}//${host}${path}` };

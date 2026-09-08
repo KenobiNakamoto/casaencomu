@@ -135,6 +135,21 @@ describe("extractResult — why a page yielded no listing", () => {
     expect(kind({ url: "https://www.vivalta.es/es/ref-7742_1168", html: fixture("vivalta-removed"), status: 200 })).toBe("removed");
   });
 
+  /**
+   * Measured 2026-09-09, once a real browser could reach these pages at all. A server only ever
+   * sees Idealista's challenge, so the site's soft 404 had never been observed: it answers a dead
+   * id with 200 and its own home page, under the requested URL, with no blob. Taken at face value
+   * that imported as a property called "Viviendas venta. Viviendas alquiler…".
+   */
+  it("calls Idealista's own home page under a dead id removed, not a listing", () => {
+    const home = { url: "https://www.idealista.com/inmueble/999999999/", title: "Viviendas venta. Viviendas alquiler. Pisos. Chalets — idealista", text: "En idealista utilizamos cookies. ".repeat(120) };
+    expect(kind(home)).toBe("removed");
+    // and the live one, whose blob names it, is still a listing
+    expect(kind({ ...home, url: "https://www.idealista.com/inmueble/112006681/", title: "Piso en venta en Calle del Rosselló", blob: 'var adMultimediasInfo = {"adId":112006681}' })).toBe("listing");
+    // a fragment is not evidence of anything: unreadable, never "the advertisement is gone" (F03)
+    expect(kind({ url: "https://www.idealista.com/inmueble/112006681/", text: "Piso\n87 m²\n3 hab." })).not.toBe("removed");
+  });
+
   it("calls a block a block, never a removal", () => {
     expect(kind({ url: live[2].url, html, status: 403 })).toBe("blocked");
     const challenge = '<html><head><title>idealista.com</title><script src="https://ct.captcha-delivery.com/c.js"></script></head><body></body></html>';

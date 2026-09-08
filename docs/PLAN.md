@@ -20,13 +20,13 @@ Runs on the MacBook Air, reached through Cloudflare Access.
 
 | Cut | Add it when |
 |---|---|
-| Server-side fetch of blocked portals; headless or real Chrome | a removed listing cannot be detected any other way |
-| Job queue, retries, `needs_review` | an import takes > 20 s, or silent failures happen weekly |
+| ~~Server-side fetch of blocked portals; headless or real Chrome~~ | **fired, issue #111.** Real Chrome, on the server, headful and stock. `scripts/capture-agent.mjs` |
+| ~~Job queue, retries, `needs_review`~~ | **fired in the smallest form, issue #111.** `sources.enriched_at` is the queue; a link nothing could read is the `needs_review` state, and it is visible as «Sin leer» |
 | Per-portal adapter files | the one generic extractor misses a field the family cares about |
 | Page-HTML snapshots | someone asks "what did the ad say before" |
 | Roles, invitations, admin page | one Cloudflare Access email list stops being enough |
 | Fuzzy duplicates, image hashes | the same flat on two portals slips through twice |
-| LLM enrichment (Anthropic API, `claude-opus-5`, structured output) | the family wants summaries or inferred fields |
+| ~~LLM enrichment (Anthropic API, structured output)~~ | **fired, issue #111.** `lib/ai.ts` + `lib/enrich.ts`, layers 2 and 3. `claude-sonnet-5` by default; no key means both layers are skipped |
 | Postgres/PostGIS, worker container, Drizzle | > 5k properties or a second writer process |
 | Neighbourhood and due-diligence add-ons | v1 is in daily use |
 

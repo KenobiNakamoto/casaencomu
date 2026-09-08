@@ -40,6 +40,11 @@ function line(e: Row) {
       return availabilityLine(String(p.to ?? ""), t);
     case "facts_change":
       return `Datos actualizados en ${t}`;
+    case "enriched": {
+      // Never "Datos actualizados": the advertisement did not change, our reading of it did.
+      const n = (Array.isArray(p.read) ? p.read.length : 0) + (Array.isArray(p.inferred) ? p.inferred.length : 0);
+      return `Se completaron ${n} dato${n === 1 ? "" : "s"} de ${t}`;
+    }
     case "stage_change":
       return `${who} pasó ${t} a ${stage(p.to)}`;
     case "comment":
