@@ -28,6 +28,12 @@ export async function proxy(request: NextRequest) {
   // deploy waits on its owner-only items. Cloudflare wins when it is configured, so
   // a stray PREVIEW_PASSWORD can never downgrade a real deployment.
   if (!team || !audience) {
+    // No prompt at all: everyone who reaches the app is this one identity. It is safe only
+    // because the preview is reachable over the tailnet and nowhere else — the tailnet is the
+    // perimeter, not the password. Never set this on a host the internet can reach.
+    const openAs = process.env.PREVIEW_OPEN_AS;
+    if (openAs) return forward(openAs);
+
     const password = process.env.PREVIEW_PASSWORD;
     if (!password) {
       return NextResponse.json(

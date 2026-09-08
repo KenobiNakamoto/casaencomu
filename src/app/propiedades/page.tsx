@@ -4,7 +4,7 @@ import { PropertyCard, type Listed } from "@/components/propiedades/card";
 import { FilterBar } from "@/components/propiedades/filter-bar";
 import { ActiveFilters, QuickFilters } from "@/components/propiedades/filters-row";
 import { fmtEur, input } from "@/components/propiedades/format";
-import { RowsTable } from "@/components/propiedades/rows";
+import { RowsList } from "@/components/propiedades/rows";
 import { SearchBar } from "@/components/propiedades/search-bar";
 import { CompareTray } from "@/components/comparar/controls";
 import { currentUser } from "@/lib/auth";
@@ -176,7 +176,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
               </p>
             </div>
           ) : v.vista === "filas" ? (
-            <RowsTable items={items} budget={budget} href={(p) => detailHref(p, v)} userId={user.id} />
+            <RowsList items={items} budget={budget} href={(p) => detailHref(p, v)} userId={user.id} />
           ) : (
             <ul className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 split:grid-cols-1 lg:grid-cols-2">
               {items.map((p) => (
