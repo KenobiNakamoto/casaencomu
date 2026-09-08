@@ -239,7 +239,7 @@ S = small local change; M = several connected modules; L = multiple flows or a m
 
 **Depends:** PIP-01, PIP-02, PIP-03. **Findings:** F16–F18, F25, F34.
 
-**Files:** existing actions, add dialog, inline feedback, route loading/error/not-found components, one native-dialog wrapper.
+**Files:** existing actions, the add control (`search-bar.tsx`, not a dialog — see 02 § 3), inline feedback, route loading/error/not-found components, one native-dialog wrapper.
 
 **Build:** small action results; preserved input; pending/failed/conflict states; versioned stage changes; bounded motion; map-aware theme fallback; shared native dialog. No receipt service or timed Undo.
 

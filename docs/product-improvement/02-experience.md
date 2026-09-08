@@ -46,7 +46,7 @@ Store list scroll position and map camera per authenticated user and canonical f
 4. Properties; embedded map when the viewport has room.
 5. Comparison tray when any properties are selected.
 
-Replace the current expanding plus field with the add dialog described below. Search placeholder becomes `Barrio, calle o palabras del anuncio`. Numeric constraints belong in labeled filters. Submit with Enter or a visible search button; include `enterKeyHint="search"`. Maintain the submitted search while a new query is loading. Clearing the field only clears text search.
+Search placeholder becomes `Barrio, calle o palabras del anuncio`. Numeric constraints belong in labeled filters. Submit with Enter or a visible search button; include `enterKeyHint="search"`. Maintain the submitted search while a new query is loading. Clearing the field only clears text search.
 
 Quick numeric filters must use truthful labels: `3+ hab.`, `4+ hab.`, `2+ baños`, `80+ m²`, `100+ m²`. Selecting `4+ hab.` replaces `3+ hab.` because they share one bound. Count all active constraints consistently, including stage and personal stance. Count a price range as one constraint.
 
@@ -97,9 +97,11 @@ Below 768 px, rows become compact stacked list items. Preserve the selected view
 
 ## 3. Add and refresh a property
 
-### Add dialog
+### Add control
 
-Title: `Añadir propiedad`. One labeled URL field, `Añadir enlace`, and a secondary section `Guardar desde el anuncio` with installation instructions. Keep the user's input after validation or network errors. Use a dialog on desktop and a full-height sheet on phone. Focus the title/first input on open and return focus to the trigger on close.
+**Superseded 2026-09-08. The expanding + field is the shipped control and is not to be replaced.** The dialog this section described was built and then reversed at the owner's request; its component was deleted. Read the rest of this section as the contract the control must meet, not as an instruction to build a dialog. `src/components/propiedades/search-bar.tsx` is the implementation.
+
+One labeled URL field, `Añadir enlace`, and a route to `Guardar desde el anuncio` with installation instructions. Keep the user's input after validation or network errors — a close and reopen must bring it back. Move focus to the field on open and return it to the trigger on close.
 
 The URL is classified before server fetch:
 
