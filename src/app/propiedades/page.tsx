@@ -29,7 +29,7 @@ import { getBudget } from "@/lib/settings";
 import { setBudgetAction } from "./actions";
 
 // `id`, `created_at` and `price_eur` come from the contract; see ALWAYS in lib/filters.ts.
-const COLUMNS = `p.title, p.area_m2, p.rooms, p.stage, p.neighborhood,
+const COLUMNS = `p.title, p.area_m2, p.rooms, p.stage, p.neighborhood, p.filled,
   p.lat, p.lng, p.address_precision AS precision`;
 
 export default async function PropiedadesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {

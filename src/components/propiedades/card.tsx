@@ -18,6 +18,8 @@ export type Listed = {
   lat: number | null;
   lng: number | null;
   precision: "exact" | "approx" | "none";
+  /** 0 while nothing has been read from the advertisement, so the title is a placeholder. */
+  filled: number;
 };
 
 
@@ -54,8 +56,11 @@ export function PropertyCard({ p, budget, href, userId }: { p: Listed; budget: B
         <Link href={href} tabIndex={-1} aria-hidden className="block">
           <div className="relative aspect-[20/19] overflow-hidden rounded-card bg-surface-soft shadow-lift">
             <Cover id={p.cover_id} className="card-photo h-full w-full transition duration-300 group-hover:scale-[1.03]" />
-            <div className="absolute left-3 top-3">
+            <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
               <StageBadge stage={p.stage} />
+              {/* The link is saved; the advertisement has not been read. Saying so is the whole
+                  point of keeping the record instead of refusing the link. */}
+              {!p.filled && <Badge>Sin leer</Badge>}
             </div>
             {p.family_avg !== null && (
               <div className="absolute right-3 top-3">

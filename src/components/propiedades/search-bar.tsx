@@ -10,7 +10,6 @@ type State =
   | { kind: "idle" }
   | { kind: "saving" }
   | { kind: "slow" }
-  | { kind: "capture"; portal: string }
   | { kind: "unsupported" }
   | { kind: "error"; message: string };
 
@@ -27,26 +26,16 @@ type Flash = "sent" | "ok" | "bad" | null;
 const SENT_MS = 230;
 const VERDICT_MS = 470;
 
-/** "Idealista", not "idealista": the name opens the sentence. */
-const portalName = (url: string) => {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "").split(".")[0];
-    return host.charAt(0).toUpperCase() + host.slice(1);
-  } catch {
-    return "Este portal";
-  }
-};
-
 /**
  * The pill searches. The round + adds a listing: clicking it grows a link field leftwards from the
  * button, which never moves, and the search box gives up the width. The + turns into an × as it
  * grows and is what closes it again, so there is one control there rather than two; Escape also
  * closes, and Enter saves.
  *
- * What the link does once it is typed is PIP-08's work, kept: the URL is classified in the browser
- * before anything is sent, because Idealista answers a server fetch with a 403 challenge every
- * time (F16). What is sent goes by `fetch`, so a failure leaves the field open with the link still
- * in it and the message beside it, instead of navigating away and losing what was typed.
+ * Only a link to a site we do not take is answered here; everything else is sent. A portal that
+ * blocks the server no longer costs the person anything — the record is created either way and
+ * the page it opens says what is still missing. What is sent goes by `fetch`, so a failure leaves
+ * the field open with the link still in it and the message beside it (F16).
  */
 export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<string, string>; clearHref: string }) {
   const [open, setOpen] = useState(false);
@@ -87,12 +76,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
       answer("bad");
       return setState({ kind: "error", message: "Pega el enlace del anuncio." });
     }
-    const route = routeFor(value);
-    if (route === "capture") {
-      answer("bad");
-      return setState({ kind: "capture", portal: portalName(value) });
-    }
-    if (route === "unsupported") {
+    if (routeFor(value) === "unsupported") {
       answer("bad");
       return setState({ kind: "unsupported" });
     }
@@ -210,7 +194,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
                 autoComplete="off"
                 aria-describedby="add-status"
                 enterKeyHint="go"
-                placeholder="Pega un anuncio de Idealista, Fotocasa o Habitaclia"
+                placeholder="Pega el enlace de un anuncio"
                 className="w-full truncate bg-transparent text-ink placeholder:text-placeholder"
               />
             </label>
@@ -260,15 +244,6 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
                 Este portal no se puede importar por enlace.{" "}
                 <Link href="/ayuda" className="font-semibold text-ink underline underline-offset-4">
                   Usa el marcador
-                </Link>
-                .
-              </span>
-            )}
-            {state.kind === "capture" && (
-              <span className="text-body">
-                {state.portal} bloquea la lectura desde el servidor. Abre el anuncio y pulsa el marcador.{" "}
-                <Link href="/ayuda" className="font-semibold text-ink underline underline-offset-4">
-                  Instalarlo
                 </Link>
                 .
               </span>

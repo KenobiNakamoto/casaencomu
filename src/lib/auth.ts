@@ -72,6 +72,23 @@ export type User = {
   last_seen_at: string | null;
 };
 
+/**
+ * The member whose bookmarklet this is, or null. The capture token identifies the person on its
+ * own, which is what lets `/api/capture` sit outside the Access proxy: a capture arrives from a
+ * portal's page with no cookie of ours, and the token is the guard the route was always designed
+ * around. It also attributes the capture to whoever installed that bookmark, not to whichever
+ * session happened to be open.
+ */
+export async function userByCaptureToken(token: string): Promise<User | null> {
+  if (!token || token.length < 16) return null;
+  const { db } = await import("./db");
+  const { rows } = await db.execute({
+    sql: "SELECT id, email, name, capture_token, last_seen_at FROM users WHERE capture_token = ?",
+    args: [token],
+  });
+  return rows.length ? (rows[0] as unknown as User) : null;
+}
+
 /** Reads `x-user-email` (set only by the proxy), upserts the `users` row and returns it. */
 export async function currentUser(): Promise<User> {
   // ponytail: lazy imports so this module loads in vitest without a Next request scope or a db file

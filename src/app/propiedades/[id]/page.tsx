@@ -4,6 +4,7 @@ import { Cover } from "@/components/propiedades/card";
 import { Chip, StageChip } from "@/components/propiedades/chip";
 import { fmtDate, fmtDateTime, fmtEur, fmtNum, SIN_DATOS, siNo } from "@/components/propiedades/format";
 import { CommentForm } from "@/components/propiedades/comment-form";
+import { PendingPoll } from "@/components/propiedades/pending-poll";
 import { RatingForm } from "@/components/propiedades/rating-form";
 import { StageForm } from "@/components/propiedades/stage-form";
 import { availabilityLine, AVAILABILITY_LABEL, isStale, type SourceAvailability } from "@/lib/availability";
@@ -36,6 +37,8 @@ type Property = {
   address_precision: string;
   neighborhood: string | null;
   created_at: string;
+  /** 0 while nothing has been read from the advertisement: the title is a placeholder. */
+  filled: number;
 };
 type Source = {
   portal: string;
@@ -45,6 +48,9 @@ type Source = {
   /** Last attempt. `last_ok_at` is the last one that actually read the advertisement. */
   last_checked_at: string | null;
   last_ok_at: string | null;
+  last_check_outcome: string | null;
+  /** Which layer produced each field: the portal, the AI reading the page, the AI deducing it. */
+  field_origin_json: string | null;
 };
 type Event = { kind: string; payload_json: string | null; created_at: string; actor: string | null };
 type Comment = { body: string; created_at: string; name: string };
@@ -52,6 +58,20 @@ type Member = { id: string; name: string };
 
 const AVAILABILITY: Record<string, string> = AVAILABILITY_LABEL;
 const PRECISION: Record<string, string> = { exact: "(exacta)", approx: "(aproximada)" };
+
+/**
+ * The link is saved and the record exists; this says why it is still empty. Written after the
+ * fact, on the page, so it survives a reload — the message under the add field is gone by then.
+ */
+const PENDING: Record<string, string> = {
+  blocked:
+    "Este portal no deja leer el anuncio desde el servidor. Se leerá en un navegador; si tarda, ábrelo tú y pulsa el marcador.",
+  offline: "No se pudo descargar la página. Se volverá a intentar.",
+  offsite: "El enlace lleva fuera del portal, así que no se pudo leer. Ábrelo y pulsa el marcador.",
+  unreadable: "No se pudo leer la página. Se volverá a intentar.",
+  removed: "El anuncio ya no está publicado, así que no hay datos que leer. El enlace queda guardado.",
+  default: "Todavía no se ha leído este anuncio. El enlace está guardado.",
+};
 const stageLabel = (s: unknown) => STAGE_LABELS[s as Stage] ?? String(s ?? "?");
 
 function parse(json: string | null): Record<string, unknown> {
@@ -116,7 +136,7 @@ export default async function PropiedadPage({
     [
       { sql: "SELECT * FROM properties WHERE id = ?", args: [id] },
       { sql: "SELECT id FROM photos WHERE property_id = ? ORDER BY position", args: [id] },
-      { sql: "SELECT portal, url_original, via, availability, last_checked_at, last_ok_at FROM sources WHERE property_id = ? ORDER BY first_seen_at", args: [id] },
+      { sql: "SELECT portal, url_original, via, availability, last_checked_at, last_ok_at, last_check_outcome, field_origin_json FROM sources WHERE property_id = ? ORDER BY first_seen_at", args: [id] },
       {
         sql: "SELECT e.kind, e.payload_json, e.created_at, u.name AS actor FROM events e LEFT JOIN users u ON u.id = e.actor_id WHERE e.property_id = ? ORDER BY e.created_at DESC",
         args: [id],
@@ -141,20 +161,25 @@ export default async function PropiedadPage({
   const family = familyAverage(ratingRows);
   const perM2 = p.price_eur !== null && p.area_m2 ? fmtEur(Math.round(p.price_eur / p.area_m2)) : null;
 
-  const facts: [string, string][] = [
-    ["Superficie", fmtNum(p.area_m2, "m²")],
-    ["Habitaciones", fmtNum(p.rooms)],
-    ["Baños", fmtNum(p.bathrooms)],
-    ["Planta", p.floor ?? SIN_DATOS],
-    ["Ascensor", siNo(p.lift)],
-    ["Exterior", p.outdoor ?? SIN_DATOS],
-    ["Parking", siNo(p.parking)],
-    ["Estado", p.condition ?? SIN_DATOS],
-    ["Certificado energético", p.energy_rating ?? SIN_DATOS],
-    ["Honorarios", fmtEur(p.fees_eur)],
-    ["Barrio", p.neighborhood ?? SIN_DATOS],
-    ["Dirección", p.address_text ? `${p.address_text} ${PRECISION[p.address_precision] ?? ""}`.trim() : SIN_DATOS],
+  const facts: [string, string, string][] = [
+    ["Superficie", fmtNum(p.area_m2, "m²"), "area_m2"],
+    ["Habitaciones", fmtNum(p.rooms), "rooms"],
+    ["Baños", fmtNum(p.bathrooms), "bathrooms"],
+    ["Planta", p.floor ?? SIN_DATOS, "floor"],
+    ["Ascensor", siNo(p.lift), "lift"],
+    ["Exterior", p.outdoor ?? SIN_DATOS, "outdoor"],
+    ["Parking", siNo(p.parking), "parking"],
+    ["Estado", p.condition ?? SIN_DATOS, "condition"],
+    ["Certificado energético", p.energy_rating ?? SIN_DATOS, "energy_rating"],
+    ["Honorarios", fmtEur(p.fees_eur), "fees_eur"],
+    ["Barrio", p.neighborhood ?? SIN_DATOS, "neighborhood"],
+    ["Dirección", p.address_text ? `${p.address_text} ${PRECISION[p.address_precision] ?? ""}`.trim() : SIN_DATOS, "address_text"],
   ];
+  // A deduced value is not a fact the advertisement states, and the two must never look alike.
+  // Only layer 3 is marked: layer 2 copies words that are on the page, which the portal's own
+  // extractor simply failed to find.
+  const origin: Record<string, string> = Object.assign({}, ...sourceRows.map((s) => parse(s.field_origin_json)));
+  const deduced = (key: string) => origin[key] === "ai_inferred";
   const summary = [p.neighborhood, p.area_m2 !== null && fmtNum(p.area_m2, "m²"), p.rooms !== null && `${p.rooms} hab.`, p.bathrooms !== null && `${p.bathrooms} baños`]
     .filter(Boolean)
     .join(" · ");
@@ -190,6 +215,13 @@ export default async function PropiedadPage({
           {faltan === 1 ? "No se pudo guardar 1 foto." : `No se pudieron guardar ${faltan} fotos.`} Vuelve a comprobar el
           anuncio para intentarlo otra vez.
         </p>
+      )}
+
+      {!p.filled && (
+        <div className="mt-4 rounded-lg bg-accent-tint px-4 py-3 text-sm text-body">
+          <p>{PENDING[sourceRows[0]?.last_check_outcome ?? ""] ?? PENDING.default}</p>
+          {sourceRows[0]?.last_check_outcome !== "removed" && <PendingPoll />}
+        </div>
       )}
 
       <header className="mt-4 space-y-1">
@@ -251,13 +283,21 @@ export default async function PropiedadPage({
           <section className="space-y-4 pb-8">
             <h2 className={h2}>Datos</h2>
             <dl className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
-              {facts.map(([k, val]) => (
+              {facts.map(([k, val, key]) => (
                 <div key={k} className="flex justify-between gap-4 border-b border-hairline-soft py-2.5 text-sm">
                   <dt className="text-muted">{k}</dt>
-                  <dd className="text-right font-medium text-ink">{val}</dd>
+                  <dd className="text-right font-medium text-ink">
+                    {val}
+                    {deduced(key) && <span className="ml-1.5 text-[11px] font-normal text-muted">deducido</span>}
+                  </dd>
                 </div>
               ))}
             </dl>
+            {facts.some(([, , key]) => deduced(key)) && (
+              <p className="text-xs text-muted">
+                «deducido» lo ha completado la IA a partir del texto o de las fotos. El anuncio no lo dice.
+              </p>
+            )}
           </section>
 
           <section className={section}>

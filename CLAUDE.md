@@ -46,7 +46,13 @@ mount. **Ponytail is on**: nothing is added until a trigger in `docs/PLAN.md` fi
 - **No PII in the repo.** Family names and emails, and the Air's hostname or username, never
   appear in code, fixtures, `.env.example`, or docs. `memory/` is gitignored.
 - **Spanish UI, hardcoded.** Listing text stays in its source language.
-- **Never bypass anti-bot or CAPTCHA.** Blocked pages get the bookmarklet hint.
+- **Never bypass anti-bot or CAPTCHA.** No proxy, no fingerprint, no CAPTCHA solving, ever. A page
+  a portal refuses to a server is read in a real browser — the family's, with the bookmarklet, or
+  the stock headful Chrome the server runs (`scripts/capture-agent.mjs`, issue #111), which passes
+  a JavaScript challenge by running it. Measured in `docs/PORTALS.md` § 4.
+- **A pasted link is never lost.** It becomes a record before anything is read, and the record
+  says why it is empty. Layers 2 and 3 (`lib/enrich.ts`) fill what layer 1 missed; a field marked
+  «deducido» was deduced, never stated, and the two must never look alike.
 - **Deploy = `./deploy.sh`** (build on the Pro, `docker load` on the Air). No git clone on the
   Air; `~/srv/casaencomu` holds only `compose.yaml` and `.env`.
 - **Data root is `/Volumes/TimeMachine/casaencomu` on the Air**, bind-mounted as `/data`. Never

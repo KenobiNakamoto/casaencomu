@@ -33,20 +33,40 @@ beforeAll(async () => {
 });
 
 describe("the migration chain", () => {
-  it("reaches version 3 and adds every column the code reads", async () => {
-    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(3);
+  it("reaches version 4 and adds every column the code reads", async () => {
+    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(4);
     const cols = async (table: string) =>
       (await db.execute(`PRAGMA table_info(${table})`)).rows.map((r) => String(r.name));
     expect(await cols("sources")).toEqual(
-      expect.arrayContaining(["last_check_outcome", "field_presence_json", "photo_urls_json", "consecutive_gone"]),
+      expect.arrayContaining([
+        "last_check_outcome",
+        "field_presence_json",
+        "photo_urls_json",
+        "consecutive_gone",
+        "raw_json",
+        "field_origin_json",
+        "enriched_at",
+      ]),
     );
-    expect(await cols("properties")).toContain("stage_version");
+    expect(await cols("properties")).toEqual(expect.arrayContaining(["stage_version", "filled"]));
     expect(await cols("photos")).toContain("source_url");
   });
 
   it("is idempotent: running it again changes nothing", async () => {
     await applySchema();
-    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(3);
+    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(4);
+  });
+
+  // Everything stored before this migration was read the old way, and the record says so: a row
+  // that already holds facts must not be shown as "sin leer" the moment the column appears.
+  it("counts what was already stored as read", async () => {
+    const id = randomUUID();
+    await db.execute({
+      sql: "INSERT INTO properties (id, title, stage, created_at, updated_at) VALUES (?, 'Piso', 'nueva', ?, ?)",
+      args: [id, at(0), at(0)],
+    });
+    const { rows } = await db.execute({ sql: "SELECT filled FROM properties WHERE id = ?", args: [id] });
+    expect(Number(rows[0].filled)).toBe(1);
   });
 });
 

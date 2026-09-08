@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { ALLOWED_HOSTS, ALLOWED_IMAGE_HOSTS, isAllowedHost, isAllowedImageHost, normalizeUrl } from "./url";
+import {
+  ALLOWED_HOSTS,
+  ALLOWED_IMAGE_HOSTS,
+  isAllowedHost,
+  isAllowedImageHost,
+  normalizeUrl,
+  PORTAL_HOSTS,
+  siteName,
+} from "./url";
 
 const cases = [
   {
@@ -69,12 +77,31 @@ describe("normalizeUrl", () => {
 
 describe("allowlists", () => {
   it("hosts", () => {
-    expect([...ALLOWED_HOSTS]).toEqual(["idealista.com", "fotocasa.es", "habitaclia.com"]);
+    // Every site a member may paste. Wider than the three with an extractor branch of their own:
+    // a link is accepted first and read afterwards, so a site that blocks the server is still
+    // taken — and the SSRF guard is still an allowlist, which is the part that matters.
+    expect([...ALLOWED_HOSTS]).toEqual([
+      "idealista.com",
+      "fotocasa.es",
+      "habitaclia.com",
+      "housfy.com",
+      "vivalta.es",
+      "iadespana.es",
+    ]);
+    expect([...PORTAL_HOSTS]).toEqual(["idealista.com", "fotocasa.es", "habitaclia.com"]);
+    // A small portal is still imported by the generic branch, so it must not be labelled a portal.
+    expect(normalizeUrl("https://www.housfy.com/comprar/piso/1234").portal).toBe("generic");
     expect(isAllowedHost("https://www.idealista.com/inmueble/1/")).toBe(true);
     expect(isAllowedHost("https://idealista.com.evil.com/inmueble/1/")).toBe(false);
     expect(isAllowedHost("http://127.0.0.1/")).toBe(false);
     expect(isAllowedHost("nope")).toBe(false);
   });
+  it("names a site the way a sentence opens with it", () => {
+    expect(siteName("https://www.idealista.com/inmueble/1/")).toBe("Idealista");
+    expect(siteName("https://www.iadespana.es/x")).toBe("iad España");
+    expect(siteName("nope")).toBe("El portal");
+  });
+
   it("image hosts", () => {
     expect(ALLOWED_IMAGE_HOSTS.size).toBe(6);
     expect(isAllowedImageHost("https://static.fotocasa.es/images/ads/x?rule=original")).toBe(true);

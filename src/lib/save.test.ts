@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { extractResult } from "./extract";
+import { pendingRecord } from "./intake";
 import type { Listing } from "./listing";
 
 // db.ts reads DATA_DIR at import; point it at a temp dir before the dynamic imports below
@@ -89,5 +90,62 @@ describe("save — a source seen again is refreshed, not rejected (F02)", () => 
     const r = await save(gone, src, { user, via: "paste", presence: { ...presence, price_eur: "explicit_null" } });
     expect(r.outcome).toBe("updated");
     expect((await property(id)).price_eur).toBeNull();
+  });
+});
+
+describe("save — a link is kept even when the page could not be read", () => {
+  const URL_B = "https://www.idealista.com/inmueble/112006681/";
+  const srcB = { url_original: URL_B, url_normalized: URL_B, portal: "idealista", portal_ref: "112006681" };
+  const page = { text: "Piso en venta. ".repeat(60) };
+  let id = "";
+
+  it("stores the link with a placeholder title and says it has not been read", async () => {
+    const { listing, presence } = pendingRecord(URL_B, "112006681");
+    const r = await save(listing, srcB, { user, via: "paste", presence, pending: "blocked" });
+    id = r.propertyId;
+    expect(r.outcome).toBe("created");
+    const p = await property(id);
+    expect(String(p.title)).toBe("Idealista · 112006681");
+    expect(Number(p.filled)).toBe(0);
+    const s = await source(id);
+    // Why it is empty, not merely that it is. `last_ok_at` stays null because nothing was read,
+    // and a challenge page is evidence of nothing, so none of it is kept.
+    expect(String(s.last_check_outcome)).toBe("blocked");
+    expect(s.last_ok_at).toBeNull();
+    expect(s.raw_json).toBeNull();
+    expect(s.enriched_at).toBeNull();
+  });
+
+  it("the browser reader's capture overwrites the placeholder and marks it read", async () => {
+    const read = { ...base, title: "Piso en venta en Calle del Rosselló" };
+    const r = await save(read, srcB, { user, via: "bookmarklet", presence, raw: page });
+    expect(r.propertyId).toBe(id); // the same home, not a second one
+    expect(r.outcome).toBe("updated");
+    const p = await property(id);
+    expect(String(p.title)).toBe("Piso en venta en Calle del Rosselló");
+    expect(Number(p.filled)).toBe(1);
+    const s = await source(id);
+    expect(String(s.last_check_outcome)).toBe("listing");
+    expect(s.last_ok_at).not.toBeNull();
+    // The page is kept so the fill layers can read it later without asking anyone for it again,
+    // and `enriched_at` back to NULL is what puts the source into their queue.
+    expect(JSON.parse(String(s.raw_json)).text).toContain("Piso en venta");
+    expect(s.enriched_at).toBeNull();
+  });
+
+  it("does not call that first read a change in the advertisement", async () => {
+    // The columns were written — the test above checked them — but nothing was announced. A
+    // price appearing where there was a placeholder is not a price cut, and the feed must not
+    // say it is.
+    expect(await events(id)).toEqual(["import"]);
+  });
+
+  it("a later blocked check never puts a read advertisement back to unread", async () => {
+    const { listing, presence: blank } = pendingRecord(URL_B, "112006681");
+    await save(listing, srcB, { user, via: "paste", presence: blank, pending: "blocked" });
+    const p = await property(id);
+    expect(Number(p.filled)).toBe(1);
+    // and the facts it already had survive, because the pending observation carried none
+    expect(String(p.title)).toBe("Piso en venta en Calle del Rosselló");
   });
 });

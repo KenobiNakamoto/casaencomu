@@ -5,7 +5,9 @@ changing `src/lib/extract.ts` or `src/lib/url.ts`. Two rounds: the three origina
 (2026-09-04, § 1) and the three the family's own links added (2026-09-07, § 2).
 
 **The rule that never changes: never work around an anti-bot block.** A page a portal refuses to
-a server is collected in a real browser with the bookmarklet, or it is not collected.
+a server is read in a real browser, or it is not read. Since issue #111 that browser can be the
+one on the server rather than a person's — § 4 — but it is still a browser, still stock, and it
+still passes the challenge by running it. No proxy, no fingerprint, no CAPTCHA, ever.
 
 ## 1. Spike — 2026-09-04
 
@@ -120,3 +122,54 @@ Then a reference pattern in `REF` if the URL carries a listing id, and one trimm
 
 That is the whole job per portal. It is deliberately not a plugin system: six portals do not earn
 one, and the fourth column of the table in § 1 is the part that actually takes the time.
+
+## 4. Idealista through a real browser — 2026-09-09
+
+Measured again five days after § 1, on the development Mac.
+
+| what was tried | result |
+|---|---|
+| `curl`, the SCAFFOLD UA | **403**, 773 B DataDome challenge |
+| `curl`, a full current-Chrome header set (UA, Accept, Accept-Language, br) | **403**, byte-identical |
+| a stock Chrome, headful, empty profile, no flags that change what a site sees | **200 — the advertisement**, in about 700 ms |
+
+The third row is the whole finding, and it is not a way around the check: DataDome's interstitial
+is a JavaScript challenge, and a browser passing it by executing it is what it is for. Header
+tuning changes nothing because the challenge is not a header test — which is also why there is
+nothing here to escalate into fingerprint spoofing, and no reason to.
+
+What the browser reader gets, versus what a server gets:
+
+| | server fetch | browser reader |
+|---|---|---|
+| HTML | 773 B challenge | 460 KB advertisement |
+| `adMultimediasInfo` blob | absent | 96 KB |
+| facts extracted | none | price, area, rooms, baths, floor, address, coordinates |
+| photos | none | 36 |
+
+### The soft 404 nobody could see before
+
+A dead id — `/inmueble/999999999/` — answers **200 with Idealista's own home page**, under the
+requested URL, with no blob and no `og:*`. It is not a 404 as § 1 recorded; § 1 could only ever
+see the challenge, so this had never been observed. Taken at face value it imported as a property
+called "Viviendas venta. Viviendas alquiler. Pisos. Chalets".
+
+The check is the one Vivalta already needed, now applied to every portal: **a page that never
+names the listing reference is not that advertisement.** Measured on both pages:
+
+| | live ad | withdrawn |
+|---|---|---|
+| reference in the blob | yes | no (there is no blob) |
+| reference in the visible text | no | no |
+| reference in `og:*` | yes | no |
+
+`og:*` is deliberately **not** searched. Vivalta echoes the requested URL straight back into
+`og:url`, so a page that knows nothing about the advertisement would still appear to name it.
+Text and blob only, and only when a whole page was seen — a hand-built fragment proves nothing by
+not containing a reference.
+
+### The description on the innerText path
+
+Idealista's language picker used to be several short lines above the seller's text and is now one
+long one, `Disponible en: Español English Otros idiomas`. The strip in `extract.ts` handles both
+shapes. It matters more than it did: the reader made innerText the main Idealista path.

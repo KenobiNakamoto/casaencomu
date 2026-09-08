@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { currentUser } from "@/lib/auth";
-import { extractResult } from "@/lib/extract";
-import { failureMessage, IMPORT_DEADLINE_MS, MAX_CAPTURE_BYTES, successLocation } from "@/lib/intake";
+import { userByCaptureToken } from "@/lib/auth";
+import { runEnrichment } from "@/lib/enrich";
+import { extractResult, rawOf } from "@/lib/extract";
+import { IMPORT_DEADLINE_MS, MAX_CAPTURE_BYTES, pendingRecord, successLocation } from "@/lib/intake";
 import { save } from "@/lib/save";
 import { normalizeUrl } from "@/lib/url";
 
@@ -32,14 +33,18 @@ const Form = z.object({
   text: z.string().optional(),
 });
 
-/** Form POST from the bookmarklet. Arrives with `Origin: null`; the `capture_token` is the CSRF guard. */
+/**
+ * Form POST from the bookmarklet, or from the browser reader on the host. Arrives with
+ * `Origin: null` and no session cookie, so the `capture_token` is both the CSRF guard and the
+ * identity: it names the member whose bookmark it is.
+ */
 export async function POST(req: Request) {
-  const user = await currentUser();
   // The body is read before it is parsed, so an oversized capture is refused, not buffered whole.
-  const raw = await req.arrayBuffer();
-  if (raw.byteLength > MAX_CAPTURE_BYTES) return fail(413, "La captura es demasiado grande");
-  const fd = await new Response(raw, { headers: { "content-type": req.headers.get("content-type") ?? "" } }).formData();
-  if (fd.get("token") !== user.capture_token) return fail(403, "Marcador no válido. Vuelve a instalarlo desde Ayuda");
+  const body = await req.arrayBuffer();
+  if (body.byteLength > MAX_CAPTURE_BYTES) return fail(413, "La captura es demasiado grande");
+  const fd = await new Response(body, { headers: { "content-type": req.headers.get("content-type") ?? "" } }).formData();
+  const user = await userByCaptureToken(String(fd.get("token") ?? ""));
+  if (!user) return fail(403, "Marcador no válido. Vuelve a instalarlo desde Ayuda");
 
   const parsed = Form.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return fail(400, "Datos del marcador incompletos");
@@ -54,13 +59,24 @@ export async function POST(req: Request) {
     return fail(400, "Enlace no válido");
   }
 
-  const r = extractResult({ url, title, ld, og, blob, imgs, text });
-  if (r.kind !== "listing") return fail(422, failureMessage(r));
+  const page = { url, title, ld, og, blob, imgs, text };
+  const r = extractResult(page);
+  // A capture that will not parse is still the page: it is kept, the record exists, and layer 2
+  // reads it afterwards. Throwing it away made the person collect it twice for nothing.
+  const record = r.kind === "listing" ? r : pendingRecord(url, norm.portalRef);
 
   const saved = await save(
-    r.listing,
+    record.listing,
     { url_original: url, url_normalized: norm.normalized, portal: norm.portal, portal_ref: norm.portalRef },
-    { user, via: "bookmarklet", presence: r.presence, deadline: AbortSignal.timeout(IMPORT_DEADLINE_MS) },
+    {
+      user,
+      via: "bookmarklet",
+      presence: record.presence,
+      raw: r.kind === "blocked" ? null : rawOf(page),
+      pending: r.kind === "listing" ? null : r.kind,
+      deadline: AbortSignal.timeout(IMPORT_DEADLINE_MS),
+    },
   );
+  void runEnrichment({ limit: 1 }).catch((e) => console.error("[enrich] pass failed", e));
   return new Response(null, { status: 303, headers: { Location: successLocation(saved) } });
 }
