@@ -65,7 +65,7 @@ describe("the add control grows out of its own button", () => {
   });
 
   it("turns the + into an ×, the long way round, and drops the second close button", () => {
-    expect(add).toContain("rotate(${open ? 405 : 0}deg)"); // a whole turn, then the 45° that makes the ×
+    expect(add).toContain("rotate(${open ? 225 : 0}deg)"); // half a turn, then the 45° that makes the ×
     expect(add).toContain("transition-transform");
     expect(add).toContain('aria-label={open ? "Cerrar" : "Añadir un anuncio"}');
     // One × on the pill. Two buttons that both close is what this replaced.

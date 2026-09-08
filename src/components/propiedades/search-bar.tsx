@@ -182,7 +182,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
           className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-full transition aria-busy:opacity-60 sm:h-12 sm:w-12"
         >
           {/* A + turned 45° is an ×, so there is one icon, not two. It takes the long way round —
-              a whole turn, then the last 45° — on a curve that starts and ends at rest. */}
+              half a turn, then the last 45° — on a curve that starts and ends at rest. */}
           <svg
             width="20"
             height="20"
@@ -192,7 +192,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
             strokeWidth="2.5"
             strokeLinecap="round"
             className="transition-transform duration-500 ease-[cubic-bezier(0.65,0,0.35,1)]"
-            style={{ transform: `rotate(${open ? 405 : 0}deg)` }}
+            style={{ transform: `rotate(${open ? 225 : 0}deg)` }}
             aria-hidden
           >
             <path d="M12 5v14M5 12h14" />
