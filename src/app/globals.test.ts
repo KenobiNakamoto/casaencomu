@@ -202,6 +202,9 @@ describe("what components are not allowed to write", () => {
    * without also opening on keyboard focus. Both are cheap to check and invisible to review.
    */
   it("only shrinks the compare pill where there is a pointer, and opens it for the keyboard too", () => {
+    // Never `:hover` on the compact pill: it changes size, and a browser recomputes hover only on
+    // a mouse move, so one that shrinks under a still cursor stays open. The component says.
+    expect(css.match(/\.compare-compact[^{]*:hover/g) ?? []).toEqual([]);
     const at = css.indexOf("@media (hover: hover)");
     const query = balanced(css, at);
     const rules = [...css.matchAll(/\.compare-compact[^{]*\{/g)];
@@ -211,8 +214,8 @@ describe("what components are not allowed to write", () => {
       // exactly the mistake this is looking for.
       const inside = rule.index >= at && rule.index < at + query.length;
       expect(inside, `outside the hover query: ${rule[0]}`).toBe(true);
-      if (rule[0].includes(":hover")) {
-        expect(rule[0], `hover with no keyboard equivalent: ${rule[0]}`).toContain("focus-visible");
+      if (rule[0].includes(".is-open")) {
+        expect(rule[0], `pointer state with no keyboard equivalent: ${rule[0]}`).toContain("focus-visible");
       }
     }
   });

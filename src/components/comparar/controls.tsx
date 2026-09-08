@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { blockedReason, FULL_MESSAGE, MAX, serialiseIds, trayLabel } from "@/lib/selection";
 import { useSelection } from "./use-selection";
 
@@ -22,6 +22,8 @@ export function CompareToggle({
 }) {
   const { ids, flip } = useSelection(userId);
   const [full, setFull] = useState(false);
+  const [open, setOpen] = useState(false);
+  const shutUntil = useRef(0);
   const checked = ids.includes(id);
 
   useEffect(() => {
@@ -31,13 +33,31 @@ export function CompareToggle({
   }, [full]);
 
   return (
-    <span className={`compare-toggle ${className}`}>
+    /*
+     * Open is state, not `:hover`. The pill changes size, and a browser only recomputes `:hover`
+     * when the mouse moves — so a pill that shrinks under a still cursor stays hovered, and stuck
+     * open. `pointermove` rather than `pointerenter` for the same reason: after it has shut under
+     * the cursor, entering never happens again, but moving does.
+     */
+    <span
+      className={`compare-toggle ${open ? "is-open" : ""} ${className}`}
+      onPointerMove={(e) => e.pointerType === "mouse" && Date.now() > shutUntil.current && setOpen(true)}
+      onPointerLeave={() => setOpen(false)}
+    >
       <label className="compare-box">
         <input
           type="checkbox"
           checked={checked}
           // A refused fifth must not leave the box looking checked.
           onChange={() => setFull(flip(id).full)}
+          // Chosen with a pointer, it shuts, which is when the square goes behind the tick. The
+          // pause is so it does not open again on the same still cursor. `detail` is 0 for the
+          // keyboard, which keeps its own focus and its own open pill.
+          onClick={(e) => {
+            if (e.detail === 0) return;
+            shutUntil.current = Date.now() + 400;
+            setOpen(false);
+          }}
           aria-label={`Comparar ${label}`}
         />
         {/* The plus, the square and the tick are all this one span; the stylesheet decides which
