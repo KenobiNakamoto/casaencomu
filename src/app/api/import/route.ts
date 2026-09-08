@@ -27,6 +27,8 @@ async function readUrl(req: Request): Promise<string | null> {
 function sameOrigin(req: Request): boolean {
   const origin = req.headers.get("origin");
   if (!origin) return false; // a form from another site sends `Origin: null`
+  // Scheme, host and port all have to match. A `PUBLIC_URL` that says https for a site served
+  // over http on a port refuses every import here and looks like nothing at all from outside.
   const expected = process.env.PUBLIC_URL ?? new URL(req.url).origin;
   try {
     return new URL(origin).origin === new URL(expected).origin;
