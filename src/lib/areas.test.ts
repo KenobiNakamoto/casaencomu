@@ -78,6 +78,32 @@ describe("the zones the map draws", () => {
     expect(border[Math.floor(border.length / 2)], "the middle border vertex is off the neighbour's outline").toBeLessThan(3);
   });
 
+  /**
+   * The same rule as above, at every rank rather than inside one district. Two zones that share a
+   * border share its points outright, so a vertex of one is a vertex of the other. One pass and a
+   * hash, which is why this one can afford to look at the whole file while the check above looks
+   * closely at six zones.
+   *
+   * This is what the old file could not do: at every rank its median was zero, and no zone shared
+   * more than two points with anybody.
+   *
+   * The median, not the minimum: an island, or the only district in a town, touches nothing and
+   * rightly shares nothing.
+   */
+  it("shares its border points at every rank", () => {
+    const byRank = new Map<number, Feature[]>();
+    for (const f of areas.features) byRank.set(f.properties.rank, [...(byRank.get(f.properties.rank) ?? []), f]);
+
+    for (const [rank, zones] of [...byRank].sort((a, b) => a[0] - b[0])) {
+      if (zones.length < 2) continue; // one zone at a rank has nobody to share with
+      const owned = zones.map((f) => new Set(points(f).map(([x, y]) => `${x},${y}`)));
+      const seen = new Map<string, number>();
+      for (const set of owned) for (const key of set) seen.set(key, (seen.get(key) ?? 0) + 1);
+      const shared = owned.map((set) => [...set].filter((key) => seen.get(key)! > 1).length).sort((a, b) => a - b);
+      expect(shared[shared.length >> 1], `rank ${rank} draws its borders twice`).toBeGreaterThan(10);
+    }
+  });
+
   it("keeps every ring closed", () => {
     for (const f of areas.features) {
       const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates;

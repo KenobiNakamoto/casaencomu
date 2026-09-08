@@ -369,6 +369,13 @@ again what the last run already found out. Only shapes are remembered this way: 
 one area the map cannot draw, while a missing Overpass answer is a whole rank silently emptied.
 `--fresh` asks them all again.
 
+**It is checked from now on, and the checks now run by themselves.** `src/lib/areas.test.ts` has
+two: one looks closely at six barris, and one counts exactly-shared points at *every* rank, which
+is a hash and one pass over the file. Both fail on the file `main` shipped — at every rank its
+median was zero, and no zone shared more than two points with anybody. Nothing ran them
+automatically, so `.github/workflows/checks.yml` now runs types, lint, tests and the build on every
+pull request and on every push to `main`.
+
 **Two zones of different ranks still do not share their border.** A barrio's outer edge and its
 district's edge are one line on the ground, and each rank is simplified on its own, so they sit a
 few metres apart. The map only ever draws both at once for the zone you selected.
