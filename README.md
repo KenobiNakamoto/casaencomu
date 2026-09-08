@@ -65,7 +65,7 @@ order the remaining issues run in.
 | `src/` | the application. Code map: `src/README.md` |
 | `scripts/` | two things run by hand, never by the app. See `scripts/README.md` |
 | `air/` | the backup script and its LaunchAgent, installed on the server. See `air/README.md` |
-| `public/areas.geojson` | Barcelona's 10 districts and 73 barris, for the map overlay. Ajuntament de Barcelona open data (CC BY 4.0), rebuilt by `scripts/build-areas.mjs` |
+| `public/areas.geojson` | The map's zones, at six administrative levels. OpenStreetMap (ODbL), rebuilt by `scripts/build-areas.mts` — one config file per country, see `scripts/areas/README.md` |
 | `compose.yaml` `Dockerfile` `deploy.sh` | one image, one container, one bind mount |
 | `.env.example` | every variable the app reads. Placeholders only |
 | `_local/` | working material that is never committed. See `_local/README.md` |

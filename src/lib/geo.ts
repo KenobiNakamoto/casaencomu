@@ -5,8 +5,14 @@ import { norm } from "./search";
  * uses it to count properties per area. No dependency: it is twenty lines and never changes.
  */
 
-export type AreaLevel = "distrito" | "barrio";
-export type AreaProps = { id: string; name: string; level: AreaLevel; district: string; count?: number };
+/**
+ * `rank` is the universal one: 1 is the widest division a country has and 6 the narrowest, so the
+ * map can decide which zoom shows what without knowing that Spain calls rank 3 a comarca and
+ * Germany calls it an Amt. `level` carries that local word, for people reading the file.
+ * `parent` is the id of the smallest area above this one that contains it, which is not always
+ * one rank up: a barrio in a town with no districts hangs off the municipality.
+ */
+export type AreaProps = { id: string; name: string; level: string; rank: number; parent: string | null; count?: number };
 export type AreaFeature = {
   type: "Feature";
   properties: AreaProps;

@@ -100,3 +100,23 @@ Photo hosts added to `ALLOWED_IMAGE_HOSTS` (a **download** allowlist, not a disp
 `media.mobiliagestion.es` (Vivalta), `images.iadespana.es` (iad), `static0.housfy.com` (Housfy).
 `cms.housfy.com` is site furniture and stays out. `ALLOWED_HOSTS` — the SSRF guard on the paste
 path — is unchanged: the three original portals only.
+
+## 3. A portal in another country
+
+Nothing in `extract.ts` is Spanish. It reads JSON-LD, then OpenGraph, then a window of text
+around the price, and most portals in most countries publish at least the first of those. What is
+country-specific is the three lines that name a site, and they are all in `src/lib/url.ts`:
+
+1. **`routeFor`** — `SERVER` if a plain server fetch returns the page, `CAPTURE` if the site
+   answers a challenge or serves an empty shell. Measure it with `curl` first, the way § 1 did.
+   Guessing wrong costs the person ten seconds per link.
+2. **`ALLOWED_HOSTS`** — only if the fetch really works. It is the SSRF guard on `/api/import`,
+   not a list of sites we like. A capture-only portal stays off it and imports as `generic`.
+3. **`ALLOWED_IMAGE_HOSTS`** — the photo host, and only the photo host. Site furniture and
+   tracking pixels stay out.
+
+Then a reference pattern in `REF` if the URL carries a listing id, and one trimmed fixture in
+`src/lib/__fixtures__/` so the extractor has something to be tested against.
+
+That is the whole job per portal. It is deliberately not a plugin system: six portals do not earn
+one, and the fourth column of the table in § 1 is the part that actually takes the time.

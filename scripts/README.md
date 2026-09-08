@@ -26,15 +26,15 @@ over in a URL fragment instead: navigate the tab to `http://localhost:3000/ayuda
 then read `location.hash` from that page and post it same-origin. In production none of this
 applies — the application is on a public HTTPS origin and the bookmarklet posts to it directly.
 
-## `build-areas.mjs` — rebuild the map overlay
+## `build-areas.mts` — rebuild the map's zones
 
 ```sh
-node scripts/build-areas.mjs        # writes public/areas.geojson
+pnpm tsx scripts/build-areas.mts es --root Catalunya    # writes public/areas.geojson
+pnpm tsx scripts/build-areas.mts es --probe             # which admin level holds what
 ```
 
-Downloads Barcelona's district and barri boundaries, keeps four properties per feature, drops the
-other fifty, and simplifies the rings to about five metres. The map shades areas; it does not
-survey them.
+Builds every administrative level of one country, from OpenStreetMap, into the one file the map
+reads. Adding a country is one JSON file in `scripts/areas/`, and no code.
 
-Source: Ajuntament de Barcelona open data, through `github.com/martgnz/bcn-geodata`, CC BY 4.0.
-Run it again only when the boundaries change, which is close to never.
+**Read `scripts/areas/README.md` before running it** — the config fields, what the two upstream
+services are for, and what the pipeline cannot do yet.

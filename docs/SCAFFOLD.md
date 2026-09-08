@@ -76,7 +76,7 @@ CasaEnComú/
   docs/  PLAN.md SCAFFOLD.md WORKPLAN.md PORTALS.md PRIOR-ART.md
   package.json next.config.ts vitest.config.ts compose.yaml Dockerfile deploy.sh .env.example
   air/casaencomu-backup.sh  air/com.kenobi.casaencomu-backup.plist     ← installed by hand on the Air
-  scripts/ingest.mts scripts/build-areas.mjs
+  scripts/ingest.mts scripts/build-areas.mts scripts/areas/
   public/areas.geojson
   src/
     proxy.ts                 ← Access JWT → x-user-email   (Next 16's name for middleware)
@@ -205,8 +205,9 @@ Server components read the DB; mutations are server actions.
 - `/propiedades/[id]` — photos, facts, sources, description, price history (from `events`),
   review matrix (6 × members), comments, timeline, stage select.
 - `/mapa` — plain MapLibre GL in a `useEffect` client component (`// ponytail: no react wrapper`);
-  markers as price pills, exact = solid, approx = `≈` and a 180 m halo; same URL filters. District
-  and barri overlays come from `public/areas.geojson`, rebuilt only by `node scripts/build-areas.mjs`;
+  markers as price pills, exact = solid, approx = `≈` and a 180 m halo; same URL filters. Zone
+  overlays come from `public/areas.geojson` at six ranks, one zoom band each, rebuilt only by
+  `pnpm tsx scripts/build-areas.mts <country>` (`scripts/areas/README.md`);
   `src/lib/geo.ts` does point-in-polygon for both the counts on the map and the `?zona=` filter.
 - `/comparar?ids=a,b,c` — 2–4 columns; differing rows highlighted; `Sin datos`.
 - `/actividad` — `events` newest first; sets `last_seen_at`.

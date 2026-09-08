@@ -12,7 +12,7 @@ no evidence is not a claim, it is a plan, and it belongs in `WORKPLAN.md`.
 ## 1. In one paragraph
 
 **Release A is finished.** All seven of its packages are merged, along with the preview
-authentication and three follow-up fixes: `main` is green at **346 tests, 3 skipped**, with lint,
+authentication and three follow-up fixes: `main` is green at **356 tests, 3 skipped**, with lint,
 types and build clean. **Release B has not been started** — six packages, none of them begun.
 Nothing is deployed to a real domain, because three items only Kenobi can do are still open. To
 let him look at the app anyway, it runs on the Air, reachable over Tailscale, behind a shared
@@ -242,6 +242,76 @@ invisible before § 4a, because the wipe was suppressed on exactly the pages tha
 **Open, for his eyes:** on the night map the near-white boundary is the same brightness family as
 the major roads. In daylight the near-black is unambiguous. If it reads as busy at night, the fix
 is one hex in `globals.css`.
+
+## 4c. Zones for any country, not just Barcelona — issue #92
+
+`public/areas.geojson` held Barcelona and nothing else: ten districts and 73 barris, from a
+Barcelona-only source, drawn by two hardcoded level names. The app is meant to work wherever the
+family looks, so the geography had to stop being one city.
+
+**A zone now carries a rank, not a Spanish word.** `rank` is 1 to 6, widest first, and it means
+the same thing everywhere: Spain's comarca and Germany's Amt are both rank 3. The map gives each
+rank a zoom band, so a region shows while the country is in view and barris show once you are
+looking at streets. `parent` is the id of the smallest zone above it — worked out from the
+geometry, because OSM does not reliably say. It is not always one rank up: a barrio in a town with
+no districts hangs off the municipality. `district` is gone.
+
+**One script, one config file per country.** `scripts/build-areas.mts` walks a country top down
+and writes the file the map reads. `scripts/areas/es.json` is six lines that say which OSM
+`admin_level` is which rank, how hard to simplify it, and how wide a net to cast when asking.
+Adding Germany is another six lines and no code. `--probe` prints what each administrative level
+of a country actually holds, which is the one thing a new country has to be told.
+`scripts/areas/README.md` is the whole procedure.
+
+**Measured, on Catalonia, at all six levels.** One comunidad, 4 provincias, 43 comarcas, 737
+municipios, 124 distritos and 404 barrios — 1,313 zones, 1.4 MB on disk and 386 KB over the wire.
+Barcelona is complete and correct: a point on the Sagrada Família falls inside `Catalunya ›
+Barcelona › Barcelonès › Barcelona › l'Eixample › la Sagrada Família`, and a test asserts exactly
+that. **About 200 rural municipalities are still missing**, in eleven inland comarcas — first
+because the endpoint rate-limited us, then because the connection to it from this machine started
+refusing outright (`ECONNREFUSED` in a fifth of a second, with `curl` to the same host working).
+The run names the eleven; `pnpm tsx scripts/build-areas.mts es --root Catalunya` on a better
+connection asks only for those and fills them in. Nothing the family searches is affected.
+
+**What the two upstream services are for.** Overpass answers which zones exist — names and ids
+only, one query per parent area. Asking it for every municipality of a region at once answers
+504; asked comarca by comarca it answers in seconds. `polygons.openstreetmap.fr` answers the
+shape of one zone, already generalised: Catalonia at full resolution is 4 MB and the map draws it
+40 px wide. Every response is cached under `_local/overpass/`, so a second run costs nothing and
+an interrupted run resumes.
+
+**Three things went wrong and are now written into the script.**
+
+- Rotating between Overpass mirrors is unsafe. An `area:` query needs an areas index, and a
+  mirror that does not build one answers `200` with an empty result instead of an error — "43
+  comarques" became "0 comarques", and it was cached. One endpoint now, and an empty answer is
+  never cached.
+- `overpass-api.de` resolves to several addresses and not all of them are reachable from here;
+  `fetch` fails in half a second while `curl` to the same name succeeds. A connection that never
+  opened is retried at once; a server that answered 429 or 504 is given a minute.
+- A question that goes unanswered eight times is a gap, not a crash. The run says which ones, and
+  a second run asks only those.
+
+**The zone you select is now drawn at every zoom.** Fitting the map to a comarca lands at about
+z10.7, which is inside the municipality band and not the comarca one, so the outline you had just
+clicked disappeared. A layer with no zoom limits draws the selected zone, and the banded layers
+give that one feature up to it so it is never stroked twice.
+
+**The active filter reads as a chain**: `Catalunya › Barcelona › Barcelonès › Barcelona ›
+Eixample`, from `areaChain` in `lib/areas.ts`. A barri's name alone does not say which city it is
+in, and once there is more than one city that matters.
+
+**Ceilings, written down in `scripts/areas/README.md`.** One file for the whole world will not
+work — every visitor downloads all of it. The next step, when it hurts, is one file per rank and
+the map fetching a rank when its band opens; nothing else in the app changes. The simplification
+per rank is set by eye. Names come out of OSM in the local language, which is right for Catalonia
+and would be wrong somewhere else.
+
+**Ingest did not need changing, and that is the finding.** `extract.ts` is not Spanish: it reads
+JSON-LD, then OpenGraph, then the text around the price. What is country-specific is three lines
+in `lib/url.ts` per portal — whether a server fetch works, the SSRF allowlist, and the photo
+host — plus a reference pattern and one fixture. `docs/PORTALS.md` § 3 is that procedure. Six
+portals do not earn a plugin system.
 
 ## 5. Not done
 

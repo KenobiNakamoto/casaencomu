@@ -53,8 +53,8 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 | `selection.ts` | which homes a person picked to compare. Pure: the storage and the React binding are in `components/comparar/` | yes |
 | `filters.ts` | **the one contract for which homes qualify.** Parses the URL, builds the statement, runs the text and area pass, and writes every link back out. The list and the map share it | yes |
 | `search.ts` | free-text matching and the filter presets, accent-insensitive, in JavaScript over the loaded rows | yes |
-| `geo.ts` | point in polygon for the map's area overlays, and `isIn` for one property. Twenty lines, no dependency | yes |
-| `areas.ts` | loads `public/areas.geojson` once and counts properties per area | no |
+| `geo.ts` | point in polygon for the map's area overlays, and `isIn` for one property. Twenty lines, no dependency. Also the shape of a zone: `rank` 1–6 and `parent` | yes |
+| `areas.ts` | loads `public/areas.geojson` once; `findArea`, and `areaChain` for the zone read widest first | no |
 | `settings.ts` | the key/value table; today it holds only the budget. Either bound alone is valid, and both empty clears it | no |
 
 ## `app/` — routes
