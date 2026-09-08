@@ -29,7 +29,9 @@ const portalName = (url: string) => {
 
 /**
  * The pill searches. The round + adds a listing: clicking it grows a link field leftwards from the
- * button, which never moves, and the search box gives up the width. Escape or × closes it again.
+ * button, which never moves, and the search box gives up the width. The + turns into an × as it
+ * grows and is what closes it again, so there is one control there rather than two; Escape also
+ * closes, and Enter saves.
  *
  * What the link does once it is typed is PIP-08's work, kept: the URL is classified in the browser
  * before anything is sent, because Idealista answers a server fetch with a 403 challenge every
@@ -90,7 +92,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
     setState({ kind: "idle" });
   }
 
-  const pill = "h-14 items-center rounded-full border border-hairline bg-raised shadow-tier transition focus-within:border-ink sm:h-16";
+  const pill = "pill h-14 items-center rounded-full border border-hairline bg-raised shadow-tier transition focus-within:border-ink sm:h-16";
 
   return (
     <div className="relative flex min-w-0 flex-1 items-center gap-3" onKeyDown={(e) => e.key === "Escape" && close()}>
@@ -144,16 +146,6 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
       >
         {open && (
           <>
-            <button
-              type="button"
-              onClick={close}
-              aria-label="Cerrar"
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-muted transition hover:bg-surface-soft hover:text-ink"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
             <label className="flex min-w-0 flex-1 flex-col justify-center px-3">
               <span className="text-xs font-semibold text-ink">Añadir enlace</span>
               <input
@@ -169,21 +161,40 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
                 inputMode="url"
                 autoComplete="off"
                 aria-describedby="add-status"
+                enterKeyHint="go"
                 placeholder="Pega un anuncio de Idealista, Fotocasa o Habitaclia"
                 className="w-full truncate bg-transparent text-ink placeholder:text-placeholder"
               />
             </label>
+            {/* Enter saves. The button beside the field closes now, so this is the submission —
+                and, being a real submit button, it is what makes Enter work at all. */}
+            <button type="submit" className="sr-only" aria-disabled={busy}>
+              Guardar el anuncio
+            </button>
           </>
         )}
         <button
-          type={open ? "submit" : "button"}
-          onClick={open ? undefined : () => setOpen(true)}
-          aria-label={open ? "Guardar el anuncio" : "Añadir un anuncio"}
+          type="button"
+          onClick={() => (open ? close() : setOpen(true))}
+          aria-label={open ? "Cerrar" : "Añadir un anuncio"}
           aria-expanded={open}
           aria-busy={busy}
           className="btn-primary flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-full transition aria-busy:opacity-60 sm:h-12 sm:w-12"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+          {/* A + turned 45° is an ×, so there is one icon, not two. It takes the long way round —
+              a whole turn, then the last 45° — on a curve that starts and ends at rest. */}
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            className="transition-transform duration-500 ease-[cubic-bezier(0.65,0,0.35,1)]"
+            style={{ transform: `rotate(${open ? 405 : 0}deg)` }}
+            aria-hidden
+          >
             <path d="M12 5v14M5 12h14" />
           </svg>
         </button>

@@ -722,6 +722,21 @@ html[data-wipe]::view-transition-new(root) {
 
 /* Motion is opt-out everywhere else in this file; nothing here animates position. */
 
+/* --- The search / add pill ---------------------------------------------------------------- */
+
+/* The pill wears the focus ring, not the bare field inside it. The global rule (F32) draws a
+   rectangle in the middle of a rounded control, which reads as a box someone forgot to remove.
+   The ring moves out to the shape the eye already sees, and takes the colour the pill's own
+   border already goes to on focus, so the whole control reads as one thing. Same 2px, same
+   offset, so it is no less visible — this is where the focus is, drawn on the right outline. */
+.pill:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.pill input:focus-visible {
+  outline: none;
+}
+
 /* --- Add a link: the message under the pill (PIP-08 behaviour, in the old control) ------- */
 
 /* The pill has no room for a sentence, and growing it would move the button under a finger

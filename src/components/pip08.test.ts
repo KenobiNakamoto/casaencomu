@@ -64,6 +64,23 @@ describe("the add control grows out of its own button", () => {
     expect(css).toContain("position: absolute");
   });
 
+  it("turns the + into an ×, the long way round, and drops the second close button", () => {
+    expect(add).toContain("rotate(${open ? 405 : 0}deg)"); // a whole turn, then the 45° that makes the ×
+    expect(add).toContain("transition-transform");
+    expect(add).toContain('aria-label={open ? "Cerrar" : "Añadir un anuncio"}');
+    // One × on the pill. Two buttons that both close is what this replaced.
+    expect(add.match(/aria-label="Cerrar"/g) ?? []).toHaveLength(0);
+    expect(add).toContain('<button type="submit" className="sr-only"'); // …so Enter still saves
+  });
+
+  it("puts the focus ring around the pill, not around the field inside it", () => {
+    expect(add).toContain('const pill = "pill ');
+    expect(css).toContain(".pill:has(input:focus-visible)");
+    expect(css.slice(css.indexOf(".pill:has("))).toMatch(/^[^}]*outline: 2px solid/); // still a ring, just on the pill
+    expect(css).toContain(".pill input:focus-visible");
+    expect(css).toContain(":focus-visible {"); // the global ring (F32) is still there for everything else
+  });
+
   it("no longer ships a dialog for it", () => {
     expect(add).not.toContain("Dialog");
     expect(() => read("./ui/dialog.tsx")).toThrow();
