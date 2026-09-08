@@ -5,6 +5,7 @@ import {
   countFilters,
   COVER_SQL,
   detailHref,
+  detailHrefFrom,
   listHref,
   listSql,
   mapHref,
@@ -215,6 +216,15 @@ describe("links", () => {
     expect(to).toBe("/propiedades/abc?desde=q%3Dgotic%26hab%3D3%26zona%3Dgotic");
     const desde = new URLSearchParams(to.split("?")[1]).get("desde")!;
     expect(backHref(desde, "abc")).toBe("/propiedades?q=gotic&hab=3&zona=gotic#p-abc");
+  });
+
+  it("builds the same link for the map, which holds the query already serialised (#80)", () => {
+    expect(detailHrefFrom("abc", toQuery(v))).toBe(detailHref("abc", v));
+    expect(detailHrefFrom("abc", "")).toBe("/propiedades/abc");
+  });
+
+  it("escapes an identifier that would otherwise change the path", () => {
+    expect(detailHrefFrom("a/b?c", "")).toBe("/propiedades/a%2Fb%3Fc");
   });
 
   it("returns to the plain list when there were no filters", () => {

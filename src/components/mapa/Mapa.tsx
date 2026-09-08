@@ -12,6 +12,7 @@ import type {
   SymbolLayerSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { detailHrefFrom } from "@/lib/filters";
 import { areaCoords, countByArea, type AreaLevel, type Areas } from "@/lib/geo";
 import { STAGE_LABELS, type Stage } from "@/lib/listing";
 import { groupByCoord, groupLabel, pinLabel, pinText, price, type PinGroup } from "@/lib/map-pins";
@@ -110,12 +111,12 @@ const circleFor = (m: MapMarker | undefined) => ({
 });
 
 /** The popup is an Airbnb mini card: photo, title, meta, price. */
-function card(m: MapMarker) {
+function card(m: MapMarker, desde: string) {
   const meta = [m.neighborhood, m.area_m2 != null && `${m.area_m2} m²`, m.rooms != null && `${m.rooms} hab.`]
     .filter(Boolean)
     .map((s) => esc(String(s)))
     .join(" · ");
-  const href = `/propiedades/${encodeURIComponent(m.id)}`;
+  const href = detailHrefFrom(m.id, desde);
   return `<a href="${href}" style="display:block;color:var(--ink);text-decoration:none">
     ${
       m.cover
@@ -131,10 +132,10 @@ function card(m: MapMarker) {
 }
 
 /** Several homes on one portal centroid: name them all instead of hiding all but the top one. */
-function chooser(items: MapMarker[]) {
+function chooser(items: MapMarker[], desde: string) {
   const rows = items
     .map(
-      (m) => `<a href="/propiedades/${encodeURIComponent(m.id)}" class="chooser-row">
+      (m) => `<a href="${detailHrefFrom(m.id, desde)}" class="chooser-row">
         <span class="chooser-price">${esc(price(m.price_eur))}</span>
         <span class="chooser-title">${esc(m.title)}</span>
         <span class="chooser-where">${m.precision === "approx" ? "Ubicación aproximada" : "Ubicación exacta"}</span>
@@ -342,7 +343,7 @@ export default function Mapa({
         if (existing.label === label) continue;
         existing.el.textContent = pinTextFor(group);
         existing.el.setAttribute("aria-label", label);
-        existing.popup.setHTML(popupFor(group));
+        existing.popup.setHTML(popupFor(group, now.current.params));
         existing.label = label;
         continue;
       }
@@ -359,7 +360,7 @@ export default function Mapa({
         focusAfterOpen: false,
         // We open and close it ourselves; see `open` below.
         closeOnClick: false,
-      }).setHTML(popupFor(group));
+      }).setHTML(popupFor(group, now.current.params));
       const key = group.key;
       const pick = () => (group.items.length === 1 ? group.items[0].id : undefined);
       // MapLibre calls preventDefault on a marker's mousedown to keep it from starting a drag,
@@ -609,4 +610,11 @@ export default function Mapa({
 
 const pinTextFor = (g: PinGroup<MapMarker>) => (g.items.length > 1 ? String(g.items.length) : pinText(g.items[0]));
 const pinLabelFor = (g: PinGroup<MapMarker>) => (g.items.length > 1 ? groupLabel(g) : pinLabel(g.items[0]));
-const popupFor = (g: PinGroup<MapMarker>) => (g.items.length > 1 ? chooser(g.items) : card(g.items[0]));
+/**
+ * A popup link carries the list it was opened from, exactly as a card does, so the detail page
+ * can come back to it. `params` is that list, already serialised (#80).
+ */
+const popupFor = (g: PinGroup<MapMarker>, params: Record<string, string>) => {
+  const desde = new URLSearchParams(params).toString();
+  return g.items.length > 1 ? chooser(g.items, desde) : card(g.items[0], desde);
+};

@@ -131,3 +131,16 @@ describe("failure leaves something to use", () => {
     expect(handler).not.toContain("setFailed");
   });
 });
+
+describe("#80 — a popup keeps the list it was opened from", () => {
+  it("builds both popup links through the shared helper, not by hand", () => {
+    expect(src).toContain("detailHrefFrom(");
+    // A bare detail path in the popup HTML is the defect: it discards the filters and the anchor.
+    expect(src).not.toContain('href="/propiedades/${encodeURIComponent(m.id)}"');
+    expect(src).not.toContain("`/propiedades/${encodeURIComponent(m.id)}`");
+  });
+
+  it("takes the query from the live params, not from a stale closure", () => {
+    expect(src).toContain("popupFor(group, now.current.params)");
+  });
+});
