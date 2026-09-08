@@ -151,6 +151,24 @@ describe("what components are not allowed to write", () => {
     expect(offenders(/\b-?(?:bottom|pb|mb)-20\b/g)).toEqual([]);
   });
 
+  /*
+   * The filters panel opens over the list. It and the compare toggles on the cards were both
+   * `z-10`, and a tie is broken by document order, so the toggles came out through the panel.
+   * Cards sit under the panel, and the add-a-link message sits over it.
+   */
+  it("keeps the toolbar's layers in order", () => {
+    const z = (name: string, re: RegExp) => {
+      const hit = sources().flatMap(([n, c]) => (n.includes(name) ? [...c.matchAll(re)].map((m) => Number(m[1])) : []));
+      expect(hit, `no z-index found in ${name}`).not.toHaveLength(0);
+      return Math.max(...hit);
+    };
+    const card = Math.max(z("propiedades/card.tsx", /\bz-(\d+)\b/g), z("propiedades/rows.tsx", /\bz-(\d+)\b/g));
+    const panel = z("propiedades/page.tsx", /\bmd:z-(\d+)\b/g);
+    const message = Number(css.match(/\.add-status \{[^}]*z-index: (\d+)/)![1]);
+    expect(panel, "the cards come out through the filters panel").toBeGreaterThan(card);
+    expect(message, "the filters panel covers the add-a-link message").toBeGreaterThan(panel);
+  });
+
   // F33: the full desktop navigation starts at 1024px, not at 768px.
   it("the navigation and the layout switch at lg, never at md", () => {
     const nav = sources().filter(([n]) => /^components\/nav|^app\/layout/.test(n));
