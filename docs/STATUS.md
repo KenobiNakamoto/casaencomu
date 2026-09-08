@@ -26,7 +26,7 @@ password. That preview is not the deployment.
 |---|---|
 | Where | The MacBook Air, in Docker under Colima |
 | Reachable from | The tailnet only, over plain HTTP on port 8080 |
-| Login | HTTP Basic. Any name, one shared password |
+| Login | None. `PREVIEW_OPEN_AS` serves every visitor as one identity (§ 4e) |
 | Data | A **copy** of the Pro's development database: 23 properties, 621 photos |
 | Survives a reboot | Yes, on its own |
 
@@ -36,8 +36,9 @@ The address, the password location and the exact commands are in `memory/decisio
 **What this preview is not:**
 
 - It is **not** the Cloudflare Access deployment. It has no domain and no Zero Trust policy.
-- The shared password is **not** the perimeter. The tailnet is. The password only keeps the
-  family's identities apart, so ratings and activity stay separate.
+- Nothing asks who you are. The tailnet is the perimeter, and it always was: the shared password
+  it replaced only kept the family's identities apart. Everyone on the preview is now one
+  identity, so ratings and activity are shared until the Access deployment lands.
 - The database on the Air is a **copy**. The Pro's `data/` is still the source of truth. Do not
   start editing on the Air and expect it to come back.
 - It is **not** HTTPS. The tailnet has no HTTPS certificates enabled. Traffic is still
@@ -379,6 +380,30 @@ pull request and on every push to `main`.
 **Two zones of different ranks still do not share their border.** A barrio's outer edge and its
 district's edge are one line on the ground, and each rank is simplified on its own, so they sit a
 few metres apart. The map only ever draws both at once for the zone you selected.
+
+## 4e. The list view, and an open preview — issue #95
+
+**The "Filas" view was a spreadsheet.** Eight narrow columns, no photograph, and a sideways
+scrollbar under 640 px. It is now the gallery card laid on its side: the photograph on the left
+(3:2, 128 px on a phone and 224 px beside the map), then the barrio, the title on at most two
+lines, and `m² · hab.` The stage chip and the price sit at the foot of each row, so a column of
+rows reads down the two things a decision is made on. Rows are separated by a hairline.
+
+The score sits at the right of the title, and **Comparar** sits on the photograph, in the same
+place as on the card. The budget warning is a chip with words: colouring the price red would say
+it by colour alone.
+
+`RowsTable` is now `RowsList`. One test in `comparar.test.ts` asserted the control had "its own
+table cell"; it asserts the same rule as the card instead — the control is outside every anchor.
+
+**The preview no longer asks for a password.** `PREVIEW_OPEN_AS` in `src/proxy.ts`: when it is
+set, every request is forwarded as that one identity and nothing is asked. It is set only in the
+Air's `.env`, and it is safe only because the Air is reachable over the tailnet and nowhere else.
+Cloudflare Access still wins whenever `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` are both
+present, so this can never downgrade a real deployment — `src/proxy.test.ts` asserts it.
+
+`vitest.config.ts` gained the `@` alias, without which no test can import a module that uses the
+app's own import prefix.
 
 ## 5. Not done
 

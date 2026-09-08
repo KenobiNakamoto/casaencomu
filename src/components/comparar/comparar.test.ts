@@ -28,8 +28,12 @@ describe("the control is a sibling of the link, not inside it", () => {
     expect(card).not.toMatch(/<CompareToggle[^>]*className="absolute/);
   });
 
-  it("rows: the toggle has its own cell", () => {
-    expect(rows).toMatch(/<td className=\{td\}>\s*<CompareToggle/);
+  it("rows: the toggle is outside every anchor", () => {
+    // Same rule as the card, now that a row is a photograph and a title rather than table cells.
+    const toggle = rows.indexOf("<CompareToggle");
+    expect(toggle).toBeGreaterThan(-1);
+    const before = rows.slice(0, toggle);
+    expect(before.match(/<Link /g) ?? []).toHaveLength(before.match(/<\/Link>/g)?.length ?? -1);
   });
 });
 
