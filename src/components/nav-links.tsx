@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { CompareCount } from "./comparar/controls";
 
-export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; badge?: number };
+/** `count` carries the user id: the comparison count lives in the browser, not the database. */
+export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; badge?: number; count?: string };
 
 const ICONS = {
   home: "M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10",
@@ -20,7 +22,7 @@ export default function NavLinks({ items }: { items: NavItem[] }) {
       aria-label="Principal"
       className="fixed inset-x-0 bottom-0 z-20 flex border-t border-hairline bg-raised pb-[env(safe-area-inset-bottom)] lg:static lg:inset-auto lg:mx-auto lg:h-full lg:border-0 lg:pb-0"
     >
-      {items.map(({ href, label, icon, badge }) => {
+      {items.map(({ href, label, icon, badge, count }) => {
         const active = pathname === href || pathname.startsWith(href + "/");
         return (
           <Link
@@ -43,7 +45,10 @@ export default function NavLinks({ items }: { items: NavItem[] }) {
                 </span>
               ) : null}
             </span>
-            <span>{label}</span>
+            <span>
+              {label}
+              {count ? <CompareCount userId={count} /> : null}
+            </span>
             {badge ? (
               <span className="ml-1.5 hidden rounded-full bg-action px-1.5 py-0.5 text-xs font-semibold leading-none text-on-action lg:inline">
                 {badge}

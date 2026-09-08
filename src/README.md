@@ -50,6 +50,7 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 | `availability.ts` | whether the advertisement is still up — the gone streak, the property's status from all its sources, staleness, and the Spanish for each. Deliberately not a stage | yes |
 | `recheck.ts` | the 48-hour loop: refetch, compare, write events, move the source's availability. Never writes a stage | no |
 | `ratings.ts` | averages and the upsert statement. Deliberately has no `db` import, so the test needs no data directory | yes |
+| `selection.ts` | which homes a person picked to compare. Pure: the storage and the React binding are in `components/comparar/` | yes |
 | `filters.ts` | **the one contract for which homes qualify.** Parses the URL, builds the statement, runs the text and area pass, and writes every link back out. The list and the map share it | yes |
 | `search.ts` | free-text matching and the filter presets, accent-insensitive, in JavaScript over the loaded rows | yes |
 | `geo.ts` | point in polygon for the map's area overlays, and `isIn` for one property. Twenty lines, no dependency | yes |
@@ -64,7 +65,7 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 | `/propiedades` | `app/propiedades/page.tsx` | the list. Filters live in the URL, so a link is a saved search. `lib/filters.ts` decides what they mean |
 | `/propiedades/[id]` | `app/propiedades/[id]/page.tsx` | photos, facts, description, ratings, comments, timeline |
 | `/mapa` | `app/mapa/page.tsx` | the shell; the map itself is `components/mapa/Mapa.tsx`. Reads the same filters as the list |
-| `/comparar` | `app/comparar/page.tsx` | 2 to 4 columns, differing rows highlighted |
+| `/comparar` | `app/comparar/page.tsx` | 2 to 4 columns, differing rows highlighted. The `ids` in the URL win; the tray is how they get there |
 | `/actividad` | `app/actividad/page.tsx` | the `events` table, newest first |
 | `/ayuda` | `app/ayuda/page.tsx` | the bookmarklet to drag, and how to use it |
 | `POST /api/capture` | `app/api/capture/route.ts` | the bookmarklet target. `capture_token` is the CSRF guard, because the request arrives with `Origin: null` |

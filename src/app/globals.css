@@ -572,3 +572,136 @@ html[data-wipe]::view-transition-new(root) {
     transform: none !important;
   }
 }
+
+/* --- Comparison selection (PIP-06) ------------------------------------------------------ */
+
+/* The checkbox that adds a home to the comparison. A sibling of the card's link, never inside
+   it, so it can be reached and read on its own. */
+.compare-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: var(--raised);
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--shadow-tier, 0 1px 2px rgb(0 0 0 / 0.08));
+}
+.compare-box:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.compare-box:has(input:checked) {
+  border-color: var(--secondary);
+  background: var(--secondary);
+  color: var(--secondary-ink);
+}
+.compare-box:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.compare-box input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--secondary-ink);
+}
+
+/* The refusal sits beside the control that refused, not in a corner of the screen. */
+.compare-full {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--canvas);
+  font-size: 12px;
+  font-weight: 500;
+}
+.compare-toggle {
+  position: relative;
+  display: inline-block;
+}
+
+/* The tray. Fixed above the bottom navigation on a phone, and above the map pill. */
+.compare-tray {
+  position: fixed;
+  inset-inline: 12px;
+  bottom: calc(var(--nav-bottom-h) + 12px);
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-inline: auto;
+  max-width: 640px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--hairline);
+  background: var(--raised);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.18);
+}
+@media (min-width: 1024px) {
+  .compare-tray {
+    bottom: 20px;
+  }
+}
+.compare-count {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.compare-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.compare-clear,
+.compare-go,
+.compare-blocked {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.compare-clear {
+  border: 1px solid var(--hairline);
+  color: var(--body);
+}
+.compare-clear:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.compare-blocked {
+  color: var(--muted);
+}
+
+/* The count beside `Comparar` in the navigation. */
+.nav-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-inline-start: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--secondary);
+  color: var(--secondary-ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Motion is opt-out everywhere else in this file; nothing here animates position. */

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CompareToggle } from "@/components/comparar/controls";
 import { budgetFit, type Budget } from "@/lib/listing";
 import { Badge, StageBadge } from "./chip";
 import { fmtEur, fmtNum } from "./format";
@@ -37,7 +38,7 @@ export function Cover({ id, className }: { id: string | null; className: string 
 const score = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** Airbnb-style card: the photo is the card; text sits below with no border. */
-export function PropertyCard({ p, budget, href }: { p: Listed; budget: Budget | null; href: string }) {
+export function PropertyCard({ p, budget, href, userId }: { p: Listed; budget: Budget | null; href: string; userId: string }) {
   const meta = [p.neighborhood, p.area_m2 !== null && fmtNum(p.area_m2, "m²"), p.rooms !== null && `${p.rooms} hab.`]
     .filter(Boolean)
     .join(" · ");
@@ -46,35 +47,39 @@ export function PropertyCard({ p, budget, href }: { p: Listed; budget: Budget | 
   return (
     // The id is the anchor a back link returns to, so the card is on screen where it was left.
     <li id={`p-${p.id}`} data-property={p.id} className="group scroll-mt-[calc(var(--header-h)+16px)]">
-      <Link href={href} className="block">
-        <div className="relative aspect-[20/19] overflow-hidden rounded-card bg-surface-soft">
-          <Cover id={p.cover_id} className="card-photo h-full w-full transition duration-300 group-hover:scale-[1.03]" />
-          <div className="absolute left-3 top-3">
-            <StageBadge stage={p.stage} />
+      <div className="relative">
+        {/* Outside the anchor: a control nested in a link cannot be reached without following it. */}
+        <CompareToggle userId={userId} id={p.id} label={p.title} className="absolute right-3 bottom-3 z-10" />
+        <Link href={href} className="block">
+          <div className="relative aspect-[20/19] overflow-hidden rounded-card bg-surface-soft">
+            <Cover id={p.cover_id} className="card-photo h-full w-full transition duration-300 group-hover:scale-[1.03]" />
+            <div className="absolute left-3 top-3">
+              <StageBadge stage={p.stage} />
+            </div>
+            {p.family_avg !== null && (
+              <div className="absolute right-3 top-3">
+                <Badge>★ {score(p.family_avg)}</Badge>
+              </div>
+            )}
+            {fit !== "ok" && (
+              <div className="absolute bottom-3 left-3">
+                {/* Over the maximum is a problem; under the minimum is only worth noticing (F30). */}
+                <Badge className={fit === "over" ? "text-error" : "text-muted"}>
+                  {fit === "over" ? "Fuera de presupuesto" : "Por debajo del mínimo"}
+                </Badge>
+              </div>
+            )}
           </div>
-          {p.family_avg !== null && (
-            <div className="absolute right-3 top-3">
-              <Badge>★ {score(p.family_avg)}</Badge>
-            </div>
-          )}
-          {fit !== "ok" && (
-            <div className="absolute bottom-3 left-3">
-              {/* Over the maximum is a problem; under the minimum is only worth noticing (F30). */}
-              <Badge className={fit === "over" ? "text-error" : "text-muted"}>
-                {fit === "over" ? "Fuera de presupuesto" : "Por debajo del mínimo"}
-              </Badge>
-            </div>
-          )}
-        </div>
-        <div className="mt-3 space-y-0.5">
-          <h2 className="truncate text-[15px] font-medium text-ink">{p.title}</h2>
-          <p className="truncate text-sm text-muted">{meta || "Sin datos"}</p>
-          <p className="text-[15px] text-ink">
-            <span className="font-semibold">{fmtEur(p.price_eur, "Sin precio")}</span>
-            {perM2 && <span className="text-muted"> · {perM2}/m²</span>}
-          </p>
-        </div>
-      </Link>
+          <div className="mt-3 space-y-0.5">
+            <h2 className="truncate text-[15px] font-medium text-ink">{p.title}</h2>
+            <p className="truncate text-sm text-muted">{meta || "Sin datos"}</p>
+            <p className="text-[15px] text-ink">
+              <span className="font-semibold">{fmtEur(p.price_eur, "Sin precio")}</span>
+              {perM2 && <span className="text-muted"> · {perM2}/m²</span>}
+            </p>
+          </div>
+        </Link>
+      </div>
     </li>
   );
 }
