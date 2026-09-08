@@ -22,7 +22,7 @@ export default async function Nav() {
   const items: NavItem[] = [
     { href: "/propiedades", label: "Propiedades", icon: "home" },
     { href: "/mapa", label: "Mapa", icon: "map" },
-    { href: "/comparar", label: "Comparar", icon: "compare" },
+    { href: "/comparar", label: "Comparar", icon: "compare", count: user.id },
     { href: "/actividad", label: "Actividad", icon: "bell", badge: unread },
   ];
 

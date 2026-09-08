@@ -6,6 +6,8 @@ import { ActiveFilters, QuickFilters } from "@/components/propiedades/filters-ro
 import { fmtEur, input } from "@/components/propiedades/format";
 import { RowsTable } from "@/components/propiedades/rows";
 import { SearchBar } from "@/components/propiedades/search-bar";
+import { CompareTray } from "@/components/comparar/controls";
+import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { STAGE_LABELS, STAGES, type Stage } from "@/lib/listing";
 import { findArea } from "@/lib/areas";
@@ -49,7 +51,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
     ],
     "read",
   );
-  const budget = await getBudget();
+  const [budget, user] = await Promise.all([getBudget(), currentUser()]);
 
   const rows = list.rows as unknown as (Listed & { haystack: string })[];
   const items = rows.filter((p) => qualifies(v, area, p));
@@ -171,11 +173,11 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
               </p>
             </div>
           ) : v.vista === "filas" ? (
-            <RowsTable items={items} budget={budget} href={(p) => detailHref(p, v)} />
+            <RowsTable items={items} budget={budget} href={(p) => detailHref(p, v)} userId={user.id} />
           ) : (
             <ul className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 split:grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3">
               {items.map((p) => (
-                <PropertyCard key={p.id} p={p} budget={budget} href={detailHref(p.id, v)} />
+                <PropertyCard key={p.id} p={p} budget={budget} href={detailHref(p.id, v)} userId={user.id} />
               ))}
             </ul>
           )}
@@ -186,6 +188,8 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
           </div>
         </aside>
       </div>
+
+      <CompareTray userId={user.id} visible={items.map((p) => p.id)} />
 
       <Link
         href={mapHref(v)}
