@@ -8,7 +8,7 @@ import {
   isJsonBody,
   MAX_HTML_BYTES,
   PAGE_FETCH_MS,
-  successLocation,
+  successResponse,
 } from "@/lib/intake";
 import { save } from "@/lib/save";
 import { isAllowedHost, normalizeUrl } from "@/lib/url";
@@ -79,5 +79,5 @@ export async function POST(req: Request) {
     { url_original: url, url_normalized: norm.normalized, portal: norm.portal, portal_ref: norm.portalRef },
     { user, via: "paste", presence: r.presence, deadline },
   );
-  return new Response(null, { status: 303, headers: { Location: successLocation(saved) } });
+  return successResponse(req, saved);
 }

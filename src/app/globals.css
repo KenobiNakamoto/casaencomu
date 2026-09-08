@@ -705,3 +705,112 @@ html[data-wipe]::view-transition-new(root) {
 }
 
 /* Motion is opt-out everywhere else in this file; nothing here animates position. */
+
+/* --- Add dialog, route states (PIP-08) --------------------------------------------------- */
+
+/* The native element. It brings the top layer, the backdrop, the focus trap, Escape, and
+   inertness of the page behind; only the return of focus is ours. A dialog on a desktop, a
+   full-height sheet on a phone. */
+.app-dialog {
+  margin: auto;
+  padding: 0;
+  border: 0;
+  max-width: min(560px, calc(100vw - 24px));
+  width: 100%;
+  background: transparent;
+  color: var(--ink);
+}
+.app-dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+.app-dialog-body {
+  border-radius: 18px;
+  border: 1px solid var(--hairline);
+  background: var(--raised);
+  padding: 20px;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.28);
+}
+@media (max-width: 640px) {
+  .app-dialog {
+    margin: 0;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+  .app-dialog-body {
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    overflow-y: auto;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+}
+.app-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.app-dialog-head h2:focus-visible {
+  outline: none;
+}
+.app-dialog-x {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  color: var(--muted);
+}
+.app-dialog-x:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+/* The trigger keeps its own width. It used to take the search field's, and on a phone the search
+   field left the screen while it was open (F17). */
+.add-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .add-trigger {
+    height: 56px;
+    width: 56px;
+    padding: 0;
+    justify-content: center;
+  }
+  .add-trigger-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* The status line holds its height, so an error appearing does not shift the button under a
+   finger already on its way to it. */
+.add-status {
+  min-height: 20px;
+}
+
+/* The loading placeholder. It breathes rather than spins, and reduced motion stops it above. */
+.skeleton {
+  background: var(--surface-strong);
+  animation: skeleton-pulse 1.6s var(--ease-out) infinite;
+}
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}

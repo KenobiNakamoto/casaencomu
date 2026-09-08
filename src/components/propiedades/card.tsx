@@ -47,10 +47,11 @@ export function PropertyCard({ p, budget, href, userId }: { p: Listed; budget: B
   return (
     // The id is the anchor a back link returns to, so the card is on screen where it was left.
     <li id={`p-${p.id}`} data-property={p.id} className="group scroll-mt-[calc(var(--header-h)+16px)]">
+      {/* The photo and the title are separate links to the same home, so the comparison control
+          can sit on the photograph without being inside an anchor. The photo's link is hidden
+          from assistive technology: the title below already names the home. */}
       <div className="relative">
-        {/* Outside the anchor: a control nested in a link cannot be reached without following it. */}
-        <CompareToggle userId={userId} id={p.id} label={p.title} className="absolute right-3 bottom-3 z-10" />
-        <Link href={href} className="block">
+        <Link href={href} tabIndex={-1} aria-hidden className="block">
           <div className="relative aspect-[20/19] overflow-hidden rounded-card bg-surface-soft">
             <Cover id={p.cover_id} className="card-photo h-full w-full transition duration-300 group-hover:scale-[1.03]" />
             <div className="absolute left-3 top-3">
@@ -70,16 +71,21 @@ export function PropertyCard({ p, budget, href, userId }: { p: Listed; budget: B
               </div>
             )}
           </div>
-          <div className="mt-3 space-y-0.5">
-            <h2 className="truncate text-[15px] font-medium text-ink">{p.title}</h2>
-            <p className="truncate text-sm text-muted">{meta || "Sin datos"}</p>
-            <p className="text-[15px] text-ink">
-              <span className="font-semibold">{fmtEur(p.price_eur, "Sin precio")}</span>
-              {perM2 && <span className="text-muted"> · {perM2}/m²</span>}
-            </p>
-          </div>
         </Link>
+        {/* The wrapper does the positioning: `.compare-toggle` sets `position: relative` for its
+            own message, and that rule wins over a Tailwind utility on the same element. */}
+        <div className="absolute bottom-3 right-3 z-10">
+          <CompareToggle userId={userId} id={p.id} label={p.title} />
+        </div>
       </div>
+      <Link href={href} className="mt-3 block space-y-0.5">
+        <h2 className="truncate text-[15px] font-medium text-ink">{p.title}</h2>
+        <p className="truncate text-sm text-muted">{meta || "Sin datos"}</p>
+        <p className="text-[15px] text-ink">
+          <span className="font-semibold">{fmtEur(p.price_eur, "Sin precio")}</span>
+          {perM2 && <span className="text-muted"> · {perM2}/m²</span>}
+        </p>
+      </Link>
     </li>
   );
 }

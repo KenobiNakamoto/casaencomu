@@ -1,6 +1,29 @@
 // Portal hosts and listing refs, copied from spike/RESULTS.md (2026-09-04).
 
 export const ALLOWED_HOSTS = new Set(["idealista.com", "fotocasa.es", "habitaclia.com"]); // after dropping `www.`
+
+/**
+ * What to do with a link before anything is sent. Idealista answers a server fetch with a 403
+ * challenge every time, so posting one only rediscovers the block and costs the person ten
+ * seconds (F16). The browser decides first, and says which path is open.
+ *
+ * `SERVER` is deliberately narrower than `ALLOWED_HOSTS`: the allowlist is what the server may
+ * fetch at all, this is what is worth fetching. Measured in `docs/PORTALS.md`.
+ */
+export type Route = "server" | "capture" | "unsupported";
+const SERVER = new Set(["fotocasa.es", "habitaclia.com"]);
+const CAPTURE = new Set(["idealista.com", "housfy.com", "vivalta.es", "iadespana.es"]);
+
+export function routeFor(url: string): Route {
+  let host: string;
+  try {
+    host = hostOf(url);
+  } catch {
+    return "unsupported";
+  }
+  if (SERVER.has(host)) return "server";
+  return CAPTURE.has(host) ? "capture" : "unsupported";
+}
 /**
  * Hosts `savePhotos` is allowed to download from. A download allowlist, not a display filter:
  * anything else in a page's image list is simply never fetched. That is what keeps a tracking

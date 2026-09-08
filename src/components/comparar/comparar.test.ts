@@ -15,11 +15,17 @@ const page = read("../../app/comparar/page.tsx");
 const css = read("../../app/globals.css");
 
 describe("the control is a sibling of the link, not inside it", () => {
-  it("card: the toggle is outside the anchor", () => {
+  it("card: the toggle is outside every anchor", () => {
+    // Both links close before the control opens, so it can never be inside one.
     const toggle = card.indexOf("<CompareToggle");
-    const link = card.indexOf("<Link href={href}");
     expect(toggle).toBeGreaterThan(-1);
-    expect(toggle).toBeLessThan(link);
+    const before = card.slice(0, toggle);
+    expect(before.match(/<Link /g) ?? []).toHaveLength(before.match(/<\/Link>/g)?.length ?? -1);
+  });
+
+  it("card: a wrapper positions it, because .compare-toggle sets its own position", () => {
+    expect(card).toMatch(/<div className="absolute bottom-3 right-3 z-10">\s*<CompareToggle/);
+    expect(card).not.toMatch(/<CompareToggle[^>]*className="absolute/);
   });
 
   it("rows: the toggle has its own cell", () => {
