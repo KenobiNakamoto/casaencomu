@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Budget } from "@/lib/settings";
+import { budgetFit, type Budget } from "@/lib/listing";
 import { Badge, StageBadge } from "./chip";
 import { fmtEur, fmtNum } from "./format";
 
@@ -19,8 +19,6 @@ export type Listed = {
   precision: "exact" | "approx" | "none";
 };
 
-export const outOfBudget = (price: number | null, budget: Budget | null) =>
-  budget !== null && price !== null && (price < budget.min || price > budget.max);
 
 export function Cover({ id, className }: { id: string | null; className: string }) {
   // ponytail: plain <img>; next/image would refetch the authenticated route without the Access cookie
@@ -39,14 +37,16 @@ export function Cover({ id, className }: { id: string | null; className: string 
 const score = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** Airbnb-style card: the photo is the card; text sits below with no border. */
-export function PropertyCard({ p, budget }: { p: Listed; budget: Budget | null }) {
+export function PropertyCard({ p, budget, href }: { p: Listed; budget: Budget | null; href: string }) {
   const meta = [p.neighborhood, p.area_m2 !== null && fmtNum(p.area_m2, "m²"), p.rooms !== null && `${p.rooms} hab.`]
     .filter(Boolean)
     .join(" · ");
   const perM2 = p.price_eur !== null && p.area_m2 ? fmtEur(Math.round(p.price_eur / p.area_m2)) : null;
+  const fit = budgetFit(p.price_eur, budget);
   return (
-    <li data-property={p.id} className="group">
-      <Link href={`/propiedades/${p.id}`} className="block">
+    // The id is the anchor a back link returns to, so the card is on screen where it was left.
+    <li id={`p-${p.id}`} data-property={p.id} className="group scroll-mt-[calc(var(--header-h)+16px)]">
+      <Link href={href} className="block">
         <div className="relative aspect-[20/19] overflow-hidden rounded-card bg-surface-soft">
           <Cover id={p.cover_id} className="card-photo h-full w-full transition duration-300 group-hover:scale-[1.03]" />
           <div className="absolute left-3 top-3">
@@ -57,9 +57,12 @@ export function PropertyCard({ p, budget }: { p: Listed; budget: Budget | null }
               <Badge>★ {score(p.family_avg)}</Badge>
             </div>
           )}
-          {outOfBudget(p.price_eur, budget) && (
+          {fit !== "ok" && (
             <div className="absolute bottom-3 left-3">
-              <Badge className="text-error">Fuera de presupuesto</Badge>
+              {/* Over the maximum is a problem; under the minimum is only worth noticing (F30). */}
+              <Badge className={fit === "over" ? "text-error" : "text-muted"}>
+                {fit === "over" ? "Fuera de presupuesto" : "Por debajo del mínimo"}
+              </Badge>
             </div>
           )}
         </div>

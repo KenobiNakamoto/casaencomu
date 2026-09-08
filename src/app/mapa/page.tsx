@@ -1,40 +1,56 @@
 import Link from "next/link";
 import Mapa, { type MapMarker } from "@/components/mapa/Mapa";
-import { findArea, isIn } from "@/lib/areas";
-import { NOT_REMOVED_SQL } from "@/lib/availability";
+import { findArea } from "@/lib/areas";
 import { db } from "@/lib/db";
+import { listHref, listSql, parseFilters, qualifies, toQuery, withArea, type SearchParams } from "@/lib/filters";
 
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+// `id`, `created_at` and `price_eur` come from the contract; see ALWAYS in lib/filters.ts.
+const COLUMNS = `p.lat, p.lng, p.address_precision AS precision, p.title,
+  p.rooms, p.area_m2, p.neighborhood, p.stage`;
 
-/** Full-screen map. Markers come straight from the server; `?etapa=` or `?todas=1` filter them. */
-export default async function MapaPage({ searchParams }: { searchParams: SearchParams }) {
+/**
+ * Full-screen map. It reads the same filters as the list, through the same module, so a link from
+ * one to the other shows the same homes. It used to honour only `?etapa=` and `?zona=` (F13).
+ */
+export default async function MapaPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
-  const etapa = typeof sp.etapa === "string" ? sp.etapa : "";
-  let where = "p.lat IS NOT NULL AND p.lng IS NOT NULL";
-  const args: string[] = [];
-  if (etapa) {
-    where += " AND p.stage = ?";
-    args.push(etapa);
-  } else if (sp.todas !== "1") {
-    where += ` AND p.stage != 'descartada' AND ${NOT_REMOVED_SQL}`;
-  }
-  const { rows } = await db.execute({
-    sql: `SELECT p.id, p.lat, p.lng, p.address_precision AS precision, p.price_eur, p.title, p.rooms, p.area_m2,
-            p.neighborhood, p.stage,
-            (SELECT id FROM photos WHERE property_id = p.id ORDER BY position LIMIT 1) AS cover
-          FROM properties p WHERE ${where}`,
-    args,
-  });
-  const area = await findArea(typeof sp.zona === "string" ? sp.zona : "");
-  const all = rows.map((r) => ({ ...r, cover: r.cover ? `/api/photos/${r.cover}` : null })) as unknown as MapMarker[];
-  const markers = area ? all.filter((m) => isIn(area, { ...m, neighborhood: m.neighborhood })) : all;
-  const params = Object.fromEntries(Object.entries({ etapa, zona: area?.properties.id ?? "", todas: sp.todas === "1" ? "1" : "" }).filter(([, v]) => v));
+  const parsed = parseFilters(sp);
+  const area = await findArea(parsed.zona);
+  const v = withArea(parsed, area);
+  const { sql, args } = listSql(v, COLUMNS);
+
+  type Row = Omit<MapMarker, "precision" | "cover" | "lat" | "lng"> & {
+    lat: number | null;
+    lng: number | null;
+    precision: "exact" | "approx" | "none";
+    haystack: string;
+    cover_id: string | null;
+  };
+  const { rows } = await db.execute({ sql, args });
+  const markers: MapMarker[] = (rows as unknown as Row[])
+    .filter((p) => qualifies(v, area, p))
+    .filter((p) => p.lat !== null && p.lng !== null && p.precision !== "none")
+    // Built field by field, not spread: the row also carries the search haystack, which is every
+    // description in the database and has no business crossing to the browser.
+    .map((p) => ({
+      id: p.id,
+      lat: p.lat as number,
+      lng: p.lng as number,
+      precision: p.precision as "exact" | "approx",
+      price_eur: p.price_eur,
+      title: p.title,
+      rooms: p.rooms,
+      area_m2: p.area_m2,
+      neighborhood: p.neighborhood,
+      stage: p.stage,
+      cover: p.cover_id ? `/api/photos/${p.cover_id}` : null,
+    }));
 
   return (
     <div className="-mb-[var(--nav-bottom-h)]">
-      <Mapa markers={markers} zona={area?.properties.id ?? ""} params={params} />
+      <Mapa markers={markers} zona={v.zona} params={Object.fromEntries(new URLSearchParams(toQuery(v)))} />
       <Link
-        href={area ? `/propiedades?zona=${area.properties.id}` : "/propiedades"}
+        href={listHref(v)}
         className="fixed bottom-[calc(var(--nav-bottom-h)+16px)] left-1/2 z-[1001] flex h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-canvas shadow-tier transition hover:opacity-90"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>

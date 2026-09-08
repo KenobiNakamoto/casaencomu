@@ -1,3 +1,5 @@
+import { norm } from "./search";
+
 /**
  * Point in polygon for the map's area overlays. The server uses it to filter by `?zona=`, the map
  * uses it to count properties per area. No dependency: it is twenty lines and never changes.
@@ -45,4 +47,14 @@ export function countByArea(areas: AreaFeature[], points: { lat: number; lng: nu
     counts[area.properties.id] = n;
   }
   return counts;
+}
+
+/**
+ * Geometry decides. A property the portal gave no coordinates for falls back to its neighbourhood
+ * text, which is the only handle it has. It lives here, not in `areas.ts`, because `areas.ts`
+ * reads the file system and the filter contract must stay importable from anywhere.
+ */
+export function isIn(area: AreaFeature, p: { lat: number | null; lng: number | null; neighborhood: string | null }) {
+  if (p.lat != null && p.lng != null) return inArea(p.lng, p.lat, area);
+  return !!p.neighborhood && norm(p.neighborhood) === norm(area.properties.name);
 }

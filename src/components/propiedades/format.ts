@@ -4,6 +4,13 @@ const num = new Intl.NumberFormat("es-ES");
 
 export const SIN_DATOS = "Sin datos";
 
+/**
+ * The shared field style. It lives here, not in `filter-bar.tsx`, because that file is a client
+ * component: a server component importing a plain value across that boundary receives a client
+ * reference, and interpolating it writes the reference's own error text into the attribute.
+ */
+export const input = "h-12 w-full rounded-lg border border-control-border bg-raised px-3 text-ink transition focus:border-ink";
+
 export const fmtEur = (n: number | null | undefined, fallback = SIN_DATOS) => (n == null ? fallback : eur.format(n));
 
 export const fmtNum = (n: number | null | undefined, unit = "") =>

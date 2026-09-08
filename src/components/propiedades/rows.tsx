@@ -1,13 +1,13 @@
 import Link from "next/link";
-import type { Budget } from "@/lib/settings";
-import { outOfBudget, type Listed } from "./card";
+import { budgetFit, type Budget } from "@/lib/listing";
+import { type Listed } from "./card";
 import { BudgetChip, StageChip } from "./chip";
 import { fmtEur, fmtNum } from "./format";
 
 const th = "px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted";
 const td = "px-3 py-3 align-top";
 
-export function RowsTable({ items, budget }: { items: Listed[]; budget: Budget | null }) {
+export function RowsTable({ items, budget, href }: { items: Listed[]; budget: Budget | null; href: (id: string) => string }) {
   return (
     <div className="overflow-x-auto rounded-card border border-hairline">
       <table className="w-full min-w-[640px] text-sm">
@@ -24,15 +24,15 @@ export function RowsTable({ items, budget }: { items: Listed[]; budget: Budget |
         </thead>
         <tbody className="divide-y divide-hairline-soft">
           {items.map((p) => (
-            <tr key={p.id} data-property={p.id} className="hover:bg-surface-soft">
+            <tr key={p.id} id={`p-${p.id}`} data-property={p.id} className="scroll-mt-[calc(var(--header-h)+16px)] hover:bg-surface-soft">
               <td className={td}>
-                <Link href={`/propiedades/${p.id}`} className="font-medium hover:underline">
+                <Link href={href(p.id)} className="font-medium hover:underline">
                   {p.title}
                 </Link>
               </td>
               <td className={`${td} whitespace-nowrap text-right font-semibold`}>
                 {fmtEur(p.price_eur, "—")}
-                {outOfBudget(p.price_eur, budget) && (
+                {budgetFit(p.price_eur, budget) === "over" && (
                   <span className="ml-1">
                     <BudgetChip />
                   </span>

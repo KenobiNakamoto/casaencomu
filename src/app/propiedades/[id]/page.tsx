@@ -2,12 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Cover } from "@/components/propiedades/card";
 import { Chip, StageChip } from "@/components/propiedades/chip";
-import { input } from "@/components/propiedades/filter-bar";
-import { fmtDate, fmtDateTime, fmtEur, fmtNum, SIN_DATOS, siNo } from "@/components/propiedades/format";
+import { fmtDate, fmtDateTime, fmtEur, fmtNum, input, SIN_DATOS, siNo } from "@/components/propiedades/format";
 import { RatingForm } from "@/components/propiedades/rating-form";
 import { availabilityLine, AVAILABILITY_LABEL, isStale, type SourceAvailability } from "@/lib/availability";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { backHref } from "@/lib/filters";
 import { DIMENSION_LABELS, DIMENSIONS, STAGE_LABELS, STAGES, type Stage } from "@/lib/listing";
 import { familyAverage, matrix, memberAverage, type RatingRow } from "@/lib/ratings";
 import { commentAction, setStageAction } from "../actions";
@@ -102,6 +102,9 @@ export default async function PropiedadPage({
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const estado = one(sp.estado);
+  // The list this home was opened from. Rebuilt through the filter contract before it is used,
+  // so a hand-edited value can only ever produce a list URL (F14).
+  const desde = one(sp.desde) ?? "";
   const faltan = Number(one(sp.faltan) ?? 0);
   const user = await currentUser();
 
@@ -160,7 +163,7 @@ export default async function PropiedadPage({
 
   return (
     <div className="mx-auto max-w-[1120px] px-4 py-5 sm:px-6 lg:px-10">
-      <Link href="/propiedades" className="inline-flex h-9 items-center gap-1.5 rounded-full px-2 text-sm font-medium text-ink transition hover:bg-surface-soft">
+      <Link href={backHref(desde, p.id)} className="inline-flex h-9 items-center gap-1.5 rounded-full px-2 text-sm font-medium text-ink transition hover:bg-surface-soft">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M15 5l-7 7 7 7" />
         </svg>

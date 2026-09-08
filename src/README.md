@@ -50,26 +50,26 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 | `availability.ts` | whether the advertisement is still up — the gone streak, the property's status from all its sources, staleness, and the Spanish for each. Deliberately not a stage | yes |
 | `recheck.ts` | the 48-hour loop: refetch, compare, write events, move the source's availability. Never writes a stage | no |
 | `ratings.ts` | averages and the upsert statement. Deliberately has no `db` import, so the test needs no data directory | yes |
+| `filters.ts` | **the one contract for which homes qualify.** Parses the URL, builds the statement, runs the text and area pass, and writes every link back out. The list and the map share it | yes |
 | `search.ts` | free-text matching and the filter presets, accent-insensitive, in JavaScript over the loaded rows | yes |
-| `geo.ts` | point in polygon for the map's area overlays. Twenty lines, no dependency | yes |
+| `geo.ts` | point in polygon for the map's area overlays, and `isIn` for one property. Twenty lines, no dependency | yes |
 | `areas.ts` | loads `public/areas.geojson` once and counts properties per area | no |
-| `settings.ts` | the key/value table; today it holds only the budget, which is empty until a member sets it | no |
+| `settings.ts` | the key/value table; today it holds only the budget. Either bound alone is valid, and both empty clears it | no |
 
 ## `app/` — routes
 
 | Route | File | Note |
 |---|---|---|
 | `/` | `app/page.tsx` | redirects to `/propiedades` |
-| `/propiedades` | `app/propiedades/page.tsx` | the list. Filters live in the URL, so a link is a saved search |
+| `/propiedades` | `app/propiedades/page.tsx` | the list. Filters live in the URL, so a link is a saved search. `lib/filters.ts` decides what they mean |
 | `/propiedades/[id]` | `app/propiedades/[id]/page.tsx` | photos, facts, description, ratings, comments, timeline |
-| `/mapa` | `app/mapa/page.tsx` | the shell; the map itself is `components/mapa/Mapa.tsx` |
+| `/mapa` | `app/mapa/page.tsx` | the shell; the map itself is `components/mapa/Mapa.tsx`. Reads the same filters as the list |
 | `/comparar` | `app/comparar/page.tsx` | 2 to 4 columns, differing rows highlighted |
 | `/actividad` | `app/actividad/page.tsx` | the `events` table, newest first |
 | `/ayuda` | `app/ayuda/page.tsx` | the bookmarklet to drag, and how to use it |
 | `POST /api/capture` | `app/api/capture/route.ts` | the bookmarklet target. `capture_token` is the CSRF guard, because the request arrives with `Origin: null` |
 | `POST /api/import` | `app/api/import/route.ts` | a pasted URL. Refuses any host outside `ALLOWED_HOSTS` |
 | `GET /api/photos/[id]` | `app/api/photos/[id]/route.ts` | streams a stored photo; authenticated like every other route |
-| `GET /api/markers` | `app/api/markers/route.ts` | coordinates for the map, filtered the same way as the list |
 | `GET /api/health` | `app/api/health/route.ts` | the container health check. The only route the proxy lets through unauthenticated |
 
 Mutations are server actions in `app/propiedades/actions.ts`: rate, comment, change stage, set the

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { COVER_SQL } from "@/lib/filters";
 import { STAGE_LABELS, type Stage } from "@/lib/listing";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -83,7 +84,7 @@ export default async function CompararPage({ searchParams }: { searchParams: Sea
 
   const { rows } = await db.execute({
     sql: `SELECT p.*,
-            (SELECT id FROM photos WHERE property_id = p.id AND position = 0) AS cover,
+            ${COVER_SQL} AS cover,
             (SELECT AVG(score) FROM ratings WHERE property_id = p.id) AS rating
           FROM properties p WHERE p.id IN (${wanted.map(() => "?").join(",")})`,
     args: wanted,
