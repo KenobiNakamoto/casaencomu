@@ -12,7 +12,7 @@ no evidence is not a claim, it is a plan, and it belongs in `WORKPLAN.md`.
 ## 1. In one paragraph
 
 **Release A is finished.** All seven of its packages are merged, along with the preview
-authentication and three follow-up fixes: `main` is green at **343 tests, 3 skipped**, with lint,
+authentication and three follow-up fixes: `main` is green at **346 tests, 3 skipped**, with lint,
 types and build clean. **Release B has not been started** — six packages, none of them begun.
 Nothing is deployed to a real domain, because three items only Kenobi can do are still open. To
 let him look at the app anyway, it runs on the Air, reachable over Tailscale, behind a shared
@@ -48,7 +48,7 @@ The address, the password location and the exact commands are in `memory/decisio
 
 ## 3. Done and merged to `main`
 
-`main` is green in the canonical checkout: **343 tests pass, 3 skip**; `eslint`, `tsc --noEmit`
+`main` is green in the canonical checkout: **346 tests pass, 3 skip**; `eslint`, `tsc --noEmit`
 and `next build` are all clean.
 
 ### The base application, before this round
@@ -213,13 +213,35 @@ screen. `/comparar` keeps 1440: four columns do not want more.
 
 **The areas on the map are visible without a cursor on them.** They rested at `fill-opacity: 0`
 behind a solid hairline in `--map-boundary` — the same grey, at the same width, that the basemap
-draws streets in, so a district read as one more road. The outline is now dashed, in `--map-label`,
-over a light neutral wash; hover and selection still take the yellow. A dash cannot be mistaken for
-a street at any zoom, which is what the colour alone could not fix.
+draws streets in, so a district read as one more road. The first fix made the outline dashed; he
+did not want a dash. See § 4b.
 
 **Not checked:** the phone and tablet widths, again. The browser automation cannot change the
 layout viewport. The wide layout was confirmed by driving the page at an effective 2749 px through
 CSS zoom, which exercises `max-width` and the grid but not the `min-width` media queries.
+
+## 4b. The area overlay, the way a portal draws it — issue #90, merged 2026-09-08
+
+The dashed boundary of § 4a lasted one look. What he asked for instead is what Idealista does: a
+continuous, thick line around every zone so its edges are obvious with nothing hovered, and a
+low-opacity wash plus a thick line in the accent colour under the cursor. Near-black by day. On
+the night map "black" is not a line, so the same role is a near-white.
+
+**Every colour is a token, and the tokens are together.** `--map-area-line`, `--map-area-active`
+and `--map-area-fill-active` in `globals.css`, three lines per theme. Changing the overlay to a
+different colour is an edit there and nothing in `components/mapa/Mapa.tsx`; a test fails if a raw
+hex or a non-`--map-area-*` token appears in the paint function. Two limits the tokens carry:
+MapLibre paints on a canvas, so a token must resolve to a plain colour — **a CSS gradient will not
+render** — and the resting colour has to differ per theme.
+
+**One console error fixed on the way.** `startViewTransition` rejects `ready` as well as `finished`
+whenever the browser skips a transition. Only `finished` was caught, so a skipped wipe raised
+"Transition was aborted because of invalid state" in the console and lit Next's dev overlay. It was
+invisible before § 4a, because the wipe was suppressed on exactly the pages that could skip it.
+
+**Open, for his eyes:** on the night map the near-white boundary is the same brightness family as
+the major roads. In daylight the near-black is unambiguous. If it reads as busy at night, the fix
+is one hex in `globals.css`.
 
 ## 5. Not done
 

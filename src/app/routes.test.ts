@@ -50,6 +50,14 @@ describe("reduced motion removes the movement, not only its transition (F18)", (
     const toggle = read("../components/theme-toggle.tsx");
     expect(toggle).not.toContain("maplibregl-map");
   });
+
+  // A skipped transition rejects `ready` as well as `finished`, and an uncaught rejection is an
+  // error in the console for something that is not an error.
+  it("swallows both promises a skipped transition rejects", () => {
+    const toggle = read("../components/theme-toggle.tsx");
+    expect(toggle).toContain("vt.ready.catch(() => {})");
+    expect(toggle).toContain("vt.finished");
+  });
 });
 
 /**

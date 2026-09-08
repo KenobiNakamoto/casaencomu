@@ -60,38 +60,45 @@ const hovered: ExpressionSpecification = ["boolean", ["feature-state", "hover"],
 const selected = (zona: string): ExpressionSpecification => ["==", ["get", "id"], zona];
 
 /**
- * F11: an area outline is a *selection highlight*, not an error, so it rests on the neutral
- * boundary token and only reaches for `--secondary` when you hover or select it. Red stays
- * reserved for the one primary action in the preview.
+ * The area overlay, styled the way a portal map does it: every zone carries a continuous, thick
+ * outline so its edges are obvious with nothing hovered, and pointing at one floods it with a
+ * low-opacity wash and thickens its outline in the same colour (Kenobi, 2026-09-08).
  *
- * The resting state used to be a hairline at 0.35 over no fill at all, so a neighbourhood only
- * existed while the cursor was on it and the map read as having no districts (Kenobi, 2026-09-08).
- * It now rests on a visible line and a neutral wash. Hover and selection keep the yellow, so what
- * you point at still separates itself from what you do not.
+ * Every colour here comes from a token, and the tokens are all together in `globals.css` under
+ * `--map-area-*`. Changing the whole overlay to another colour is those three lines and nothing
+ * in this file. Two constraints they carry: MapLibre paints on a canvas, so a token must resolve
+ * to a plain colour — a CSS gradient does not render — and the resting colour is theme-dependent,
+ * because black on the night basemap is not a line.
+ *
+ * F11 still holds: the selection colour appears only on hover and selection. Red is never here.
  */
 function areaPaint(zona: string, bump: number) {
-  const edge = css("--map-label");
-  const mark = css("--secondary");
-  // Night needs a touch more of everything to read at the same strength (§ 6).
+  const edge = css("--map-area-line");
+  const mark = css("--map-area-active");
+  const wash = css("--map-area-fill-active");
+  const active = ["case", hovered, mark, selected(zona), mark, edge] as ExpressionSpecification;
+  // Night carries a slightly heavier wash to read at the same strength against a dark map (§ 6).
   const night = document.documentElement.dataset.theme === "dark";
-  const rest = night ? 0.06 : 0.045;
-  const hover = night ? 0.18 : 0.14;
-  const pick = night ? 0.24 : 0.2;
   return {
     line: {
-      // Dashed, always. The basemap's own streets are solid lines of about this width in about
-      // this grey, so a solid boundary was read as one more street and the districts disappeared
-      // into the road network. A dash cannot be mistaken for a street at any zoom.
-      "line-dasharray": [3, 2.5],
-      "line-color": ["case", hovered, mark, selected(zona), mark, edge] as ExpressionSpecification,
-      "line-width": ["case", selected(zona), 2.6 + bump, hovered, 2.2 + bump, 1.6 + bump] as ExpressionSpecification,
-      "line-opacity": ["case", selected(zona), 1, hovered, 0.95, 0.75] as ExpressionSpecification,
+      // Continuous, and thick enough to be a boundary rather than a hairline. No dash: a dashed
+      // edge reads as provisional, and the whole point is that a zone's edge is definite.
+      "line-color": active,
+      "line-width": ["case", selected(zona), 4 + bump, hovered, 3.5 + bump, 2.4 + bump] as ExpressionSpecification,
+      "line-opacity": ["case", selected(zona), 1, hovered, 1, 0.85] as ExpressionSpecification,
     },
     fill: {
-      // Neutral at rest so the whole city is not tinted with the selection colour; the wash turns
-      // yellow only for the one area you are pointing at or have chosen.
-      "fill-color": ["case", hovered, mark, selected(zona), mark, edge] as ExpressionSpecification,
-      "fill-opacity": ["case", selected(zona), pick, hovered, hover, rest] as ExpressionSpecification,
+      // Nothing at rest: the outline already says where each zone is, and a wash on every zone at
+      // once is a veil over the city rather than a highlight of one.
+      "fill-color": wash,
+      "fill-opacity": [
+        "case",
+        selected(zona),
+        night ? 0.28 : 0.24,
+        hovered,
+        night ? 0.22 : 0.18,
+        0,
+      ] as ExpressionSpecification,
     },
     label: {
       "text-color": ["case", [">", ["get", "count"], 0], css("--map-label"), css("--map-label-secondary")] as ExpressionSpecification,

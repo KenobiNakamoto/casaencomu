@@ -125,6 +125,18 @@
   --map-path: #ddd8cf;
   --map-rail: #b5b1aa;
   --map-boundary: #8c8982;
+  /*
+   * The area overlay on the map — the one place its colours are decided. Change these four and
+   * every district and barrio outline follows, in both themes, with nothing to edit in
+   * `components/mapa/Mapa.tsx`. `--map-area-line` is the resting outline: near-black on the day
+   * map, near-white on the night one, because "black" on a dark basemap is not a line. The
+   * `-active` pair is hover and selection.
+   * MapLibre draws these on a canvas, so they must be plain colours: a CSS gradient will not
+   * render, and neither will `color-mix()` in a browser MapLibre still supports.
+   */
+  --map-area-line: #14130f;
+  --map-area-active: var(--secondary);
+  --map-area-fill-active: var(--secondary);
   --map-label: #4b4a43;
   --map-label-secondary: #68665f;
   --map-water-label: #385971;
@@ -215,6 +227,9 @@
   --map-path: #353e46;
   --map-rail: #65717e;
   --map-boundary: #65707c;
+  --map-area-line: #eef1f5;
+  --map-area-active: var(--secondary);
+  --map-area-fill-active: var(--secondary);
   --map-label: #d3d8de;
   --map-label-secondary: #aab3bd;
   --map-water-label: #a2c6da;
@@ -278,6 +293,9 @@
     --map-path: #353e46;
     --map-rail: #65717e;
     --map-boundary: #65707c;
+    --map-area-line: #eef1f5;
+    --map-area-active: var(--secondary);
+    --map-area-fill-active: var(--secondary);
     --map-label: #d3d8de;
     --map-label-secondary: #aab3bd;
     --map-water-label: #a2c6da;
