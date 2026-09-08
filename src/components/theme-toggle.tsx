@@ -48,6 +48,11 @@ export default function ThemeToggle() {
     // already applied by then, so swallow it. `finally` always clears the flag: a rejected
     // transition must never leave the button dead.
     const vt = document.startViewTransition(() => setTheme(next));
+    // `ready` rejects on its own whenever the browser skips the transition — "Transition was
+    // aborted because of invalid state". Nothing awaits it, so an uncaught rejection reaches the
+    // console and Next's dev overlay. The theme is already applied by then; a skipped animation
+    // is not an error.
+    vt.ready.catch(() => {});
     vt.finished
       .catch(() => {})
       .finally(() => {

@@ -62,14 +62,14 @@ describe("F11 — one colour, one meaning", () => {
     expect(pin).not.toContain("--on-action");
   });
 
-  it("rests an area outline on a neutral token", () => {
+  it("rests an area outline on a neutral token, and keeps red out of it", () => {
     const at = src.indexOf("function areaPaint");
     const body = src.slice(at, src.indexOf("\n}", at));
-    // The resting colour moved from `--map-boundary` to `--map-label` on 2026-09-08: the
-    // boundary token is the same grey the basemap draws streets in, so the outline was invisible.
-    // What F11 asks is that the resting colour be neutral and that red never appear here.
-    expect(body).toMatch(/const edge = css\("--map-(label|boundary)"\)/);
-    expect(body).toContain('css("--secondary")');
+    // The resting outline is `--map-area-line`, which is near-black by day and near-white by
+    // night; the selection colour reaches the map only through `--map-area-active`. What F11 asks
+    // is that the resting colour be neutral and that the accent never appear here.
+    expect(body).toContain('css("--map-area-line")');
+    expect(body).toContain('css("--map-area-active")');
     expect(body).not.toContain("--accent");
   });
 
@@ -149,28 +149,50 @@ describe("#80 — a popup keeps the list it was opened from", () => {
 });
 
 /**
- * The areas were invisible until the cursor was on them: `fill-opacity` rested at 0, and the
- * outline was a solid hairline in a grey the basemap also uses for streets, so a district read as
- * one more road (Kenobi, 2026-09-08).
+ * The areas were invisible until the cursor was on them: `fill-opacity` rested at 0 behind a
+ * hairline in the grey the basemap draws streets in. A dashed boundary fixed the confusion with
+ * streets but read as provisional, so it is now what a portal map does — a continuous, thick
+ * outline at rest, and a wash in the selection colour under the cursor (Kenobi, 2026-09-08).
  */
-describe("the areas are visible without a cursor on them", () => {
-  const paint = src.slice(src.indexOf("function areaPaint("), src.indexOf("function approxPaint("));
+describe("every zone shows its own edges", () => {
+  // The line and fill only. The `label` block below them paints the area's name, which is text
+  // and takes the text tokens.
+  const whole = src.slice(src.indexOf("function areaPaint("), src.indexOf("function approxPaint("));
+  const paint = whole.slice(0, whole.indexOf("label: {"));
 
-  it("rests on a fill, not on nothing", () => {
-    // The last branch of a `case` is the resting one. Neither theme may rest at zero.
-    const rest = [...paint.matchAll(/const (rest) = night \? ([\d.]+) : ([\d.]+);/g)][0];
-    expect(rest, "the resting fill opacity is no longer declared here").toBeTruthy();
-    expect(Number(rest[2])).toBeGreaterThan(0);
-    expect(Number(rest[3])).toBeGreaterThan(0);
-    expect(paint).toContain("hovered, hover, rest]");
+  it("draws a continuous outline, never a dashed one", () => {
+    expect(paint).not.toContain("line-dasharray");
   });
 
-  it("draws the boundary as a dash, so it cannot be read as a street", () => {
-    expect(paint).toContain('"line-dasharray"');
+  it("rests on an outline thick enough to be a boundary", () => {
+    const rest = paint.match(/"line-width": \["case", selected\(zona\), [\d.]+ \+ bump, hovered, [\d.]+ \+ bump, ([\d.]+) \+ bump\]/);
+    expect(rest, "the resting line width is no longer declared here").toBeTruthy();
+    expect(Number(rest![1])).toBeGreaterThanOrEqual(2);
   });
 
-  it("keeps the selection colour for hover and selection only", () => {
-    // The resting branch is the last: it must be the neutral token, never `--secondary`.
-    expect(paint).toContain('["case", hovered, mark, selected(zona), mark, edge]');
+  it("washes the one zone under the cursor, and no other", () => {
+    const from = paint.indexOf('"fill-opacity"');
+    const fill = paint.slice(from, paint.indexOf("ExpressionSpecification,", from)).replace(/\s+/g, " ");
+    expect(fill).toContain("night ? 0.22 : 0.18");
+    // The last branch of a `case` is the resting one, and it is the only one allowed to be 0.
+    expect(fill).toMatch(/, 0, \] as $/);
+  });
+
+  /**
+   * The point of the tokens: "replace this by whatever colour we like" has to be an edit in
+   * `globals.css` alone. A raw hex or a `--secondary` read in this file would break that.
+   */
+  it("takes every colour from a --map-area-* token", () => {
+    const colours = [...paint.matchAll(/css\("(--[a-z-]+)"\)/g)].map((m) => m[1]);
+    expect(colours.length).toBeGreaterThan(0);
+    for (const c of colours) expect(c).toMatch(/^--map-area-/);
+    expect(paint).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+  });
+
+  it("defines those tokens in both themes", () => {
+    for (const token of ["--map-area-line", "--map-area-active", "--map-area-fill-active"]) {
+      // once for the day palette, once for the night one, once for the system-dark mirror
+      expect(css.match(new RegExp(`${token}:`, "g")) ?? [], token).toHaveLength(3);
+    }
   });
 });
