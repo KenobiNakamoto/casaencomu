@@ -914,6 +914,22 @@ html[data-wipe]::view-transition-new(root) {
   outline: none;
 }
 
+
+/*
+ * No ring on a field you just clicked. A browser matches `:focus-visible` on any text field
+ * however it was reached, so a pointer draws the ring that exists for somebody who did not watch
+ * the caret arrive. `data-pointer` says which it was (set in `layout.tsx`), and one key press
+ * takes it off again — nobody navigating by keyboard ever loses the indicator.
+ *
+ * Outside `@layer base` on purpose: the rules it has to beat are out here too, and an unlayered
+ * rule beats a layered one whatever the specificity says.
+ */
+:root[data-pointer] :is(input, textarea, select):focus-visible,
+:root[data-pointer] .pill:has(input:focus-visible),
+:root[data-pointer] .compare-box:has(input:focus-visible) {
+  outline: none;
+}
+
 /* --- Add a link: the message under the pill (PIP-08 behaviour, in the old control) ------- */
 
 /* The pill has no room for a sentence, and growing it would move the button under a finger
