@@ -80,7 +80,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   const href = (patch: Record<string, string> = {}) => listHref(v, patch);
 
   return (
-    <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10">
+    <div className="mx-auto max-w-[2040px] px-4 sm:px-6 lg:px-10">
       {typeof sp.error === "string" && sp.error && (
         <p className="mt-4 rounded-lg bg-accent-tint px-4 py-3 text-sm text-error">{sp.error}</p>
       )}
@@ -160,7 +160,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
       {/* `data-results` scopes the map's hover and focus sync to the cards, not the whole document. */}
       <div
         data-results
-        className="pb-10 split:grid split:grid-cols-[minmax(0,1fr)_minmax(380px,42%)] split:gap-8"
+        className="pb-10 split:grid split:grid-cols-[minmax(0,1fr)_minmax(420px,46%)] split:gap-8"
       >
         <section>
           {items.length === 0 ? (
@@ -175,7 +175,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
           ) : v.vista === "filas" ? (
             <RowsTable items={items} budget={budget} href={(p) => detailHref(p, v)} userId={user.id} />
           ) : (
-            <ul className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 split:grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 split:grid-cols-1 lg:grid-cols-2">
               {items.map((p) => (
                 <PropertyCard key={p.id} p={p} budget={budget} href={detailHref(p.id, v)} userId={user.id} />
               ))}

@@ -12,7 +12,7 @@ no evidence is not a claim, it is a plan, and it belongs in `WORKPLAN.md`.
 ## 1. In one paragraph
 
 **Release A is finished.** All seven of its packages are merged, along with the preview
-authentication and three follow-up fixes: `main` is green at **336 tests, 3 skipped**, with lint,
+authentication and three follow-up fixes: `main` is green at **343 tests, 3 skipped**, with lint,
 types and build clean. **Release B has not been started** — six packages, none of them begun.
 Nothing is deployed to a real domain, because three items only Kenobi can do are still open. To
 let him look at the app anyway, it runs on the Air, reachable over Tailscale, behind a shared
@@ -48,7 +48,7 @@ The address, the password location and the exact commands are in `memory/decisio
 
 ## 3. Done and merged to `main`
 
-`main` is green in the canonical checkout: **187 tests pass, 3 skip**; `eslint`, `tsc --noEmit`
+`main` is green in the canonical checkout: **343 tests pass, 3 skip**; `eslint`, `tsc --noEmit`
 and `next build` are all clean.
 
 ### The base application, before this round
@@ -158,8 +158,9 @@ a real one. A phone shows two columns at a time without losing the other two.
 ### PIP-08 · Saving, errors, and purposeful motion — issue #84, PR #85
 
 The add form threw the typed URL away on failure and posted Idealista links to a server fetch
-that answers 403 every time. Links are now classified in the browser first, failures stay in a
-native `<dialog>` with the URL still in the field, and there is one honest pending state. A stage
+that answers 403 every time. Links are now classified in the browser first, failures stay
+in place with the URL still in the field, and there is one honest pending state. (The dialog this
+package introduced was replaced on the same day — see § 4a; everything else here survived it.) A stage
 change carries the version it was drawn from, so two people deciding at once no longer means the
 later write wins in silence — **verified: the refused write left the database untouched and wrote
 no event**. A refused comment comes back with its text. `error.tsx`, `not-found.tsx` and
@@ -182,6 +183,43 @@ inside an anchor.
 23 import events in the Actividad feed. `vitest.config.ts` now also collects `scripts/**`.
 
 ---
+
+## 4a. Kenobi's first look at the preview — issue #88, merged 2026-09-08
+
+He opened the 09-08 preview on a 27-inch screen and sent seven items. All seven are done.
+
+**The add control is the old one again.** The `+` stays where it is and grows a link field
+leftwards out of itself; the search field yields the width, and on a phone it steps aside. PIP-08's
+dialog is deleted, and `components/ui/dialog.tsx` with it. What PIP-08 actually fixed is untouched
+and now lives inside that control: the link is still classified before anything is sent, a failure
+still keeps what was typed, and the message sits under the pill where it cannot change the field's
+height. **Verified in a browser:** an Idealista link is refused without a request, a Fotocasa link
+that does not exist comes back with its message and the link still in the field.
+
+**The theme has two states.** `sistema` is gone, and with it the screen glyph and the standing
+subscription to the operating system. A first visit still opens in whatever the system reports;
+after that the switch decides. An older `sistema` value in `localStorage` reads as "no choice yet",
+so nothing needs migrating.
+
+**The circular reveal runs again.** It was skipped whenever a map was on screen — which is both
+pages that have one, so it almost never ran. The reason given was that a map cannot be captured by
+a view transition. **That is not true in Chrome:** the wipe was slowed to six seconds and
+photographed mid-sweep on `/propiedades`, and the map is in both the old and the new snapshot, in
+the right theme on each side of the circle. The guard is deleted.
+
+**The page uses the screen it is given.** The container goes from 1440 px to 2040 px, the map beside
+the list from 42% to 46%, and the gallery never shows a third column — two cards, however wide the
+screen. `/comparar` keeps 1440: four columns do not want more.
+
+**The areas on the map are visible without a cursor on them.** They rested at `fill-opacity: 0`
+behind a solid hairline in `--map-boundary` — the same grey, at the same width, that the basemap
+draws streets in, so a district read as one more road. The outline is now dashed, in `--map-label`,
+over a light neutral wash; hover and selection still take the yellow. A dash cannot be mistaken for
+a street at any zoom, which is what the colour alone could not fix.
+
+**Not checked:** the phone and tablet widths, again. The browser automation cannot change the
+layout viewport. The wide layout was confirmed by driving the page at an effective 2749 px through
+CSS zoom, which exercises `max-width` and the grid but not the `min-width` media queries.
 
 ## 5. Not done
 

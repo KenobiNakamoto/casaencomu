@@ -63,21 +63,35 @@ const selected = (zona: string): ExpressionSpecification => ["==", ["get", "id"]
  * F11: an area outline is a *selection highlight*, not an error, so it rests on the neutral
  * boundary token and only reaches for `--secondary` when you hover or select it. Red stays
  * reserved for the one primary action in the preview.
+ *
+ * The resting state used to be a hairline at 0.35 over no fill at all, so a neighbourhood only
+ * existed while the cursor was on it and the map read as having no districts (Kenobi, 2026-09-08).
+ * It now rests on a visible line and a neutral wash. Hover and selection keep the yellow, so what
+ * you point at still separates itself from what you do not.
  */
 function areaPaint(zona: string, bump: number) {
-  const edge = css("--map-boundary");
+  const edge = css("--map-label");
   const mark = css("--secondary");
-  // Night needs a touch more fill to read at the same strength (§ 6).
-  const fill = document.documentElement.dataset.theme === "dark" ? 0.12 : 0.1;
+  // Night needs a touch more of everything to read at the same strength (§ 6).
+  const night = document.documentElement.dataset.theme === "dark";
+  const rest = night ? 0.06 : 0.045;
+  const hover = night ? 0.18 : 0.14;
+  const pick = night ? 0.24 : 0.2;
   return {
     line: {
+      // Dashed, always. The basemap's own streets are solid lines of about this width in about
+      // this grey, so a solid boundary was read as one more street and the districts disappeared
+      // into the road network. A dash cannot be mistaken for a street at any zoom.
+      "line-dasharray": [3, 2.5],
       "line-color": ["case", hovered, mark, selected(zona), mark, edge] as ExpressionSpecification,
-      "line-width": ["case", selected(zona), 2 + bump, hovered, 1.5 + bump, 1 + bump] as ExpressionSpecification,
-      "line-opacity": ["case", selected(zona), 1, hovered, 0.8, 0.35] as ExpressionSpecification,
+      "line-width": ["case", selected(zona), 2.6 + bump, hovered, 2.2 + bump, 1.6 + bump] as ExpressionSpecification,
+      "line-opacity": ["case", selected(zona), 1, hovered, 0.95, 0.75] as ExpressionSpecification,
     },
     fill: {
-      "fill-color": mark,
-      "fill-opacity": ["case", selected(zona), fill, hovered, 0.06, 0] as ExpressionSpecification,
+      // Neutral at rest so the whole city is not tinted with the selection colour; the wash turns
+      // yellow only for the one area you are pointing at or have chosen.
+      "fill-color": ["case", hovered, mark, selected(zona), mark, edge] as ExpressionSpecification,
+      "fill-opacity": ["case", selected(zona), pick, hovered, hover, rest] as ExpressionSpecification,
     },
     label: {
       "text-color": ["case", [">", ["get", "count"], 0], css("--map-label"), css("--map-label-secondary")] as ExpressionSpecification,
