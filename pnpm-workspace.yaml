@@ -1,4 +1,11 @@
+# Native build scripts, each answered on purpose. `false` means "do not compile this, we do not
+# need it": esbuild, sharp and unrs-resolver ship prebuilt binaries, and better-sqlite3 and
+# msgpackr-extract come in under mapshaper, which only runs in `scripts/build-areas.mts` on a
+# developer's machine and works without them. pnpm 11 fails the install rather than warn, so an
+# unanswered one breaks CI and the Docker build.
 allowBuilds:
   esbuild: false
   sharp: false
   unrs-resolver: false
+  better-sqlite3: false
+  msgpackr-extract: false
