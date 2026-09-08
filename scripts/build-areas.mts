@@ -18,9 +18,10 @@
  *                     geometry: asking it for every municipality of a region at once answers
  *                     504, and the same question asked one comarca at a time answers in
  *                     three seconds.
- *   polygons.osm.fr   the shape of one area, already generalised. Catalonia at full resolution
- *                     is 4 MB and the map draws it 40 px wide, so the tolerance goes in the
- *                     request and the download stays in kilobytes.
+ *   polygons.osm.fr   the shape of one area, one relation per request, at a fine tolerance.
+ *                     Making it small is `align()`'s job, not the request's: a border between
+ *                     two areas has to be generalised once for both of them, or the map draws
+ *                     it twice.
  *
  * Every response is cached under `_local/overpass/`. A second run costs nothing, and a run
  * interrupted halfway resumes. `--fresh` ignores the cache.
@@ -30,10 +31,18 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import mapshaper from "mapshaper";
 import { inArea, type AreaFeature, type AreaProps } from "../src/lib/geo";
 
+/** `tol` is the generalisation, in metres, and `digits` the decimals kept. Both per rank. */
 type Level = { rank: number; level: string; admin: number; tol: number; digits: number; chunk?: number };
-type Config = { code: string; name: string; osm: number; levels: Level[] };
+/**
+ * `scope` is the part of the country this deployment covers — named areas at one rank, kept whole
+ * with everything inside them. It is the product's decision, not the country's shape: delete it
+ * and the same file builds the whole country.
+ */
+type Scope = { rank: number; names: string[] };
+type Config = { code: string; name: string; osm: number; levels: Level[]; scope?: Scope };
 
 const args = process.argv.slice(2);
 const flag = (name: string) => {
@@ -45,6 +54,7 @@ const rootFilter = flag("root")?.toLowerCase();
 const maxRank = Number(flag("max-rank") ?? 99);
 const fresh = args.includes("--fresh");
 const config = JSON.parse(readFileSync(join("scripts/areas", `${code}.json`), "utf8")) as Config;
+const scope = config.scope;
 
 const CACHE = "_local/overpass";
 const UA = "casaencomu-area-builder/1";
@@ -69,10 +79,12 @@ async function slotFreesIn(): Promise<number> {
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const cacheFile = (key: string) => join(CACHE, `${createHash("sha1").update(key).digest("hex").slice(0, 16)}.json`);
+
 /** Any request, answered from disk when it has been answered before. */
 async function cached(key: string, get: () => Promise<Response>, keep: (body: string) => boolean = () => true): Promise<string | null> {
   mkdirSync(CACHE, { recursive: true });
-  const file = join(CACHE, `${createHash("sha1").update(key).digest("hex").slice(0, 16)}.json`);
+  const file = cacheFile(key);
   if (!fresh && existsSync(file)) return readFileSync(file, "utf8") || null;
   // Two different failures, two different answers. A server that says 429 or 504 is busy and
   // wants a minute. A connection that never opens is one of the several addresses the name
@@ -161,65 +173,73 @@ if (args.includes("--probe")) {
 type Geometry = AreaFeature["geometry"];
 
 /**
- * The shape of one relation, generalised by the service to about `tol` metres. The three numbers
- * are its own tolerances; the first dominates and a quarter of it for the other two matches the
- * ratio its own interface uses.
+ * The shape of one relation, at one fine tolerance for every rank. The three numbers are the
+ * service's own generalisation; the first dominates and a quarter of it for the other two
+ * matches the ratio its own interface uses.
+ *
+ * A metre is far finer than the map needs — Catalonia alone is 2 MB at this setting — but the
+ * generalisation cannot happen here. Two neighbours share a border in OpenStreetMap, and asking
+ * for each of them separately at the rank's own tolerance returns two different copies of that
+ * one border. `align()` is where the shapes are made small, together.
  */
-async function shapeOf(osm: number, tol: number): Promise<Geometry | null> {
-  const t = tol / METRES_PER_DEG;
+const SOURCE_TOL = 1; // metres
+async function shapeOf(osm: number): Promise<Geometry | null> {
+  const t = SOURCE_TOL / METRES_PER_DEG;
   const params = `${t.toFixed(6)}-${(t / 4).toFixed(6)}-${(t / 4).toFixed(6)}`;
   const url = `https://polygons.openstreetmap.fr/get_geojson.py?id=${osm}&params=${params}`;
   const body = await cached(url, () => fetch(url, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(240_000) }));
-  if (!body) return null;
+  if (!body) {
+    // Remember the ones that never arrive. Three shapes in Catalonia hang on every attempt, and
+    // without this each of them costs eight four-minute timeouts on every rebuild — half an hour
+    // apiece, to be told again what the last run already found out. `--fresh` asks them again.
+    // Only shapes are remembered this way: a missing shape is one area the map cannot draw, while
+    // a missing Overpass answer is a whole rank silently emptied.
+    writeFileSync(cacheFile(url), "");
+    return null;
+  }
   const g = JSON.parse(body) as Geometry;
   return g?.type === "Polygon" || g?.type === "MultiPolygon" ? g : null;
 }
 
 /**
- * Douglas-Peucker. Keeps the first and last point, drops anything within `tol` of the chord.
- * The service already generalises, but by its own measure and not ours: 43 comarques came back
- * at 677 KB. This is the step that makes the size of the file a number we choose.
+ * Generalises one whole rank in a single pass, so that the border between two areas is one line
+ * and not two.
+ *
+ * Simplifying each shape on its own cannot do this, whatever the algorithm: Douglas-Peucker keeps
+ * a different set of points depending on where the ring starts and which way round it runs, so the
+ * two copies of a shared border drift apart. On the six barris of l'Eixample the drift reached
+ * 19 m, which at z17 is a black line and a gold line running side by side down the same street.
+ *
+ * mapshaper does it the way it has to be done: `snap` collapses the near-identical vertices of the
+ * two copies into one, which turns the border into a single arc that both areas point at, and the
+ * arc is then simplified once. Everything the map draws twice is drawn from the same numbers.
+ *
+ * Five metres of snapping, measured rather than guessed. OpenStreetMap's own two copies of a
+ * border are one to two metres apart — the relations follow different ways down the same street —
+ * and at two metres seven in ten border vertices were still the area's own alone. At five, four in
+ * five are the neighbour's as well and the middle one is exact. Twenty would close the rest and
+ * start flattening a barrio's corners, which are a fifth of a block apart.
+ *
+ * Mutates, because the feature is the same feature — only its shape is smaller.
  */
-function simplify(points: number[][], tol: number): number[][] {
-  if (points.length < 3) return points;
-  const [ax, ay] = points[0];
-  const [bx, by] = points.at(-1)!;
-  let far = 0;
-  let max = -1;
-  for (let i = 1; i < points.length - 1; i++) {
-    const [px, py] = points[i];
-    const dx = bx - ax;
-    const dy = by - ay;
-    const len = dx * dx + dy * dy;
-    const t = len ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len)) : 0;
-    const d = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
-    if (d > max) {
-      max = d;
-      far = i;
-    }
+async function align(features: AreaFeature[], level: Level): Promise<void> {
+  if (!features.length) return;
+  const command = [
+    `-i in.json snap snap-interval=${(5 / METRES_PER_DEG).toFixed(6)}`,
+    `-simplify interval=${level.tol} keep-shapes`,
+    `-o out.json format=geojson precision=${10 ** -level.digits}`,
+  ].join(" ");
+  const out = await mapshaper.applyCommands(command, {
+    "in.json": JSON.stringify({ type: "FeatureCollection", features }),
+  });
+  const shaped = new Map<string, Geometry>(
+    (JSON.parse(out["out.json"]) as { features: AreaFeature[] }).features.map((f) => [f.properties.id, f.geometry]),
+  );
+  for (let i = features.length - 1; i >= 0; i--) {
+    const g = shaped.get(features[i].properties.id);
+    if (g) features[i].geometry = g;
+    else features.splice(i, 1); // simplified away to nothing: an area the map could not draw anyway
   }
-  if (max <= tol) return [points[0], points.at(-1)!];
-  return [...simplify(points.slice(0, far + 1), tol).slice(0, -1), ...simplify(points.slice(far), tol)];
-}
-
-/** Simplify to `tol` metres, trim the decimals nobody can see, and drop what is no longer a ring. */
-function shrink(g: Geometry, tol: number, digits: number): Geometry | null {
-  const ring = (r: number[][]) => {
-    const out = simplify(r, tol / METRES_PER_DEG)
-      .map((p) => [Number(p[0].toFixed(digits)), Number(p[1].toFixed(digits))])
-      .filter((p, i, a) => i === 0 || p[0] !== a[i - 1][0] || p[1] !== a[i - 1][1]);
-    if (out.length < 4) return null;
-    const [first, last] = [out[0], out.at(-1)!];
-    if (first[0] !== last[0] || first[1] !== last[1]) out.push(first);
-    return out;
-  };
-  const poly = (p: number[][][]) => p.map(ring).filter((r): r is number[][] => !!r);
-  if (g.type === "Polygon") {
-    const rings = poly(g.coordinates);
-    return rings.length ? { type: "Polygon", coordinates: rings } : null;
-  }
-  const polys = g.coordinates.map(poly).filter((p) => p.length);
-  return polys.length ? { type: "MultiPolygon", coordinates: polys } : null;
 }
 
 /** Up to 21 points spread over a feature, for deciding which bigger area contains it. */
@@ -287,13 +307,20 @@ for (const level of config.levels) {
     if (!kept.length) throw new Error(`--root ${rootFilter} matched none of: ${rels.map((r) => r.tags.name).join(", ")}`);
     rels = kept;
   }
+  if (level.rank === scope?.rank) {
+    // Before any shape is asked for, as above. This is also what keeps the ranks below small:
+    // a level with `chunk` set to this rank asks only inside what is left here.
+    const want = scope.names.map(slug);
+    const kept = rels.filter((r) => want.includes(slug(r.tags.name)));
+    if (kept.length !== want.length) {
+      throw new Error(`scope matched ${kept.length} of ${want.length} names among: ${rels.map((r) => r.tags.name).join(", ")}`);
+    }
+    rels = kept;
+  }
   let done = 0;
   const shapes = await pooled(
     rels,
-    async (rel) => {
-      const g = await shapeOf(rel.id, level.tol);
-      return g && shrink(g, level.tol, level.digits);
-    },
+    (rel) => shapeOf(rel.id),
     () => line(`  ${level.level.padEnd(10)} drawing ${++done}/${rels.length}`),
   );
 
@@ -312,6 +339,9 @@ for (const level of config.levels) {
     osmOf.set(properties.id, rel.id);
     features.push({ type: "Feature", properties, geometry });
   }
+
+  // One pass over the whole rank, so that two areas that share a border share its geometry.
+  await align(features, level);
 
   // The parent is the smallest area above this one that holds the feature. Not always one rank
   // up: a barrio in a town with no districts hangs off the municipality instead.
@@ -335,6 +365,20 @@ for (const level of config.levels) {
       `${lost ? `, ${lost} with no shape` : ""}${orphans ? `, ${orphans} with no parent` : ""}\n`,
   );
 
+}
+
+// Everything below the scope rank that is not inside one of the named areas goes. The ranks
+// above it stay whole: the map needs a zone to draw in every zoom band, and there are five of them.
+if (scope) {
+  const inScope = new Set((byRank.get(scope.rank) ?? []).map((f) => f.properties.id));
+  const parentOf = new Map(config.levels.flatMap((l) => byRank.get(l.rank) ?? []).map((f) => [f.properties.id, f.properties.parent]));
+  const held = (f: AreaFeature) => {
+    for (let id = f.properties.parent; id; id = parentOf.get(id) ?? null) if (inScope.has(id)) return true;
+    return false;
+  };
+  for (const l of config.levels) {
+    if (l.rank > scope.rank) byRank.set(l.rank, (byRank.get(l.rank) ?? []).filter(held));
+  }
 }
 
 const all = config.levels.flatMap((l) => byRank.get(l.rank) ?? []);

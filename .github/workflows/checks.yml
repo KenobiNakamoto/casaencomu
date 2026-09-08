@@ -1,0 +1,24 @@
+# The checks that were only ever run by hand. A map whose borders were drawn twice reached `main`
+# once already (#94); `src/lib/areas.test.ts` catches that, but only if something runs it.
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
