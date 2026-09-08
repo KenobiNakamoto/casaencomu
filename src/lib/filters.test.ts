@@ -24,7 +24,7 @@ const cols = "p.id";
 /** A one-degree square with its corner on the origin, plus the name the fallback matches on. */
 const area: AreaFeature = {
   type: "Feature",
-  properties: { id: "gotic", name: "Gòtic", level: "barrio", district: "Ciutat Vella" },
+  properties: { id: "gotic", name: "Gòtic", level: "barrio", rank: 6, parent: null },
   geometry: { type: "Polygon", coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
 };
 

@@ -4,7 +4,7 @@ import { countByArea, inArea, type AreaFeature, type Areas } from "./geo";
 
 const square = (rings: number[][][]): AreaFeature => ({
   type: "Feature",
-  properties: { id: "t", name: "Test", level: "barrio", district: "01" },
+  properties: { id: "t", name: "Test", level: "barrio", rank: 6, parent: null },
   geometry: { type: "Polygon", coordinates: rings },
 });
 const OUTER = [[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]];
@@ -32,25 +32,29 @@ describe("inArea", () => {
   });
 });
 
-describe("the shipped Barcelona boundaries", () => {
+describe("the shipped boundaries", () => {
   const areas = JSON.parse(readFileSync("public/areas.geojson", "utf8")) as Areas;
+  // By name and rank: "Barcelona" is both a province and the city inside it.
+  const named = (name: string, rank: number) => areas.features.find((f) => f.properties.name === name && f.properties.rank === rank)!;
 
-  it("carries both levels with unique ids", () => {
-    const ids = new Set(areas.features.map((f) => f.properties.id));
-    expect(ids.size).toBe(areas.features.length);
-    expect(areas.features.filter((f) => f.properties.level === "distrito")).toHaveLength(10);
-    expect(areas.features.filter((f) => f.properties.level === "barrio")).toHaveLength(73);
+  it("carries Barcelona's ten districts under the city itself", () => {
+    const city = named("Barcelona", 4);
+    const districts = areas.features.filter((f) => f.properties.parent === city.properties.id);
+    expect(districts).toHaveLength(10);
   });
 
-  it("puts the Sagrada Família in its own barri and in Eixample", () => {
+  it("puts the Sagrada Família in its own barri, its district, its city and its region", () => {
     const [lng, lat] = [2.1744, 41.4036];
     const hits = areas.features.filter((f) => inArea(lng, lat, f)).map((f) => f.properties.name);
     expect(hits).toContain("la Sagrada Família");
-    expect(hits).toContain("Eixample");
+    expect(hits).toContain("l'Eixample");
+    expect(hits).toContain("Barcelona");
+    expect(hits).toContain("Catalunya");
   });
 
-  it("counts a point once per level", () => {
+  it("counts a point once at each level that contains it", () => {
     const counts = countByArea(areas.features, [{ lat: 41.4036, lng: 2.1744 }]);
-    expect(Object.values(counts).filter((n) => n > 0)).toHaveLength(2);
+    const hit = areas.features.filter((f) => counts[f.properties.id] > 0);
+    expect(new Set(hit.map((f) => f.properties.rank)).size).toBe(hit.length);
   });
 });

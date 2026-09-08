@@ -13,7 +13,7 @@ import type {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { detailHrefFrom } from "@/lib/filters";
-import { areaCoords, countByArea, type AreaLevel, type Areas } from "@/lib/geo";
+import { areaCoords, countByArea, type Areas } from "@/lib/geo";
 import { STAGE_LABELS, type Stage } from "@/lib/listing";
 import { groupByCoord, groupLabel, pinLabel, pinText, price, type PinGroup } from "@/lib/map-pins";
 import { buildStyle, MAP_TOKENS, repaint, type MapTokens } from "@/lib/map-style";
@@ -43,21 +43,49 @@ const css = (name: string) => getComputedStyle(document.documentElement).getProp
 const readTokens = (): MapTokens =>
   Object.fromEntries(MAP_TOKENS.map((t) => [t, css(t)])) as MapTokens;
 
-/** Districts while the whole city is in view, barris once you are looking at streets. */
-const ZOOM_SPLIT = 13.5;
-const LEVELS: { level: AreaLevel; minzoom: number; maxzoom: number; size: number; bump: number }[] = [
-  // § 6: widths go up half a pixel at district zoom, where the outlines are further apart.
-  { level: "distrito", minzoom: 0, maxzoom: ZOOM_SPLIT, size: 13, bump: 0.5 },
-  { level: "barrio", minzoom: ZOOM_SPLIT, maxzoom: 24, size: 12, bump: 0 },
+/**
+ * One zoom band per administrative rank, widest first: a region while the country is in view,
+ * districts while the whole city is, barris once you are looking at streets.
+ *
+ * The bands are the same in every country, because `rank` means the same thing in every country
+ * (`lib/geo.ts`). Spain's comarca and Germany's Amt are both rank 3, and both appear here.
+ * A country with fewer divisions simply has no features at some ranks, and those bands are empty.
+ */
+const ZOOM_SPLIT = 13.5; // districts below, barris above — the split the family actually uses
+const LEVELS: { rank: number; minzoom: number; maxzoom: number; size: number; bump: number; label?: boolean }[] = [
+  // § 6: widths go up half a pixel at the wider levels, where the outlines are further apart.
+  // A region and a province carry no label of ours. A GeoJSON source is tiled, and a shape that
+  // spans many tiles is labelled in each of them: "Catalunya" appeared four times on one screen.
+  // The basemap already names anything that big, and the filter chip names what is selected.
+  { rank: 1, minzoom: 0, maxzoom: 6.5, size: 14, bump: 1, label: false },
+  { rank: 2, minzoom: 6.5, maxzoom: 8.5, size: 14, bump: 1, label: false },
+  { rank: 3, minzoom: 8.5, maxzoom: 10, size: 13, bump: 0.5 },
+  { rank: 4, minzoom: 10, maxzoom: 11.5, size: 13, bump: 0.5 },
+  { rank: 5, minzoom: 11.5, maxzoom: ZOOM_SPLIT, size: 13, bump: 0.5 },
+  { rank: 6, minzoom: ZOOM_SPLIT, maxzoom: 24, size: 12, bump: 0 },
 ];
 
-// The boundaries are 129 KB and never change within a session, so fetch them once per page load.
+/**
+ * The zone you chose, drawn at every zoom. Fitting the map to a comarca lands at about z10.7,
+ * which is inside the municipality band, not the comarca one — so without this the outline you
+ * just clicked disappears. It is the same paint, with no zoom limits, and the banded layers give
+ * the selected feature up to it so it is never stroked twice.
+ */
+const SELECTED = { rank: 0, minzoom: 0, maxzoom: 24, size: 13, bump: 0.5, label: false };
+const DRAWN = [...LEVELS, SELECTED];
+
+// The zones are about a megabyte for one region and never change within a session, so fetch them
+// once per page load. ponytail: one file for the whole world will not do — the next step is one
+// file per rank, fetched when its zoom band opens (`scripts/areas/README.md`).
 let areasOnce: Promise<Areas> | undefined;
 const getAreas = () => (areasOnce ??= fetch("/areas.geojson").then((r) => r.json() as Promise<Areas>));
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const hovered: ExpressionSpecification = ["boolean", ["feature-state", "hover"], false];
 const selected = (zona: string): ExpressionSpecification => ["==", ["get", "id"], zona];
+/** Rank 0 is the selected zone alone; every other rank is its band, minus that zone. */
+const filterFor = (rank: number, zona: string): ExpressionSpecification =>
+  rank === 0 ? selected(zona) : ["all", ["==", ["get", "rank"], rank], ["!", selected(zona)]];
 
 /**
  * The area overlay, styled the way a portal map does it: every zone carries a continuous, thick
@@ -236,11 +264,11 @@ export default function Mapa({
     m.addSource("approx", { type: "geojson", data: circleFor(undefined) });
 
     // Areas first, so the halos and the basemap's own labels stay above them.
-    for (const { level, minzoom, maxzoom, bump } of LEVELS) {
-      const filter = ["==", ["get", "level"], level] as ExpressionSpecification;
+    for (const { rank, minzoom, maxzoom, bump } of DRAWN) {
+      const filter = filterFor(rank, now.current.zona);
       const p = areaPaint(now.current.zona, bump);
-      m.addLayer({ id: `areas-fill-${level}`, type: "fill", source: "areas", filter, minzoom, maxzoom, paint: p.fill }, before);
-      m.addLayer({ id: `areas-line-${level}`, type: "line", source: "areas", filter, minzoom, maxzoom, paint: p.line }, before);
+      m.addLayer({ id: `areas-fill-${rank}`, type: "fill", source: "areas", filter, minzoom, maxzoom, paint: p.fill }, before);
+      m.addLayer({ id: `areas-line-${rank}`, type: "line", source: "areas", filter, minzoom, maxzoom, paint: p.line }, before);
     }
 
     const a = approxPaint();
@@ -252,12 +280,13 @@ export default function Mapa({
       (l): l is SymbolLayerSpecification => l.type === "symbol" && Array.isArray(l.layout?.["text-font"]),
     )?.layout?.["text-font"];
     if (font) {
-      for (const { level, minzoom, maxzoom, size, bump } of LEVELS) {
+      for (const { rank, minzoom, maxzoom, size, bump, label } of DRAWN) {
+        if (label === false) continue;
         m.addLayer({
-          id: `areas-label-${level}`,
+          id: `areas-label-${rank}`,
           type: "symbol",
           source: "areas",
-          filter: ["==", ["get", "level"], level] as ExpressionSpecification,
+          filter: filterFor(rank, now.current.zona),
           minzoom,
           maxzoom,
           layout: {
@@ -289,8 +318,8 @@ export default function Mapa({
       if (hover) m.setFeatureState({ source: "areas", id: hover }, { hover: false });
       hover = undefined;
     };
-    for (const { level } of LEVELS) {
-      const layer = `areas-fill-${level}`;
+    for (const { rank } of DRAWN) {
+      const layer = `areas-fill-${rank}`;
       m.on("mousemove", layer, (e) => {
         const f = e.features?.[0];
         if (!f || String(f.id) === hover) return;
@@ -539,11 +568,11 @@ export default function Mapa({
     const m = map.current;
     if (!m || !ready.current) return;
     repaint(m, readTokens());
-    for (const { level, bump } of LEVELS) {
+    for (const { rank, bump } of DRAWN) {
       const p = areaPaint(now.current.zona, bump);
-      set(m, `areas-line-${level}`, p.line);
-      set(m, `areas-fill-${level}`, p.fill);
-      set(m, `areas-label-${level}`, p.label);
+      set(m, `areas-line-${rank}`, p.line);
+      set(m, `areas-fill-${rank}`, p.fill);
+      set(m, `areas-label-${rank}`, p.label);
     }
     const a = approxPaint();
     set(m, "approx-line", a.line);
@@ -572,10 +601,13 @@ export default function Mapa({
   useEffect(() => {
     const m = map.current;
     if (!m || !ready.current) return;
-    for (const { level, bump } of LEVELS) {
+    for (const { rank, bump } of DRAWN) {
       const p = areaPaint(zona, bump);
-      set(m, `areas-line-${level}`, p.line);
-      set(m, `areas-fill-${level}`, p.fill);
+      set(m, `areas-line-${rank}`, p.line);
+      set(m, `areas-fill-${rank}`, p.fill);
+      // The label layer only exists when the basemap gave us a font, hence the guard.
+      for (const kind of ["fill", "line", "label"])
+        if (m.getLayer(`areas-${kind}-${rank}`)) m.setFilter(`areas-${kind}-${rank}`, filterFor(rank, zona));
     }
     void (async () => {
       const [ml, areas] = await Promise.all([import("maplibre-gl"), getAreas()]);

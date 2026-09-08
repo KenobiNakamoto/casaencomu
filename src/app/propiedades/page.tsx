@@ -10,7 +10,7 @@ import { CompareTray } from "@/components/comparar/controls";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { STAGE_LABELS, STAGES, type Stage } from "@/lib/listing";
-import { findArea } from "@/lib/areas";
+import { areaChain, findArea } from "@/lib/areas";
 import {
   ARCHIVED_COUNT_SQL,
   CLEARABLE,
@@ -39,6 +39,9 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   // they mean, so this page and /mapa cannot drift apart again.
   const parsed = parseFilters(sp);
   const area = await findArea(parsed.zona);
+  // The last three, the way a portal writes it: `Barcelona › l'Eixample › la Sagrada Família`.
+  // The full chain from the autonomous community down is six names and does not fit a chip.
+  const zonaLabel = (await areaChain(parsed.zona)).slice(-3).map((a) => a.properties.name).join(" › ") || undefined;
   const v = withArea(parsed, area);
   const { sql, args } = listSql(v, COLUMNS);
 
@@ -129,7 +132,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
       </div>
 
       <QuickFilters v={v} href={href} />
-      <ActiveFilters v={v} href={href} zonaLabel={area?.properties.name} clearAllHref={href(CLEARABLE)} />
+      <ActiveFilters v={v} href={href} zonaLabel={zonaLabel} clearAllHref={href(CLEARABLE)} />
 
       {/* Result line + view toggle */}
       <div className="flex flex-wrap items-center justify-between gap-3 py-4">

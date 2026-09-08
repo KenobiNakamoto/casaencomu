@@ -196,3 +196,30 @@ describe("every zone shows its own edges", () => {
     }
   });
 });
+
+/**
+ * The overlay used to be two hardcoded levels, `distrito` and `barrio`, which is Barcelona and
+ * nowhere else. It now draws by `rank`, which means the same thing in every country (#92).
+ */
+describe("one zoom band per rank", () => {
+  const split = src.match(/const ZOOM_SPLIT = ([\d.]+)/)![1];
+  const levels = src
+    .slice(src.indexOf("const LEVELS"), src.indexOf("];", src.indexOf("const LEVELS")))
+    .replaceAll("ZOOM_SPLIT", split);
+  const bands = [...levels.matchAll(/rank: (\d+), minzoom: ([\d.]+), maxzoom: ([\d.]+)/g)].map((m) => m.slice(1).map(Number));
+
+  it("covers every rank the builder can produce", () => {
+    expect(bands.map((b) => b[0])).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it("leaves no zoom without a level and no zoom with two", () => {
+    expect(bands[0][1]).toBe(0);
+    expect(bands.at(-1)![2]).toBe(24);
+    for (let i = 1; i < bands.length; i++) expect(bands[i][1]).toBe(bands[i - 1][2]);
+  });
+
+  it("selects features by rank, never by the local word for the level", () => {
+    expect(src).toContain('["==", ["get", "rank"], rank]');
+    expect(src).not.toContain('["get", "level"]');
+  });
+});
