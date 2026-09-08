@@ -181,9 +181,11 @@ export const listHref = (f: Filters, patch: Record<string, string> = {}) => at("
 export const mapHref = (f: Filters, patch: Record<string, string> = {}) => at("/mapa", toQuery(f, patch));
 
 /** One home, carrying the list it was opened from so the way back is the way in (F14). */
-export function detailHref(id: string, f: Filters): string {
-  const from = toQuery(f);
-  return at(`/propiedades/${id}`, from ? `desde=${encodeURIComponent(from)}` : "");
+export const detailHref = (id: string, f: Filters) => detailHrefFrom(id, toQuery(f));
+
+/** The same link from an already-serialised query, for the map, which holds `params` not filters. */
+export function detailHrefFrom(id: string, query: string): string {
+  return at(`/propiedades/${encodeURIComponent(id)}`, query ? `desde=${encodeURIComponent(query)}` : "");
 }
 
 /**
