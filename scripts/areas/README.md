@@ -51,6 +51,18 @@ description of practice, not a rule. Measure before you trust: that is what `--p
    | `digits` | Decimal places kept. 3 is ~110 m, 4 is ~11 m, 5 is ~1 m. |
    | `chunk` | Which rank to ask inside, when the parent rank is too small a net. Default: one rank up. |
 
+   One key sits beside `levels`, not inside it. `scope` is the part of the country this deployment
+   covers — named areas at one rank, kept whole with everything inside them. Ranks above it are
+   kept whole too, because the map needs a zone to draw in every zoom band.
+
+   ```json
+   "scope": { "rank": 3, "names": ["Barcelonès", "Baix Llobregat", "Vallès Occidental"] }
+   ```
+
+   It is the product's decision, not the country's shape: delete the key and the same file builds
+   the whole country. Every name has to match, or the build stops and lists what it did find — a
+   silent typo would quietly drop a region.
+
 4. **Build one branch first**, so a mistake is cheap:
 
    ```sh
@@ -83,8 +95,9 @@ districts hangs off the municipality.
 
 ## Ceilings
 
-- **One file for the whole world will not work.** Catalonia's six ranks are 2.7 MB, 644 KB over the
-  wire, and every visitor downloads all of it. The next step, when it hurts, is one file per rank, and the
+- **One file for the whole world will not work.** Three comarques around Barcelona, at six ranks,
+  are 715 KB, 160 KB over the wire, and every visitor downloads all of it. Catalonia entire was
+  2.7 MB — which is what `scope` exists to avoid. The next step, when it hurts, is one file per rank, and the
   map fetching a rank when its zoom band opens. Nothing else in the app has to change.
 - **`tol` is set by eye.** There is no check that a rank's outlines stay separate at the widest
   zoom of its band. What *is* checked is that they stay together where they touch: the whole rank

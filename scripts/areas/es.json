@@ -9,5 +9,6 @@
     { "rank": 4, "level": "municipio", "admin": 8,  "tol": 60,   "digits": 4, "chunk": 3 },
     { "rank": 5, "level": "distrito",  "admin": 9,  "tol": 8,    "digits": 5 },
     { "rank": 6, "level": "barrio",    "admin": 10, "tol": 3,    "digits": 5 }
-  ]
+  ],
+  "scope": { "rank": 3, "names": ["Barcelonès", "Baix Llobregat", "Vallès Occidental"] }
 }

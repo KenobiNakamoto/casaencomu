@@ -265,14 +265,14 @@ of a country actually holds, which is the one thing a new country has to be told
 
 **Measured, on Catalonia, at all six levels.** One comunidad, 4 provincias, 43 comarcas, 737
 municipios, 124 distritos and 404 barrios — 1,313 zones, 1.4 MB on disk and 386 KB over the wire.
-(§ 4d fills the missing municipalities and rebuilds the file; the counts there are the current ones.)
+(§ 4d cuts this to the three comarques around Barcelona and rebuilds the file; the counts there are the current ones.)
 Barcelona is complete and correct: a point on the Sagrada Família falls inside `Catalunya ›
 Barcelona › Barcelonès › Barcelona › l'Eixample › la Sagrada Família`, and a test asserts exactly
-that. **About 200 rural municipalities are still missing**, in eleven inland comarcas — first
+that. About 200 rural municipalities were missing at this point, in eleven inland comarcas — first
 because the endpoint rate-limited us, then because the connection to it from this machine started
 refusing outright (`ECONNREFUSED` in a fifth of a second, with `curl` to the same host working).
-The run names the eleven; `pnpm tsx scripts/build-areas.mts es --root Catalunya` on a better
-connection asks only for those and fills them in. Nothing the family searches is affected.
+None of them is inside the scope § 4d settled on, so the gap no longer matters; it would return if
+that scope ever widened, and the cure is the same run on a better connection.
 
 **What the two upstream services are for.** Overpass answers which zones exist — names and ids
 only, one query per parent area. Asking it for every municipality of a region at once answers
@@ -314,7 +314,7 @@ in `lib/url.ts` per portal — whether a server fetch works, the SSRF allowlist,
 host — plus a reference pattern and one fixture. `docs/PORTALS.md` § 3 is that procedure. Six
 portals do not earn a plugin system.
 
-## 4d. One border, one line — issue #94
+## 4d. One border, one line, and only around Barcelona — issue #94
 
 From about z14 up, every border between two zones of the same rank was drawn **twice**, a few
 metres apart. With one of the two selected, a gold line and a black line ran side by side down the
@@ -344,19 +344,30 @@ The shapes are fetched at one metre for every rank, because the snap needs real 
 `simplify()` and `shrink()` are gone. mapshaper is a devDependency — it runs in the build script
 and no part of it reaches the browser.
 
-**The missing municipalities are in.** `overpass-api.de` is unreachable from this machine (TCP to
-both of its addresses times out; § 4c had already recorded the same connection going bad). The
-zone list is not geometry and does not change between mirrors, so it was taken from a mirror that
-answered and written into the script's own cache, which the build then read without calling
-Overpass at all. All 43 comarques answered, including the eleven that never had:
-**1,523 zones — 1 comunidad, 4 provincias, 43 comarcas, 947 municipios, 124 distritos, 404
-barrios.**
+**The map now covers the area the family is actually looking in, and nothing else.** Building the
+whole of Catalonia was never asked for. `scripts/areas/es.json` gained a `scope` key — named areas
+at one rank, kept whole with everything inside them:
 
-**The file is 2.7 MB, 644 KB over the wire** — up from 1.4 MB and 386 KB. Two thirds of the growth
-is the 210 municipalities that were missing; the rest is that a rank's tolerance now means what it
-says. The old file was generalised twice, so its shapes were far coarser than the number in the
-config claimed. The ceiling has not moved: when this hurts, it is one file per rank fetched when
-its zoom band opens, and nothing else in the app changes.
+```json
+"scope": { "rank": 3, "names": ["Barcelonès", "Baix Llobregat", "Vallès Occidental"] }
+```
+
+Three comarques, which is Barcelona plus l'Hospitalet, Badalona, Santa Coloma, Sant Adrià,
+Cornellà, Esplugues, Sant Cugat and fifty more. The build applies it twice: the unwanted comarques
+are dropped before a single shape is asked for, and anything below that is not inside one of them
+is pruned at the end. The ranks above it are kept whole, because the map needs a zone to draw in
+every zoom band. Delete the key and the same file builds the whole country.
+
+**398 zones — 1 comunidad, 4 provincias, 3 comarcas, 58 municipios, 67 distritos, 265 barrios.**
+The file is **715 KB, 160 KB over the wire**, down from 1.4 MB and 386 KB, and that is with each
+rank's tolerance now meaning what it says. The old file was generalised twice over, so its shapes
+were far coarser than the number in the config claimed.
+
+A shape that never arrives is now remembered. Three areas in Catalonia hang on every attempt, and
+each of them cost eight four-minute timeouts on every rebuild — half an hour apiece, to be told
+again what the last run already found out. Only shapes are remembered this way: a missing shape is
+one area the map cannot draw, while a missing Overpass answer is a whole rank silently emptied.
+`--fresh` asks them all again.
 
 **Two zones of different ranks still do not share their border.** A barrio's outer edge and its
 district's edge are one line on the ground, and each rank is simplified on its own, so they sit a

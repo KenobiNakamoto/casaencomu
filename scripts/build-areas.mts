@@ -36,7 +36,13 @@ import { inArea, type AreaFeature, type AreaProps } from "../src/lib/geo";
 
 /** `tol` is the generalisation, in metres, and `digits` the decimals kept. Both per rank. */
 type Level = { rank: number; level: string; admin: number; tol: number; digits: number; chunk?: number };
-type Config = { code: string; name: string; osm: number; levels: Level[] };
+/**
+ * `scope` is the part of the country this deployment covers — named areas at one rank, kept whole
+ * with everything inside them. It is the product's decision, not the country's shape: delete it
+ * and the same file builds the whole country.
+ */
+type Scope = { rank: number; names: string[] };
+type Config = { code: string; name: string; osm: number; levels: Level[]; scope?: Scope };
 
 const args = process.argv.slice(2);
 const flag = (name: string) => {
@@ -48,6 +54,7 @@ const rootFilter = flag("root")?.toLowerCase();
 const maxRank = Number(flag("max-rank") ?? 99);
 const fresh = args.includes("--fresh");
 const config = JSON.parse(readFileSync(join("scripts/areas", `${code}.json`), "utf8")) as Config;
+const scope = config.scope;
 
 const CACHE = "_local/overpass";
 const UA = "casaencomu-area-builder/1";
@@ -72,10 +79,12 @@ async function slotFreesIn(): Promise<number> {
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const cacheFile = (key: string) => join(CACHE, `${createHash("sha1").update(key).digest("hex").slice(0, 16)}.json`);
+
 /** Any request, answered from disk when it has been answered before. */
 async function cached(key: string, get: () => Promise<Response>, keep: (body: string) => boolean = () => true): Promise<string | null> {
   mkdirSync(CACHE, { recursive: true });
-  const file = join(CACHE, `${createHash("sha1").update(key).digest("hex").slice(0, 16)}.json`);
+  const file = cacheFile(key);
   if (!fresh && existsSync(file)) return readFileSync(file, "utf8") || null;
   // Two different failures, two different answers. A server that says 429 or 504 is busy and
   // wants a minute. A connection that never opens is one of the several addresses the name
@@ -179,7 +188,15 @@ async function shapeOf(osm: number): Promise<Geometry | null> {
   const params = `${t.toFixed(6)}-${(t / 4).toFixed(6)}-${(t / 4).toFixed(6)}`;
   const url = `https://polygons.openstreetmap.fr/get_geojson.py?id=${osm}&params=${params}`;
   const body = await cached(url, () => fetch(url, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(240_000) }));
-  if (!body) return null;
+  if (!body) {
+    // Remember the ones that never arrive. Three shapes in Catalonia hang on every attempt, and
+    // without this each of them costs eight four-minute timeouts on every rebuild — half an hour
+    // apiece, to be told again what the last run already found out. `--fresh` asks them again.
+    // Only shapes are remembered this way: a missing shape is one area the map cannot draw, while
+    // a missing Overpass answer is a whole rank silently emptied.
+    writeFileSync(cacheFile(url), "");
+    return null;
+  }
   const g = JSON.parse(body) as Geometry;
   return g?.type === "Polygon" || g?.type === "MultiPolygon" ? g : null;
 }
@@ -290,6 +307,16 @@ for (const level of config.levels) {
     if (!kept.length) throw new Error(`--root ${rootFilter} matched none of: ${rels.map((r) => r.tags.name).join(", ")}`);
     rels = kept;
   }
+  if (level.rank === scope?.rank) {
+    // Before any shape is asked for, as above. This is also what keeps the ranks below small:
+    // a level with `chunk` set to this rank asks only inside what is left here.
+    const want = scope.names.map(slug);
+    const kept = rels.filter((r) => want.includes(slug(r.tags.name)));
+    if (kept.length !== want.length) {
+      throw new Error(`scope matched ${kept.length} of ${want.length} names among: ${rels.map((r) => r.tags.name).join(", ")}`);
+    }
+    rels = kept;
+  }
   let done = 0;
   const shapes = await pooled(
     rels,
@@ -338,6 +365,20 @@ for (const level of config.levels) {
       `${lost ? `, ${lost} with no shape` : ""}${orphans ? `, ${orphans} with no parent` : ""}\n`,
   );
 
+}
+
+// Everything below the scope rank that is not inside one of the named areas goes. The ranks
+// above it stay whole: the map needs a zone to draw in every zoom band, and there are five of them.
+if (scope) {
+  const inScope = new Set((byRank.get(scope.rank) ?? []).map((f) => f.properties.id));
+  const parentOf = new Map(config.levels.flatMap((l) => byRank.get(l.rank) ?? []).map((f) => [f.properties.id, f.properties.parent]));
+  const held = (f: AreaFeature) => {
+    for (let id = f.properties.parent; id; id = parentOf.get(id) ?? null) if (inScope.has(id)) return true;
+    return false;
+  };
+  for (const l of config.levels) {
+    if (l.rank > scope.rank) byRank.set(l.rank, (byRank.get(l.rank) ?? []).filter(held));
+  }
 }
 
 const all = config.levels.flatMap((l) => byRank.get(l.rank) ?? []);
