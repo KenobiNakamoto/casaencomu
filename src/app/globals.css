@@ -745,7 +745,9 @@ html[data-wipe]::view-transition-new(root) {
 .add-status {
   position: absolute;
   inset: calc(100% + 8px) 0 auto 0;
-  z-index: 20;
+  /* Above the filters panel (z-20), which is itself above the cards (z-10). All three hang off
+     the same toolbar, so the order has to be written down or the last one in the markup wins. */
+  z-index: 30;
   pointer-events: none;
 }
 .add-status-box {

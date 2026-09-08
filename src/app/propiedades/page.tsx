@@ -108,7 +108,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
               <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1.5 text-xs font-semibold text-canvas">{activeFilters}</span>
             )}
           </summary>
-          <div className="mt-3 w-full space-y-6 rounded-card border border-hairline bg-raised p-5 shadow-tier md:absolute md:left-4 md:right-4 md:z-10 md:mt-2 md:w-auto lg:left-10 lg:right-10">
+          <div className="mt-3 w-full space-y-6 rounded-card border border-hairline bg-raised p-5 shadow-tier md:absolute md:left-4 md:right-4 md:z-20 md:mt-2 md:w-auto lg:left-10 lg:right-10">
             <FilterBar values={v} neighborhoods={neighborhoods} stages={STAGES.map((s) => [s, STAGE_LABELS[s]])} />
             <form action={setBudgetAction} className="border-t border-hairline-soft pt-5">
               <p className="text-sm font-semibold text-ink">Presupuesto familiar</p>
