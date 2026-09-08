@@ -129,6 +129,17 @@ const sources = () =>
     .filter((f) => !f.endsWith(".test.ts"))
     .map((f) => [f.slice(SRC.length), readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "")] as const);
 
+/** The block starting at `from`, up to its own closing brace — not to the end of the file. */
+function balanced(text: string, from: number): string {
+  expect(from, "no such block").toBeGreaterThan(-1);
+  let depth = 0;
+  for (let i = text.indexOf("{", from); i < text.length; i++) {
+    if (text[i] === "{") depth++;
+    else if (text[i] === "}" && --depth === 0) return text.slice(from, i + 1);
+  }
+  throw new Error("unbalanced braces");
+}
+
 const offenders = (re: RegExp) =>
   sources().flatMap(([name, code]) => {
     const hits = code.match(re);
@@ -183,6 +194,27 @@ describe("what components are not allowed to write", () => {
     // `cqw` is the map column's own width, so this is a 3:2 upright cap, not a guess in pixels.
     expect(frame).toContain("max-height: 150cqw");
     expect(css).toContain("container-type: inline-size");
+  });
+
+  /*
+   * The compare pill shrinks to a plus and gives the word back on hover. Two ways that quietly
+   * strands someone: doing it where there is no pointer to hover with, and opening on hover
+   * without also opening on keyboard focus. Both are cheap to check and invisible to review.
+   */
+  it("only shrinks the compare pill where there is a pointer, and opens it for the keyboard too", () => {
+    const at = css.indexOf("@media (hover: hover)");
+    const query = balanced(css, at);
+    const rules = [...css.matchAll(/\.compare-compact[^{]*\{/g)];
+    expect(rules.length).toBeGreaterThan(3);
+    for (const rule of rules) {
+      // by position, not by text: a second copy of the same selector outside the query is
+      // exactly the mistake this is looking for.
+      const inside = rule.index >= at && rule.index < at + query.length;
+      expect(inside, `outside the hover query: ${rule[0]}`).toBe(true);
+      if (rule[0].includes(":hover")) {
+        expect(rule[0], `hover with no keyboard equivalent: ${rule[0]}`).toContain("focus-visible");
+      }
+    }
   });
 
   // F33: the full desktop navigation starts at 1024px, not at 768px.

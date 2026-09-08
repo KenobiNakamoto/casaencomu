@@ -175,6 +175,11 @@
 
   /* The map beside the results. `--map-gap` is the breathing room above and below it, so there
      is always ground under the map rather than a frame flush with the bottom of the screen. */
+  /* The one movement the interface uses when something opens or closes. `search-bar.tsx`
+     declares the same pair in Tailwind's spelling; these are for the stylesheet. */
+  --ease-motion: cubic-bezier(0.65, 0, 0.35, 1);
+  --motion: 400ms var(--ease-motion);
+
   --map-gap: 24px;
   /* How far the toolbar above the results scrolls away before the map is stuck to the header.
      The map grows by exactly this much over exactly that scroll, so it fills the screen the
@@ -608,9 +613,14 @@ html[data-wipe]::view-transition-new(root) {
 
 /* --- Comparison selection (PIP-06) ------------------------------------------------------ */
 
-/* The checkbox that adds a home to the comparison. A sibling of the card's link, never inside
-   it, so it can be reached and read on its own. */
+/*
+ * The checkbox that adds a home to the comparison. A sibling of the card's link, never inside
+ * it: a control nested in an anchor cannot be reached by keyboard without also following the
+ * link. The real `<input>` covers the whole pill and is invisible; `.compare-mark` is what you
+ * see. That split is what lets the square shrink away while the tick stays.
+ */
 .compare-box {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -624,6 +634,9 @@ html[data-wipe]::view-transition-new(root) {
   font-weight: 500;
   cursor: pointer;
   box-shadow: var(--shadow-tier, 0 1px 2px rgb(0 0 0 / 0.08));
+  /* the pill's own motion: the same curve and duration as the add control */
+  transition: min-height var(--motion), padding var(--motion), gap var(--motion),
+    border-color var(--motion), background-color var(--motion), color var(--motion);
 }
 .compare-box:hover {
   border-color: var(--ink);
@@ -638,10 +651,116 @@ html[data-wipe]::view-transition-new(root) {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
+/* Invisible, not absent: it is still the thing that is focused, clicked and read out. */
 .compare-box input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--secondary-ink);
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  appearance: none;
+  border-radius: inherit;
+  cursor: inherit;
+}
+
+/*
+ * The mark. `::before` is the plus, which becomes the square; `::after` is the tick. Two layers
+ * rather than one glyph swapped, because the two have to move independently at the end.
+ */
+.compare-mark {
+  position: relative;
+  width: 17px;
+  height: 17px;
+  flex: none;
+  transition: transform var(--motion);
+}
+.compare-mark::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  border: 1.5px solid currentColor;
+  /* two bars crossing: the plus. They shrink to nothing when the square takes over. */
+  background-image: linear-gradient(currentColor, currentColor), linear-gradient(currentColor, currentColor);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 0 1.5px, 1.5px 0;
+  transition: transform var(--motion), opacity var(--motion), border-color var(--motion),
+    background-size var(--motion);
+}
+.compare-mark::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: currentColor;
+  /* Every space percent-encoded and every number comma-separated: an unencoded space inside a
+     data URI is where an SVG path quietly loses a segment. */
+  mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23000'%20stroke-width='3.2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M5,12.8L9.4,17.2L19,7'/%3E%3C/svg%3E")
+    center / 118% no-repeat;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: transform var(--motion), opacity var(--motion);
+}
+.compare-box:has(input:checked) .compare-mark::after {
+  opacity: 1;
+  transform: none;
+}
+
+/*
+ * Compact: on a card, where the pill sits on the photograph and the photograph is the point.
+ * Only where there is a pointer to hover with — on a touch screen there is no hover to reveal
+ * the word, and the collapsed pill would be a 34px target with a plus on it and nothing else.
+ */
+@media (hover: hover) {
+  .compare-compact .compare-text {
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: max-width var(--motion), opacity var(--motion);
+  }
+  .compare-compact .compare-box {
+    min-height: 34px;
+    padding: 0 8px;
+    /* the gap belongs to the word; shut, it would sit as dead space on one side of the circle */
+    gap: 0;
+  }
+  /* Open: the word arrives, and the plus turns half a revolution into the square you tick. */
+  .compare-compact .compare-box:hover,
+  .compare-compact .compare-box:has(input:focus-visible) {
+    min-height: 40px;
+    padding: 0 12px 0 10px;
+    gap: 6px;
+  }
+  .compare-compact .compare-box:hover .compare-text,
+  .compare-compact .compare-box:has(input:focus-visible) .compare-text {
+    max-width: 9ch;
+    opacity: 1;
+  }
+  .compare-compact .compare-box:hover .compare-mark,
+  .compare-compact .compare-box:has(input:focus-visible) .compare-mark {
+    transform: rotate(180deg);
+  }
+  /* Shut, and not yet chosen: no square, just the plus. */
+  .compare-compact .compare-box:not(:hover):not(:has(input:focus-visible)) .compare-mark::before {
+    border-color: transparent;
+    background-size: 11px 1.5px, 1.5px 11px;
+  }
+  /*
+   * Shut, and chosen: the square shrinks to a point under the tick and only then fades, so it
+   * reads as going behind it rather than as two things disappearing together. The tick does not
+   * move — the pill closing around it is what carries it to the right.
+   */
+  .compare-compact .compare-box:not(:hover):not(:has(input:focus-visible)):has(input:checked) .compare-mark::before {
+    transform: scale(0.3);
+    opacity: 0;
+    background-size: 0 1.5px, 1.5px 0;
+    transition: transform 260ms var(--ease-motion), background-size var(--motion),
+      opacity 120ms linear 220ms;
+  }
+  /* …and the tick takes the room the square gave up, rather than sitting in a space that is
+     suddenly too big for it. */
+  .compare-compact .compare-box:not(:hover):not(:has(input:focus-visible)):has(input:checked) .compare-mark::after {
+    transform: scale(1.25);
+  }
 }
 
 /* The refusal sits beside the control that refused, not in a corner of the screen. */
