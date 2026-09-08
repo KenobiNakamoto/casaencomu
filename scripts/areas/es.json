@@ -4,10 +4,10 @@
   "osm": 1311341,
   "levels": [
     { "rank": 1, "level": "comunidad", "admin": 4,  "tol": 1500, "digits": 3 },
-    { "rank": 2, "level": "provincia", "admin": 6,  "tol": 800,  "digits": 3 },
-    { "rank": 3, "level": "comarca",   "admin": 7,  "tol": 200,  "digits": 4 },
+    { "rank": 2, "level": "provincia", "admin": 6,  "tol": 400,  "digits": 3 },
+    { "rank": 3, "level": "comarca",   "admin": 7,  "tol": 120,  "digits": 4 },
     { "rank": 4, "level": "municipio", "admin": 8,  "tol": 60,   "digits": 4, "chunk": 3 },
-    { "rank": 5, "level": "distrito",  "admin": 9,  "tol": 15,   "digits": 5 },
-    { "rank": 6, "level": "barrio",    "admin": 10, "tol": 8,    "digits": 5 }
+    { "rank": 5, "level": "distrito",  "admin": 9,  "tol": 8,    "digits": 5 },
+    { "rank": 6, "level": "barrio",    "admin": 10, "tol": 3,    "digits": 5 }
   ]
 }

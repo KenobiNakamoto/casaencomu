@@ -47,7 +47,7 @@ description of practice, not a rule. Measure before you trust: that is what `--p
    | `rank` | 1 to 6. Decides the zoom band the map draws it in. |
    | `level` | The local word. For people reading the file; no code branches on it. |
    | `admin` | The OSM `admin_level` this rank comes from, from step 2. |
-   | `tol` | Simplification, in metres. About 2 px at the tightest zoom of the band. |
+   | `tol` | Simplification, in metres. About 1 px at the tightest zoom of the band. |
    | `digits` | Decimal places kept. 3 is ~110 m, 4 is ~11 m, 5 is ~1 m. |
    | `chunk` | Which rank to ask inside, when the parent rank is too small a net. Default: one rank up. |
 
@@ -83,11 +83,16 @@ districts hangs off the municipality.
 
 ## Ceilings
 
-- **One file for the whole world will not work.** Catalonia's six ranks are about a megabyte, and
-  every visitor downloads all of it. The next step, when it hurts, is one file per rank, and the
+- **One file for the whole world will not work.** Catalonia's six ranks are 2.7 MB, 644 KB over the
+  wire, and every visitor downloads all of it. The next step, when it hurts, is one file per rank, and the
   map fetching a rank when its zoom band opens. Nothing else in the app has to change.
 - **`tol` is set by eye.** There is no check that a rank's outlines stay separate at the widest
-  zoom of its band.
+  zoom of its band. What *is* checked is that they stay together where they touch: the whole rank
+  is simplified in one pass (`align()`), so a border between two areas is one line rather than two
+  a few metres apart, and `src/lib/areas.test.ts` fails if that ever stops being true.
+- **Ranks are simplified one at a time, so a border shared by two ranks is not shared geometry.**
+  A barrio's outer edge and its district's edge are the same line on the ground, and the map draws
+  them a few metres apart when it shows both — which it only does for the zone you selected.
 - **Names come out of OSM in the local language** — Catalan in Catalonia. That matches the portals
   and the family. A country where that is wrong needs `name:xx`, which the script does not read.
 

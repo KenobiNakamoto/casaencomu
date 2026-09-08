@@ -265,6 +265,7 @@ of a country actually holds, which is the one thing a new country has to be told
 
 **Measured, on Catalonia, at all six levels.** One comunidad, 4 provincias, 43 comarcas, 737
 municipios, 124 distritos and 404 barrios — 1,313 zones, 1.4 MB on disk and 386 KB over the wire.
+(§ 4d fills the missing municipalities and rebuilds the file; the counts there are the current ones.)
 Barcelona is complete and correct: a point on the Sagrada Família falls inside `Catalunya ›
 Barcelona › Barcelonès › Barcelona › l'Eixample › la Sagrada Família`, and a test asserts exactly
 that. **About 200 rural municipalities are still missing**, in eleven inland comarcas — first
@@ -276,9 +277,9 @@ connection asks only for those and fills them in. Nothing the family searches is
 **What the two upstream services are for.** Overpass answers which zones exist — names and ids
 only, one query per parent area. Asking it for every municipality of a region at once answers
 504; asked comarca by comarca it answers in seconds. `polygons.openstreetmap.fr` answers the
-shape of one zone, already generalised: Catalonia at full resolution is 4 MB and the map draws it
-40 px wide. Every response is cached under `_local/overpass/`, so a second run costs nothing and
-an interrupted run resumes.
+shape of one zone. Every response is cached under `_local/overpass/`, so a second run costs
+nothing and an interrupted run resumes. (§ 4d changed what tolerance the shape is asked for, and
+where it is made small.)
 
 **Three things went wrong and are now written into the script.**
 
@@ -312,6 +313,54 @@ JSON-LD, then OpenGraph, then the text around the price. What is country-specifi
 in `lib/url.ts` per portal — whether a server fetch works, the SSRF allowlist, and the photo
 host — plus a reference pattern and one fixture. `docs/PORTALS.md` § 3 is that procedure. Six
 portals do not earn a plugin system.
+
+## 4d. One border, one line — issue #94
+
+From about z14 up, every border between two zones of the same rank was drawn **twice**, a few
+metres apart. With one of the two selected, a gold line and a black line ran side by side down the
+same street and crossed each other, and neither followed the street.
+
+**The cause was in the build, not in the map.** `build-areas.mts` generalised every zone on its
+own, twice over: once in the request to `polygons.openstreetmap.fr`, and once locally with
+Douglas-Peucker. Two neighbours share one border in OpenStreetMap — the same ways, the same nodes —
+but each copy of it was simplified without knowing about the other, so each kept different points.
+On the six barris of l'Eixample as shipped: **the middle border vertex was 6.9 m from the
+neighbour's outline, the ninth in ten was 15.9 m, and not one of them landed on it.** At z17 that
+is twenty pixels.
+
+No per-shape algorithm can fix this. Douglas-Peucker's answer depends on where the ring starts and
+which way round it runs, so two copies of one line drift apart by construction.
+
+**The whole rank is now generalised in one pass** (`align()`, on mapshaper). `snap` collapses the
+near-identical vertices of the two copies into one, which makes the border a single arc that both
+zones point at; the arc is simplified once. Five metres of snapping, measured: OSM's own two copies
+sit one to two metres apart, and at two metres seven in ten border vertices were still the zone's
+own alone. Now **the middle border vertex is exact and four in five are shared outright**, and what is
+left is OSM's own disagreement, under two metres. `src/lib/areas.test.ts` asserts both numbers and
+fails on the old file.
+
+The shapes are fetched at one metre for every rank, because the snap needs real vertices to match;
+`tol` in `scripts/areas/<code>.json` is now the mapshaper interval and nothing else generalises.
+`simplify()` and `shrink()` are gone. mapshaper is a devDependency — it runs in the build script
+and no part of it reaches the browser.
+
+**The missing municipalities are in.** `overpass-api.de` is unreachable from this machine (TCP to
+both of its addresses times out; § 4c had already recorded the same connection going bad). The
+zone list is not geometry and does not change between mirrors, so it was taken from a mirror that
+answered and written into the script's own cache, which the build then read without calling
+Overpass at all. All 43 comarques answered, including the eleven that never had:
+**1,523 zones — 1 comunidad, 4 provincias, 43 comarcas, 947 municipios, 124 distritos, 404
+barrios.**
+
+**The file is 2.7 MB, 644 KB over the wire** — up from 1.4 MB and 386 KB. Two thirds of the growth
+is the 210 municipalities that were missing; the rest is that a rank's tolerance now means what it
+says. The old file was generalised twice, so its shapes were far coarser than the number in the
+config claimed. The ceiling has not moved: when this hurts, it is one file per rank fetched when
+its zoom band opens, and nothing else in the app changes.
+
+**Two zones of different ranks still do not share their border.** A barrio's outer edge and its
+district's edge are one line on the ground, and each rank is simplified on its own, so they sit a
+few metres apart. The map only ever draws both at once for the zone you selected.
 
 ## 5. Not done
 
