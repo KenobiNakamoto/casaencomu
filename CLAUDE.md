@@ -17,7 +17,7 @@ the app keeps facts and photos, deduplicates, maps, compares, lets each member r
 and rechecks price and availability every 48 h. It runs on the MacBook Air inside the Colima VM
 that already hosts umbrelOS, and is reached through Cloudflare Tunnel + Access.
 
-**State (2026-09-08): `main` is green — 187 tests (3 skipped), lint, types and build clean. Three of the seven Release A product packages are merged (PIP-01, PIP-02, PIP-03); PIP-04 is in review as PR #76. The dev database holds 23 real listings, ingested from the ads themselves with `scripts/ingest.mts`; nothing is hand-written. Nothing is deployed to a domain — M1 waits on Kenobi's #1, #2 and #5, then #18 → #19 → #21 → #20 — but a password-protected preview runs on the Air over Tailscale. Full state, with what is not done: `docs/STATUS.md`.**
+**State (2026-09-08): Release A is complete.** `main` is green — 336 tests (3 skipped), lint, types and build clean. All seven Release A packages are merged (PIP-01 to PIP-06 and PIP-08), plus the preview authentication and four follow-up fixes. Release B — six packages — has not been started; the largest gap it closes is the family score, which today averages rating rows rather than people (F21). The dev database holds 23 real listings, ingested from the ads themselves with `scripts/ingest.mts`; nothing is hand-written. Nothing is deployed to a domain — M1 waits on Kenobi's #1, #2 and #5, then #18 → #19 → #21 → #20 — and the Tailscale preview on the Air still runs the 09-07 build. Full state, with what is not done: `docs/STATUS.md`.
 
 ## Read in this order
 

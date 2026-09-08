@@ -1,8 +1,8 @@
 # CasaEnComú — what is done, and what is not
 
-_2026-09-08, covering work through the night of 09-07. This file answers one question: **what
-is the real state right now?** `WORKPLAN.md` holds the plan and the order. This holds the
-state. When they disagree, this one is newer — check the dates._
+_2026-09-08. This file answers one question: **what is the real state right now?**
+`WORKPLAN.md` holds the plan and the order. This holds the state. When they disagree, this one
+is newer — check the dates._
 
 Every claim below names the pull request, the issue, or the command that proves it. A line with
 no evidence is not a claim, it is a plan, and it belongs in `WORKPLAN.md`.
@@ -11,10 +11,12 @@ no evidence is not a claim, it is a plan, and it belongs in `WORKPLAN.md`.
 
 ## 1. In one paragraph
 
-The application is **code complete and green** for everything built so far. **Three of the seven
-Release A packages are merged**, a fourth is in review, and three are not started. Nothing is deployed to a real domain, because three
-items only Kenobi can do are still open. To let him look at the app anyway, it now runs on the
-Air, reachable over Tailscale, behind a shared password. That preview is not the deployment.
+**Release A is finished.** All seven of its packages are merged, along with the preview
+authentication and three follow-up fixes: `main` is green at **336 tests, 3 skipped**, with lint,
+types and build clean. **Release B has not been started** — six packages, none of them begun.
+Nothing is deployed to a real domain, because three items only Kenobi can do are still open. To
+let him look at the app anyway, it runs on the Air, reachable over Tailscale, behind a shared
+password. That preview is not the deployment.
 
 ---
 
@@ -117,42 +119,76 @@ people actually use.** Run the checks in the canonical checkout before calling a
 
 ---
 
-## 4. In review, not merged
+## 4. The rest of Release A — merged 2026-09-08
 
 ### PIP-04 · Stable, fully themed map — issue #75, PR #76
 
-**233 tests pass, 3 skip** on the branch; lint, types and build clean.
+A vendored 55-layer style snapshot with a role manifest that **throws** on an unmapped layer, so
+a light default can never ship silently again. The map is built once and repainted on a theme
+change rather than rebuilt. Pins are buttons, so the keyboard reaches them.
 
-- The basemap has 55 layers; the code themed 7. Every road, path, rail, boundary, label and text
-  halo kept its light default, so the night map had a white road network and white halos.
-- The style is now a vendored snapshot, and **every layer has a role**. A layer with no role
-  throws, and the test fails on a snapshot the manifest does not cover.
-- The map used to be destroyed and rebuilt on almost every render. It is now built once. A theme
-  change re-paints it in place. Measured in the browser: the same map instance, the same centre
-  to six decimal places, the same pins.
-- Area outlines, the position circle and the selected pin were all red. Three meanings, one
-  colour. They are now separated.
-- Pins are real buttons with accessible names, reachable by keyboard.
-- Homes on one portal centroid are grouped and open a chooser.
+### PIP-05 · One search and context contract — issue #78, PR #79
 
-Two faults found only in the browser: MapLibre's marker popup is unreachable from the keyboard,
-and MapLibre's 29 px control rule beat our 44 px rule on source order. Both fixed, both now have
-tests.
+Four surfaces each decided which homes qualify and no two agreed. `src/lib/filters.ts` is now the
+only place that answers it; two tests fail if either page grows a query of its own. `/api/markers`
+was deleted — nothing called it. Also: one cover rule, one archive policy, links that carry every
+filter, a detail page that returns to the list it came from, independent budget bounds, and labels
+that say what the filters actually do.
+
+Two older defects surfaced while verifying it: `ORDER BY created_at` ran on the outer statement
+and failed for any caller that had not selected that column; and the budget fields rendered with a
+corrupted `class` attribute, because a server component imported the shared field style from a
+`"use client"` module. Building map markers field by field instead of spreading the row also took
+the search haystack out of the browser — **the map page's payload fell from 76 KB to 30 KB**.
+
+### Map popups keep the filters — issue #80, PR #81
+
+PIP-05 could not touch `Mapa.tsx` while PR #76 owned it. Opening a home from a pin and pressing
+back landed on an unfiltered list.
+
+### PIP-06 · Usable comparison selection — issue #82, PR #83
+
+`/comparar` accepted two to four identifiers and **nothing in the application selected them**;
+the empty page asked a family member to compose a URL by hand. There is now a checkbox on every
+card, row and detail page, outside the link rather than inside it, and a tray that states the
+count, refuses a fifth without evicting anything, and says how many of the chosen homes the
+filters are hiding. Differences are decided on raw typed values, so a rounded €/m² no longer hides
+a real one. A phone shows two columns at a time without losing the other two.
+
+### PIP-08 · Saving, errors, and purposeful motion — issue #84, PR #85
+
+The add form threw the typed URL away on failure and posted Idealista links to a server fetch
+that answers 403 every time. Links are now classified in the browser first, failures stay in a
+native `<dialog>` with the URL still in the field, and there is one honest pending state. A stage
+change carries the version it was drawn from, so two people deciding at once no longer means the
+later write wins in silence — **verified: the refused write left the database untouched and wrote
+no event**. A refused comment comes back with its text. `error.tsx`, `not-found.tsx` and
+`loading.tsx` exist, so no flow reaches a framework default.
+
+F18 needed no work: PIP-03 had already removed the card zoom and the pin scale under reduced
+motion and cut the theme wipe from 520 ms to 320 ms. It is now covered by a test instead.
+
+### Two defects of my own, found and fixed the same day
+
+The comparison checkbox was positioned by a Tailwind utility that lost to `.compare-toggle`'s own
+`position: relative` — same specificity, my rule later in the file — so it rendered above the card;
+fixing that put it over the title. The card's photo and title are now separate links to the same
+home, which is what document 02 § 4 asks for, so the control sits on the photograph without being
+inside an anchor.
+
+### `ingest.mts` credited a flag — issue #74, PR #86
+
+`args[args.indexOf("--user") + 1]` reads `args[0]` when the flag is absent, so `--reset` owned all
+23 import events in the Actividad feed. `vitest.config.ts` now also collects `scripts/**`.
 
 ---
 
 ## 5. Not done
 
-### Release A — the rest of it
+### Release A — nothing left
 
-| Package | What it is | State |
-|---|---|---|
-| PIP-05 | One search and context contract | **Not started.** Unblocked: PIP-02 and PIP-03 are merged |
-| PIP-06 | Usable comparison selection | **Not started.** Needs PIP-05 first |
-| PIP-08 | Saving, errors, and purposeful motion | **Not started.** Unblocked: PIP-01 and PIP-03 are merged |
-
-Release A is seven packages: PIP-01 to PIP-06, plus PIP-08. **Three merged** (01, 02, 03),
-**one in review** (04), **three not started** (05, 06, 08).
+All seven packages are merged. PIP-05 and PIP-06 were the two that PIP-01 to PIP-03 had unblocked;
+PIP-08 was independent of them.
 
 ### Release B — none of it
 
@@ -195,8 +231,11 @@ went ahead, and why the Tailscale preview exists.
 
 Each of these is small, and each one is his to make.
 
-1. **Merge PR #76?** PIP-04 is finished and green. Nothing else waits on it, but PIP-05 will
-   touch neighbouring files.
+1. **Start Release B?** Six packages, in this order: PIP-07 (detail and listing hierarchy),
+   PIP-09 (review persistence and fair aggregates), PIP-10 (opinion editor), PIP-11
+   (conversation), PIP-13 (activity and freshness), PIP-14 (profile and help). PIP-09 is the one
+   that matters most: the family score currently averages **rating rows**, so somebody who scored
+   six dimensions has six times the weight of somebody who scored one (F21).
 2. **Enable HTTPS certificates on the tailnet?** One toggle at the Tailscale admin console,
    DNS → HTTPS Certificates. It turns the preview into a real `https://` address with a valid
    certificate. Two minutes of work after that.
@@ -205,10 +244,8 @@ Each of these is small, and each one is his to make.
 4. **Signed commits.** About half of this repository's history is unsigned. Bcomm policy
    requires cryptographic signing on shared repositories. This is a private personal repository,
    so it may not apply, but the gap is real and should be a decision, not an accident.
-5. **Fix issue #74?** One line in `scripts/ingest.mts`. Until it is fixed, the Actividad feed
-   says `--reset` imported all 23 homes. See § 8.
-6. **Commit this file.** It, and the edits to `CLAUDE.md`, `docs/README.md`, `docs/WORKPLAN.md`
-   and `.gitignore` that point at it, are written but not committed. Say the word.
+5. **The three items that unblock a real deployment** — issues #1, #2 and #5. Nothing in the
+   code is waiting on anything else. See § 6.
 
 ---
 
@@ -218,21 +255,26 @@ These are real, and none of them is fixed.
 
 - **`docs/product-improvement/` is untracked.** 16 packages, 40 findings, 12 decisions and 27
   validation cases, in no commit, on one machine.
-- **Issue #74 — `ingest.mts` takes the first argument as the user.**
-  `args[args.indexOf("--user") + 1]` reads `args[0]` when the flag is absent, because `indexOf`
-  returns −1. So `--reset` became a user, and it owns all 23 import events. Cosmetic, one line,
-  not this issue's file.
-- **The desktop split layout has never been checked in a browser.** It starts at 960 px, and the
-  browser automation cannot change the layout viewport. Everything above that breakpoint is
-  covered by source assertions only. **Do not claim it is verified.**
+- **The family score is not fair yet.** It averages rating rows, so a member who scored six
+  dimensions outweighs one who scored a single dimension six to one. Finding F21, package PIP-09,
+  not started. It is the largest correctness gap left in the product.
+- **No layout above 960 px, and none below 768 px, has been seen in a browser.** The automation
+  cannot change the layout viewport, so the desktop split view and every phone layout are covered
+  by source assertions only. Where a phone branch mattered — the comparison pair view — it was
+  exercised by pointing its media query at 4000 px temporarily, which proves the branch and not
+  the breakpoint. **Do not claim any of it is visually verified.**
 - **No backup restore drill.** Issue #21. The backup script and its LaunchAgent exist in `air/`
   but have not been installed or exercised. Nobody has restored a database and confirmed it
   works.
 - **The map's group chooser has no real data behind it.** All 19 mappable properties have
   distinct coordinates. The chooser was verified by forcing three onto one point in a throwaway
   copy of the database. It is unit-tested, and it has never fired on real data.
+- **`rateAction` still returns silently** on an empty submission. It is the one mutation without
+  a result state; its form belongs to PIP-10.
 - **Four of the 23 properties have no coordinates**, so they appear in the list and never on the
-  map. That is correct behaviour, not a defect, but it surprises people.
+  map. The list now says how many, which is the fix — the behaviour itself is correct.
+- **The Air is still running the 2026-09-07 build.** Everything merged on 09-08 — five packages —
+  is on `main` and not on the preview. Redeploy with `./deploy.sh`.
 
 ---
 
