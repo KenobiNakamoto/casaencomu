@@ -81,6 +81,25 @@ Tokens: `--duration-fast: 120ms`, `--duration-standard: 180ms`, `--duration-them
 movement is the point — the card photo zoom and the map pin scale — not merely the transition that
 carries it. A scale with no transition is still a jump.
 
+## Over the page
+
+Photographs open in two stacked layers, and the depth is the whole navigation: it has to be
+obvious which one a click outside will close.
+
+| Layer | Scrim | Blur |
+|---|---|---|
+| the mosaic, over the page | black at 55% | 6 px |
+| one photograph, over the mosaic | black at 78% | 16 px |
+
+The scrim is black in **both** themes. A lightbox is dark on white paper too, and a photograph
+needs a neutral ground more than it needs the palette. Every control that floats over a
+photograph carries its own dark chip for the same reason — it cannot borrow a theme's surface
+when what is behind it is somebody's living room.
+
+Both layers are a native `<dialog>`. The browser owns the top layer, Escape, the focus trap and
+the return of focus; the stylesheet owns only the look. Nesting them is what makes Escape close
+the photograph back to the mosaic, and the mosaic back to the page.
+
 ## The distinctive move
 
 The theme switch. One button, one circular wipe out of it, the whole page repainted — no fade, no
