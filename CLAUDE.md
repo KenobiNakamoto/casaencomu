@@ -43,6 +43,10 @@ mount. **Ponytail is on**: nothing is added until a trigger in `docs/PLAN.md` fi
 
 ## Rules
 
+- **This is a personal project, not work.** It uses no employer account, machine, domain,
+  password manager, signing key or email address. The Cloudflare account, the domain, the
+  password store and the member emails are the family's own. Nothing here is ever discussed in
+  a work channel.
 - **No PII in the repo.** Family names and emails, and the Air's hostname or username, never
   appear in code, fixtures, `.env.example`, or docs. `memory/` is gitignored.
 - **Spanish UI, hardcoded.** Listing text stays in its source language.
@@ -64,7 +68,9 @@ mount. **Ponytail is on**: nothing is added until a trigger in `docs/PLAN.md` fi
 - **Data root is `/Volumes/TimeMachine/casaencomu` on the Air**, bind-mounted as `/data`. Never
   run the app from an iCloud folder. Never let a host launchd job touch that path directly; go
   through `ssh localhost` (launchd cannot read `/Volumes`).
-- **The nightly encrypted dump is the only backup.** Passphrase in 1Password.
+- **The nightly encrypted dump is the only backup.** Passphrase in the family's own password
+  store — Apple Passwords is on every device already — and shared with one other member, so it
+  does not die with one phone.
 - Repo: private, `KenobiNakamoto/casaencomu` (created 2026-09-04). Work flows issue → branch
   `issue-<n>-<slug>` in a worktree outside iCloud → PR → merge. Commit and push only when asked.
 - **Anything not committed lives in `_local/`, `memory/`, `_archive/` or `data/`.** Page captures,
