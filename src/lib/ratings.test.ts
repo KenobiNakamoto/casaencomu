@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { DIMENSIONS } from "./listing";
-import { familyAverage, matrix, memberAverage, UPSERT_RATING_SQL, type RatingRow } from "./ratings";
+import { changedScores, familyAverage, matrix, memberAverage, UPSERT_RATING_SQL, type RatingRow } from "./ratings";
 
 // Two members, second one has rated only two of six dimensions.
 const rows: RatingRow[] = [
@@ -82,5 +82,25 @@ describe("one score per member per dimension", () => {
     const { rows } = await db.execute("SELECT score FROM ratings WHERE property_id = 'p1' AND user_id = 'u1'");
     expect(rows).toHaveLength(1);
     expect(rows[0].score).toBe(5);
+  });
+});
+
+describe("changedScores", () => {
+  const current = { ubicacion: 4, estado: 2 };
+
+  it("returns only what is new or different", () => {
+    expect(changedScores(current, { ubicacion: 4, estado: 5, luz_vistas: 3 })).toEqual([
+      ["estado", 5],
+      ["luz_vistas", 3],
+    ]);
+  });
+
+  it("an unchanged form writes nothing at all", () => {
+    expect(changedScores(current, current)).toEqual([]);
+    expect(changedScores({}, {})).toEqual([]);
+  });
+
+  it("a first score counts as a change", () => {
+    expect(changedScores({}, { ubicacion: 1 })).toEqual([["ubicacion", 1]]);
   });
 });

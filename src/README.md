@@ -3,9 +3,9 @@
 _Paths in this file are relative to `src/`._
 
 Next.js 16 App Router, everything server-rendered unless a file says `"use client"`. There are
-seven client components in the whole application: the map, the theme toggle, the navigation
-links, the search bar, the filter bar, the gallery and a home's own map. Nothing else ships
-JavaScript.
+eight client components in the whole application: the map, the theme toggle, the navigation
+links, the search bar, the filter bar, the gallery, a home's own map and the opinion box. Nothing
+else ships JavaScript.
 
 ## The two paths through the code
 
@@ -85,7 +85,7 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 |---|---|---|
 | `/` | `app/page.tsx` | redirects to `/propiedades` |
 | `/propiedades` | `app/propiedades/page.tsx` | the list. Filters live in the URL, so a link is a saved search. `lib/filters.ts` decides what they mean |
-| `/propiedades/[id]` | `app/propiedades/[id]/page.tsx` | photos, facts, description, ratings, comments, timeline, and a full-width map of this home alone |
+| `/propiedades/[id]` | `app/propiedades/[id]/page.tsx` | four bands: the description with the facts beside it, the opinion box, the family's table beside the conversation, and a full-width map of this home alone. The advertisement's own record — sources, price history, activity — reads last |
 | `/mapa` | `app/mapa/page.tsx` | the shell; the map itself is `components/mapa/Mapa.tsx`. Reads the same filters as the list |
 | `/ayuda` and route states | `app/{error,not-found,loading}.tsx` | every flow's own error, missing-page and loading screens |
 | `/comparar` | `app/comparar/page.tsx` | 2 to 4 columns, differing rows highlighted. The `ids` in the URL win; the tray is how they get there |
@@ -97,8 +97,10 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 | `GET /api/photos/[id]` | `app/api/photos/[id]/route.ts` | streams a stored photo; authenticated like every other route |
 | `GET /api/health` | `app/api/health/route.ts` | the container health check. The only route the proxy lets through unauthenticated |
 
-Mutations are server actions in `app/propiedades/actions.ts`: rate, comment, change stage, set the
-budget. They call `revalidatePath`, so there is no client-side cache to invalidate.
+Mutations are server actions in `app/propiedades/actions.ts`. There are two: `opinionAction`,
+which writes the scores, the comment and the stage of one home in one transaction — each part
+only if it changed — and `setBudgetAction`. They call `revalidatePath`, so there is no
+client-side cache to invalidate.
 
 ## Boot
 
