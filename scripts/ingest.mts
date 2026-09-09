@@ -18,7 +18,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createProject, listProjects } from "../src/lib/control";
 import { db, applySchema } from "../src/lib/db";
-import { extractResult, type Page } from "../src/lib/extract";
+import { extractResult, rawOf, type Page } from "../src/lib/extract";
 import { save } from "../src/lib/save";
 import { normalizeUrl } from "../src/lib/url";
 
@@ -94,7 +94,9 @@ for (const file of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
   const r = await save(
     listing,
     { url_original: page.url, url_normalized: norm.normalized, portal: norm.portal, portal_ref: norm.portalRef },
-    { user, via: page.html ? "paste" : "bookmarklet", presence: result.presence },
+    // `raw` is what layer 2 reads later. Without it the source is stored with nothing to read,
+    // and the "copy what the page says" layer is silently skipped for everything this imports.
+    { user, via: page.html ? "paste" : "bookmarklet", presence: result.presence, raw: rawOf(page) },
   );
   if (r.outcome === "created") ok++;
   else dup++;

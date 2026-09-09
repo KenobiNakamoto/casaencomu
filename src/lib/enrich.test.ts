@@ -30,7 +30,11 @@ const presenceOf = (present: string[]): Presence =>
       .map((k) => [k, present.includes(k) ? "present" : "absent"]),
   );
 
-const RAW = { text: "Piso de 87 m² con 3 habitaciones y 2 baños. Precio 575.000 €. Ascensor. Barrio: Eixample." };
+const RAW = {
+  text:
+    "Piso de 87 m² con 3 habitaciones y 2 baños en 3ª planta. Precio 575.000 €. Ascensor y terraza. " +
+    "Gastos 70 €/mes. En buen estado. Sin plaza de garaje. Barrio: Eixample. Anuncia Savills.",
+};
 
 beforeEach(() => {
   h.ready = true;
@@ -70,6 +74,33 @@ describe("fill — layer 2 reads what layer 1 missed", () => {
     expect(r.listing.floor ?? null).toBeNull();
     expect(r.listing.condition ?? null).toBeNull();
     expect(r.listing.agency).toBe("Savills");
+  });
+
+  /**
+   * The prompt tells the model that every value has to appear in the page. Asking is not
+   * enforcing: measured against the family's own listings, 1 in 5 came back with an agency name
+   * the model had joined together out of two places, one of them the privacy notice.
+   */
+  it("drops a value that is not in the page, however plausible it reads", async () => {
+    h.answers = [{ agency: "Carles Juanico Riera - iad España", neighborhood: "Eixample" }];
+    const r = await fill({ listing: listing(), presence: presenceOf(["title"]), raw: RAW });
+    expect(r.listing.agency ?? null).toBeNull();
+    expect(r.listing.neighborhood).toBe("Eixample");
+    expect(r.read).toEqual(["neighborhood"]);
+  });
+
+  it("does not mind how the page spells it", async () => {
+    // Same words, different accent and case. The page says «Eixample»; this is still a reading.
+    h.answers = [{ neighborhood: "EIXAMPLE", floor: "3ª" }];
+    const r = await fill({ listing: listing(), presence: presenceOf(["title"]), raw: RAW });
+    expect(r.listing.neighborhood).toBe("EIXAMPLE");
+    expect(r.listing.floor).toBe("3ª");
+  });
+
+  it("still lets it build the outdoor list, because that field is asked for as a list", async () => {
+    h.answers = [{ outdoor: "terraza, balcón" }];
+    const r = await fill({ listing: listing(), presence: presenceOf(["title"]), raw: RAW });
+    expect(r.listing.outdoor).toBe("terraza, balcón");
   });
 
   it("asks nothing when there is no page text, and nothing when there is no key", async () => {
