@@ -27,7 +27,8 @@ legacy.close();
 mkdirSync(join(DATA_DIR, "photos", "p1"), { recursive: true });
 writeFileSync(join(DATA_DIR, "photos", "p1", "abc.jpg"), "not really a jpeg");
 
-const { bootstrap, listProjects, projectDir, projectForCaptureToken, projectsOf } = await import("./control");
+const { bootstrap, listProjects, projectDir, projectForCaptureToken, projectsOf, roleOf } =
+  await import("./control");
 const { db, inProject } = await import("./db");
 
 describe("adopting the database from before projects existed", () => {
@@ -53,6 +54,10 @@ describe("adopting the database from before projects existed", () => {
     expect((await projectsOf("ana@example.com")).map((p) => p.id)).toEqual([id]);
     expect((await projectsOf("bruno@example.com")).map((p) => p.id)).toEqual([id]);
     expect(await projectsOf("carla@example.com")).toEqual([]);
+
+    // Somebody has to be able to invite and remove afterwards. The oldest account set the app up.
+    expect(await roleOf("ana@example.com", id)).toBe("owner");
+    expect(await roleOf("bruno@example.com", id)).toBe("member");
 
     // The bookmarklets they already installed still open the right project.
     expect(await projectForCaptureToken("token-ana-0123456789012")).toBe(id);

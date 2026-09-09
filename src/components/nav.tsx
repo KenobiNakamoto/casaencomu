@@ -41,6 +41,17 @@ export default async function Nav() {
           {/* the greeting is the first thing to go: it is the least useful of the six items in this row */}
           <span className="hidden max-w-[14ch] truncate text-sm text-body lg:inline">Hola {user.name}</span>
           <ThemeToggle />
+          {/* The way to the people in this project, and to your other projects. */}
+          <Link
+            href="/proyectos"
+            aria-label="Proyectos y personas"
+            title="Proyectos y personas"
+            className="touch-target flex h-11 w-11 items-center justify-center rounded-full border border-control-border text-ink transition hover:shadow-tier"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M16 19v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 9a3 3 0 100-6 3 3 0 000 6M22 19v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+            </svg>
+          </Link>
           <Link
             href="/ayuda"
             aria-label="Ayuda"

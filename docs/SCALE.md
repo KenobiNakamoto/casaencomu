@@ -241,29 +241,41 @@ flow and no second provider. Add a library when a second provider or SAML arrive
 
 ---
 
-## 6. Step four — projects, members and invitations
+## 6. Step four — projects, members and invitations — **built**
 
-The control database is built; this is the part people can see and use. It is the next issue.
+Two pages, one actions file, and four tables. Everything below is in the repository and checked.
 
-- **Start a project.** A name, and you are its first member. `createProject()` already does this,
-  and a person with no project already gets one — the page just makes it deliberate.
-- **Switch project.** A control in the header listing `projectsOf(email)`, writing the `casa_p`
-  cookie. `resolveProject()` already reads it and already refuses one you do not belong to.
-- **Invite.** Type an email. A row in `invites`: a random token, the project, the email, who
-  invited, and an expiry. The link is `/invitacion/<token>`.
-- **Accept.** The invited person signs in, which proves their email. If it matches the invite, a
-  `memberships` row is written and the token is spent. **If it does not match, refuse** — the
-  email in the link is a claim, the signed-in email is the evidence. An expired or spent token is
-  refused with a message, never silently.
-- **Roles.** `memberships.role` is `owner` or `member`. Owner can invite, remove and rename.
-  Everything else is equal; two roles are enough until somebody asks for a third.
-- **Members page.** Who is in, what invitations are open, and a way to withdraw one. Not an admin
-  panel over every tenant — that is a different product and needs its own access decision.
+- **Start a project.** «Empezar otro proyecto» on `/proyectos`. A name, and you own it. A person
+  with no project still gets one made for them; the page makes it deliberate instead.
+- **Switch project.** «Tus proyectos» on the same page writes the `casa_p` cookie. The cookie is a
+  preference, not a permission: `resolveProject()` checks the membership again on every request,
+  so a cookie for somebody else's project is ignored. Two projects can carry the same name, so a
+  project that is not yours says whose it is.
+- **Invite.** Type an address. `createInvite()` writes a row: a random token, the project, the
+  address, who invited, and a date 14 days out. Pressing the button twice returns the same link.
+- **Send.** **The app shows the link and the owner sends it** — WhatsApp, or wherever the family
+  already talks (Kenobi, 2026-09-09). No mail server, no deliverability, no bounce handling. Send
+  real email when somebody asks; the token and the page do not change.
+- **Accept.** `/invitacion/<token>` says who invited you and to what, and does nothing until the
+  button is pressed — a link that joins by being opened would be joined by the first chat app that
+  makes a preview of it. **The signed-in address is the evidence; the address in the link is only
+  a claim.** A link opened by anybody else is refused, in words, with no button. So is one already
+  used, one past its date, and one the owner has withdrawn.
+- **Roles.** `memberships.role` is `owner` or `member`.
+  - **Owner** — the person who started the project. Invites, withdraws an invitation, and removes
+    a member. An owner is never removed: the project would be left with nobody who can manage it.
+  - **Member** — sees exactly the same list of people, and no buttons. Knowing who can read your
+    search is not the same as being able to change it.
+  - The rule is in `mustOwn()`, which throws, and every function that changes who is in a project
+    calls it first. It is not in the page, so a page cannot forget it.
+- **Removing somebody takes their bookmarklet with them.** The `capture_tokens` row goes in the
+  same write. Otherwise their bookmark keeps posting listings into a project they are out of.
+- **Members page.** `/proyectos` is it. Not an administration panel over every tenant — that is a
+  different product and needs its own access decision.
 
-**One thing to decide before writing it:** the invitation link is sent by whom? The lazy answer is
-that the app shows the link and the person sends it themselves, over WhatsApp or wherever the
-family already talks. That needs no mail server, no deliverability, and no address in the
-database beyond the invite row. Send real email when somebody asks for it.
+Skipped, and when to add it: **making a second owner** (one family, one owner is enough; add it
+when an owner loses their account), **renaming or deleting a project** (nobody has asked),
+**leaving a project** (the owner removes you), and **real email**.
 
 ---
 
