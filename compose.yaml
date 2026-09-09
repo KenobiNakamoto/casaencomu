@@ -8,4 +8,7 @@ services:
     ports: ["127.0.0.1:3100:3000"]
     env_file: .env
     volumes: ["/Volumes/TimeMachine/casaencomu:/data"]   # virtiofs; see § 8.0 and the Phase 1 test
+    # The fill layers reach the model through scripts/ai-bridge.mjs, which runs on the host
+    # because the Claude Code CLI and its credentials live there. air/README.md.
+    extra_hosts: ["host.docker.internal:host-gateway"]
     mem_limit: 1g        # ponytail: keeps a runaway import from starving electrs

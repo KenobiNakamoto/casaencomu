@@ -61,7 +61,7 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 | `extract.ts` | one extractor for every portal: JSON-LD → OpenGraph → the portal's own blob. `extractResult()` says **why** a page gave nothing — `removed`, `blocked` or `unreadable` — and which fields it carried | yes |
 | `fetching.ts` | every request the server makes outward: https only, no credentials, default port, allowlist on **each redirect hop**, and a streamed byte cap | half |
 | `intake.ts` | what the intake routes share: the deadlines, the Spanish sentence per outcome, the placeholder record a link becomes before it is read, and where a form post is sent instead of a JSON body | yes |
-| `ai.ts` | the whole model client: one POST to the Messages API, structured output through one tool whose schema comes from `Listing` itself. No key → every call answers null | half |
+| `ai.ts` | the whole model client: one POST to the Messages API, structured output through one tool whose schema comes from `Listing` itself. No key → every call answers null. `AI_BASE_URL` points it at `scripts/ai-bridge.mjs` on the server, which needs no key at all | half |
 | `enrich.ts` | layers 2 and 3, and the pass that walks the queue. `sources.enriched_at` **is** the queue: a new observation sets it back to NULL | half |
 | `bookmarklet.ts` | the collector both readers run, and the bookmarklet that wraps it in a form post | yes |
 | `photos.ts` | downloads, deduplicates by sha256, resizes to one 800 px JPEG, stores under `DATA_DIR`. 40 per property, not per call | no |

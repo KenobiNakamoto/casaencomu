@@ -85,3 +85,61 @@ ssh air 'tail -f ~/Library/Logs/casaencomu-reader.log'
 It is a LaunchAgent, not a Daemon: Chrome is headful and needs the logged-in GUI session. If the
 server is ever left at the login window, the reader stops working and every link simply stays
 unread until it comes back — which is the failure mode this was designed to have.
+
+## `ai-bridge.mjs` — the fill layers, without an API key
+
+`scripts/ai-bridge.mjs` in this repository, copied to the server as
+`~/.local/bin/casaencomu-ai-bridge.mjs`. Layers 2 and 3 need a model; the server already has the
+Claude Code CLI, signed in, so it needs no API key. The bridge is what lets the container use it:
+it answers `POST /v1/messages` in the Anthropic Messages shape by running `claude -p` in a
+temporary directory of its own.
+
+It runs on the host for the same reason the reader does — the CLI's credentials are in the login
+Keychain, which is not in the image. Nothing about the fill layers moves out here: the prompts,
+the range guards and the `deducido` marks all stay in `src/lib/enrich.ts`.
+
+```sh
+scp scripts/ai-bridge.mjs air:.local/bin/casaencomu-ai-bridge.mjs
+ssh air 'mkdir -p ~/.config/casaencomu && chmod 700 ~/.config/casaencomu'
+# one secret, used twice: here, and as ANTHROPIC_API_KEY in ~/srv/casaencomu/.env
+ssh air 'cat > ~/.config/casaencomu/ai.env' <<'EOF'
+export CASA_AI_TOKEN=…
+EOF
+ssh air 'chmod 600 ~/.config/casaencomu/ai.env'
+ssh air '. ~/.config/casaencomu/ai.env && PATH=$HOME/.local/bin:/opt/homebrew/bin:$PATH node ~/.local/bin/casaencomu-ai-bridge.mjs'
+```
+
+In another terminal, the check — it should print the three fields that are in the text and `null`
+for the one that is not:
+
+```sh
+ssh air 'curl -s -XPOST http://127.0.0.1:8788/v1/messages -H "x-api-key: …" -H "content-type: application/json" \
+  -d "{\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"78 m2, 3 habitaciones, 245.000 EUR\"}]}],\"tools\":[{\"name\":\"c\",\"input_schema\":{\"type\":\"object\",\"properties\":{\"price_eur\":{},\"area_m2\":{},\"rooms\":{},\"energy_rating\":{}}}}]}"'
+```
+
+Then the app's own `.env` — `ANTHROPIC_API_KEY` is the same secret, not a key:
+
+```sh
+ssh air 'printf "ANTHROPIC_API_KEY=…\nAI_BASE_URL=http://host.docker.internal:8788\n" >> ~/srv/casaencomu/.env'
+./deploy.sh          # compose.yaml carries the extra_hosts line that makes that name resolve
+```
+
+The bridge listens on every interface, because the container reaches it through the Docker
+gateway rather than through loopback. `CASA_AI_TOKEN` is what keeps the rest of the network out,
+so it is a long random string and it is checked before anything is run.
+
+## `com.kenobi.casaencomu-ai.plist`
+
+The LaunchAgent that keeps the bridge running.
+
+```sh
+scp air/com.kenobi.casaencomu-ai.plist air:Library/LaunchAgents/
+ssh air 'launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kenobi.casaencomu-ai.plist'
+ssh air 'tail -f ~/Library/Logs/casaencomu-ai.log'
+```
+
+One line per request: the layer, how many photographs went with it, how long it took, and which
+fields came back. A layer that finds nothing prints `nada`, which is an ordinary answer.
+
+If the bridge is not running, the app behaves exactly as it did before it existed: layers 2 and 3
+are skipped, no source is marked as done, and everything waiting is filled when it comes back.

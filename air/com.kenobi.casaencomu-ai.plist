@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- CasaEnComú AI bridge — air/README.md. Install: cp to ~/Library/LaunchAgents/ then
+	     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kenobi.casaencomu-ai.plist
+	     A LaunchAgent, not a Daemon: `claude` reads its credentials from the login Keychain, which
+	     a daemon cannot open. CASA_AI_TOKEN is the shared secret with the container; it stays in
+	     ~/.config/casaencomu/ai.env, out of this file and out of the repository. -->
+	<key>Label</key>
+	<string>com.kenobi.casaencomu-ai</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/sh</string>
+		<string>-c</string>
+		<string>. "$HOME/.config/casaencomu/ai.env" &amp;&amp; PATH=$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH exec node "$HOME/.local/bin/casaencomu-ai-bridge.mjs" >>"$HOME/Library/Logs/casaencomu-ai.log" 2>&amp;1</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>ThrottleInterval</key>
+	<integer>60</integer>
+</dict>
+</plist>

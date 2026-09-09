@@ -1,7 +1,35 @@
 # Scripts
 
-Two things that are run by hand. Neither is part of the application, neither runs in the
-container, and neither is on a schedule.
+Nothing here runs in the container. `ingest.mts` and `build-areas.mts` are run by hand in
+development; `capture-agent.mjs` and `ai-bridge.mjs` run on the server, beside the container,
+because a container can drive neither a browser nor a signed-in CLI. Both server scripts are
+installed and kept alive by LaunchAgents — **`air/README.md` is their runbook**, this file only
+says what they are.
+
+## `capture-agent.mjs` — the browser reader
+
+Asks the app which pasted links are still unread, opens each one in a stock Chrome with an empty
+profile, and posts the collected page back to `/api/capture`. It exists because Idealista answers
+a server fetch with a DataDome challenge and a real browser with the advertisement. Nothing here
+defeats the challenge: the challenge's own JavaScript runs and passes. Details: `docs/PORTALS.md`.
+
+## `ai-bridge.mjs` — the fill layers without an API key
+
+```sh
+CASA_AI_TOKEN=… node scripts/ai-bridge.mjs      # then AI_BASE_URL=http://…:8788 in the app's .env
+```
+
+Answers `POST /v1/messages` in the Anthropic Messages shape by running `claude -p` in a temporary
+directory: fixed instructions in, one JSON object out. Photographs arrive as base64 and are
+written to that directory as files the CLI opens with `Read`.
+
+The prompts, the range guards and the provenance marks are **not** here — they stay in
+`src/lib/enrich.ts`, so the two ways to reach a model produce the same records and the same
+tests cover both. The bridge only carries the request, and an answer it cannot parse becomes an
+empty tool call, which every caller already reads as "this layer found nothing".
+
+`CASA_AI_TOKEN` is the shared secret: the app sends it as `x-api-key` and the bridge refuses
+everything else, because it listens on every interface so the container can reach it.
 
 ## `ingest.mts` — fill a development database from real advertisements
 

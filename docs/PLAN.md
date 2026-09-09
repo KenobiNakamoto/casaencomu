@@ -26,7 +26,7 @@ Runs on the MacBook Air, reached through Cloudflare Access.
 | Page-HTML snapshots | someone asks "what did the ad say before" |
 | Roles, invitations, admin page | one Cloudflare Access email list stops being enough |
 | Fuzzy duplicates, image hashes | the same flat on two portals slips through twice |
-| ~~LLM enrichment (Anthropic API, structured output)~~ | **fired, issue #111.** `lib/ai.ts` + `lib/enrich.ts`, layers 2 and 3. `claude-sonnet-5` by default; no key means both layers are skipped |
+| ~~LLM enrichment (Anthropic API, structured output)~~ | **fired, issues #111 and #113.** `lib/ai.ts` + `lib/enrich.ts`, layers 2 and 3. An API key, or the server's own Claude Code CLI through `scripts/ai-bridge.mjs`. Neither configured means both layers are skipped |
 | Postgres/PostGIS, worker container, Drizzle | > 5k properties or a second writer process |
 | Neighbourhood and due-diligence add-ons | v1 is in daily use |
 
