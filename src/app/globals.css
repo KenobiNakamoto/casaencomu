@@ -183,7 +183,11 @@
   --map-gap: 24px;
   /* How far the toolbar above the results scrolls away before the map is stuck to the header.
      The map grows by exactly this much over exactly that scroll, so it fills the screen the
-     moment it stops moving and fits the screen at every point before that. */
+     moment it stops moving and fits the screen at every point before that — including at rest,
+     which a wrong value here spoils. `map-fit.tsx` measures the real distance and overwrites
+     this; the value below is what applies until it does, and without JavaScript. It is
+     deliberately larger than any real toolbar, because too large only makes the map short and
+     too small hangs it off the bottom of the screen. */
   --map-grow: 232px;
   --map-h-full: calc(100dvh - var(--header-h) - var(--map-gap) * 2);
   --map-h-rest: calc(var(--map-h-full) - var(--map-grow));
@@ -882,8 +886,9 @@ html[data-wipe]::view-transition-new(root) {
   position: sticky;
   top: calc(var(--header-h) + var(--map-gap));
   height: var(--map-h-rest);
-  /* On a very tall screen the map would become a ribbon. 3:2 upright is where it stops. */
-  max-height: 150cqw;
+  /* On a very tall screen the map would become a ribbon. Slightly taller than square is where
+     it stops — the shape it has on a 14" screen, which is the one that looks right. */
+  max-height: 110cqw;
   overflow: hidden;
 }
 @supports (animation-timeline: scroll()) {
@@ -904,7 +909,7 @@ html[data-wipe]::view-transition-new(root) {
     align-items: flex-end;
   }
   .map-frame > * {
-    height: min(var(--map-h-full), 150cqw);
+    height: min(var(--map-h-full), 110cqw);
     flex: none;
   }
   @keyframes map-fill {

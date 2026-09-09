@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Mapa, { type MapMarker } from "@/components/mapa/Mapa";
+import { MapFit } from "@/components/mapa/map-fit";
 import { PropertyCard, type Listed } from "@/components/propiedades/card";
 import { FilterBar } from "@/components/propiedades/filter-bar";
 import { ActiveFilters, QuickFilters } from "@/components/propiedades/filters-row";
@@ -197,6 +198,7 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
           )}
         </section>
         <aside className="map-column hidden split:block">
+          <MapFit />
           <div className="map-frame rounded-card border border-hairline shadow-lift">
             <Mapa markers={markers} embedded zona={v.zona} params={Object.fromEntries(new URLSearchParams(toQuery(v)))} />
           </div>
