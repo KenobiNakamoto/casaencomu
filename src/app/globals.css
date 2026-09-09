@@ -183,7 +183,11 @@
   --map-gap: 24px;
   /* How far the toolbar above the results scrolls away before the map is stuck to the header.
      The map grows by exactly this much over exactly that scroll, so it fills the screen the
-     moment it stops moving and fits the screen at every point before that. */
+     moment it stops moving and fits the screen at every point before that — including at rest,
+     which a wrong value here spoils. `map-fit.tsx` measures the real distance and overwrites
+     this; the value below is what applies until it does, and without JavaScript. It is
+     deliberately larger than any real toolbar, because too large only makes the map short and
+     too small hangs it off the bottom of the screen. */
   --map-grow: 232px;
   --map-h-full: calc(100dvh - var(--header-h) - var(--map-gap) * 2);
   --map-h-rest: calc(var(--map-h-full) - var(--map-grow));
@@ -882,8 +886,9 @@ html[data-wipe]::view-transition-new(root) {
   position: sticky;
   top: calc(var(--header-h) + var(--map-gap));
   height: var(--map-h-rest);
-  /* On a very tall screen the map would become a ribbon. 3:2 upright is where it stops. */
-  max-height: 150cqw;
+  /* On a very tall screen the map would become a ribbon. Slightly taller than square is where
+     it stops — the shape it has on a 14" screen, which is the one that looks right. */
+  max-height: 110cqw;
   overflow: hidden;
 }
 @supports (animation-timeline: scroll()) {
@@ -904,7 +909,7 @@ html[data-wipe]::view-transition-new(root) {
     align-items: flex-end;
   }
   .map-frame > * {
-    height: min(var(--map-h-full), 150cqw);
+    height: min(var(--map-h-full), 110cqw);
     flex: none;
   }
   @keyframes map-fill {
@@ -1148,4 +1153,194 @@ html[data-wipe]::view-transition-new(root) {
   bottom: 0;
   border-radius: 999px;
   background: var(--secondary);
+}
+
+/*
+ * Everything below is in the components layer, so a Tailwind utility on the element still wins.
+ * Unlayered CSS beats a layered utility whatever the specificity: `.photo-all { display: flex }`
+ * written outside a layer defeats `md:hidden`, and the phone's control appears on the desktop.
+ */
+@layer components {
+  /* ------------------------------------------------------------------------------------------
+   * The photographs, over the page (issue #122).
+   *
+   * Two native <dialog>s, nested. The browser gives the top layer, Escape, the focus trap and the
+   * return of focus; all that is left here is the look. The two backdrops stack, so the page is
+   * darker and blurrier behind the second layer than behind the first, and it is always obvious
+   * which layer a click outside will close.
+   *
+   * The scrim is black in both themes, deliberately: a lightbox is dark on white paper too. It is
+   * written here rather than tokenised because it is one colour used by two rules in this file.
+   * ponytail: make it a token the day a theme wants a different scrim.
+   * ---------------------------------------------------------------------------------------- */
+  body:has(dialog.photo-layer[open]) {
+    overflow: hidden;
+  }
+
+  .photo-layer {
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    overscroll-behavior: contain;
+    /* `display` and `overlay` are discrete, so the fade needs them named to survive the close. */
+    opacity: 0;
+    transition:
+      opacity var(--duration-fast) var(--ease-out),
+      display var(--duration-fast) allow-discrete,
+      overlay var(--duration-fast) allow-discrete;
+  }
+  .photo-layer[open] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+  }
+  /* The mosaic is taller than the screen, so it scrolls and starts at the top. */
+  .photo-layer-scroll[open] {
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+  .photo-layer::backdrop {
+    background: rgb(0 0 0 / 0.55);
+    backdrop-filter: blur(6px);
+    opacity: 0;
+    transition:
+      opacity var(--duration-fast) var(--ease-out),
+      display var(--duration-fast) allow-discrete,
+      overlay var(--duration-fast) allow-discrete;
+  }
+  .photo-layer[open]::backdrop {
+    opacity: 1;
+  }
+  /* One photograph sits over the mosaic, so its own backdrop takes the mosaic further away too. */
+  .photo-zoom::backdrop {
+    background: rgb(0 0 0 / 0.78);
+    backdrop-filter: blur(16px);
+  }
+  @starting-style {
+    .photo-layer[open],
+    .photo-layer[open]::backdrop {
+      opacity: 0;
+    }
+  }
+
+  .photo-full {
+    width: auto;
+    height: auto;
+    max-width: min(92vw, 1400px);
+    max-height: 84dvh;
+    object-fit: contain;
+    border-radius: var(--radius-card);
+  }
+
+  /* The controls float over photographs, so they carry their own ground rather than a theme's. */
+  .photo-close,
+  .photo-step {
+    position: fixed;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 9999px;
+    background: rgb(0 0 0 / 0.55);
+    color: #fff;
+    backdrop-filter: blur(4px);
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .photo-close:hover,
+  .photo-step:not(:disabled):hover {
+    background: rgb(0 0 0 / 0.85);
+  }
+  .photo-close {
+    top: 16px;
+    right: 16px;
+  }
+  .photo-step {
+    top: 50%;
+    translate: 0 -50%;
+  }
+  .photo-step:disabled {
+    opacity: 0.3;
+  }
+  .photo-count {
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    translate: -50% 0;
+    border-radius: 9999px;
+    background: rgb(0 0 0 / 0.55);
+    backdrop-filter: blur(4px);
+    padding: 7px 15px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #fff;
+  }
+
+  /* A photograph you can open. It dims rather than moves, so reduced motion needs no exception. */
+  .photo-open,
+  .photo-tile {
+    display: block;
+    cursor: zoom-in;
+  }
+  .photo-open img,
+  .photo-tile img {
+    transition: opacity var(--duration-standard) var(--ease-out);
+  }
+  .photo-open:hover img,
+  .photo-tile:hover img {
+    opacity: 0.86;
+  }
+
+  .photo-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 10px;
+    border: 1px solid var(--ink);
+    background: var(--raised);
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: var(--shadow-tier, 0 1px 2px rgb(0 0 0 / 0.08));
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .photo-all:hover {
+    background: var(--surface-soft);
+  }
+
+  /* ---- where this home is: full width, and much wider than it is tall -------------------- */
+  .location-strip {
+    position: relative;
+    width: 100%;
+    height: clamp(200px, 22vw, 300px);
+    overflow: hidden;
+  }
+  .here {
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    background: var(--action-bg);
+    border: 3px solid var(--pin-bg);
+    box-shadow: 0 1px 5px rgb(0 0 0 / 0.35);
+  }
+  /*
+   * An approximate address is a neighbourhood, not a doorway. The ring says so at a glance and the
+   * caption says so in words.
+   * ponytail: the ring is a fixed 40 px and does not scale with the zoom, so it shows uncertainty
+   * without measuring it. Draw a real circle geometry if the radius ever has to mean metres.
+   */
+  .here-approx {
+    box-shadow:
+      0 1px 5px rgb(0 0 0 / 0.35),
+      0 0 0 40px color-mix(in srgb, var(--action-bg) 16%, transparent);
+  }
 }

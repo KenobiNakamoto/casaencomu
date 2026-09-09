@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 /** Source guards for the states that are hard to reach and easy to lose in a refactor. */
 const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), "utf8");
 const add = read("./propiedades/search-bar.tsx");
-const comment = read("./propiedades/comment-form.tsx");
-const stage = read("./propiedades/stage-form.tsx");
+// The comment, the scores and the stage are one form since #128; the three that were here are gone.
+const opinion = read("./propiedades/opinion-form.tsx");
 const actions = read("../app/propiedades/actions.ts");
 const css = read("../app/globals.css");
 
@@ -114,23 +114,24 @@ describe("the add control grows out of its own button", () => {
 });
 
 describe("a refused save keeps the words (F25)", () => {
-  it("the comment comes back with its text", () => {
-    expect(actions).toContain("text?: string");
-    expect(actions).toContain("text: raw");
-    expect(comment).toContain("defaultValue={failed?.text ?? \"\"}");
+  it("the comment comes back with its text, and the scores with it", () => {
+    expect(actions).toContain("text: string");
+    expect(actions).toContain("const back = { text: raw, scores };");
+    expect(opinion).toContain("defaultValue={failed?.text ?? \"\"}");
+    // The radios are held in React, because React resets an uncontrolled field when the action
+    // returns — a refused save would otherwise throw away every choice the person just made.
+    expect(opinion).toContain("checked={scores[dim] === n}");
   });
 
   it("a stage change is conditional on the version it was drawn from", () => {
     expect(actions).toContain("WHERE id = ? AND stage_version = ?");
-    expect(actions).toContain("Number(rows[0].stage_version) !== seen");
-    expect(stage).toContain('name="version"');
+    expect(actions).toContain("Number(prop.rows[0].stage_version) !== seen");
+    expect(opinion).toContain('name="version"');
   });
 
-  it("neither form returns nothing at all any more", () => {
-    for (const fn of ["commentAction", "setStageAction"]) {
-      const at = actions.indexOf(`export async function ${fn}`);
-      const body = actions.slice(at, actions.indexOf("\n}\n", at));
-      expect(body, `${fn} still has a bare return`).not.toMatch(/^\s*(if \(.*\) )?return;\s*$/m);
-    }
+  it("the one save action never returns nothing at all", () => {
+    const at = actions.indexOf("export async function opinionAction");
+    const body = actions.slice(at, actions.indexOf("\n}\n", at));
+    expect(body, "opinionAction still has a bare return").not.toMatch(/^\s*(if \(.*\) )?return;\s*$/m);
   });
 });

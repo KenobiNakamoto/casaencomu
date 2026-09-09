@@ -463,9 +463,9 @@ Each of these is small, and each one is his to make.
    certificate. Two minutes of work after that.
 3. **Commit `docs/product-improvement/`.** The 16-package proposal is **in no commit**. It
    exists only as untracked files in this checkout. If this Mac is lost, so is it. See § 8.
-4. **Signed commits.** About half of this repository's history is unsigned. Bcomm policy
-   requires cryptographic signing on shared repositories. This is a private personal repository,
-   so it may not apply, but the gap is real and should be a decision, not an accident.
+4. **Signed commits.** About half of this repository's history is unsigned. This is a private
+   personal repository with one author, so nothing requires signing; it is worth a decision
+   rather than an accident. Signing would use a personal key, never a work one.
 5. **The three items that unblock a real deployment** — issues #1, #2 and #5. Nothing in the
    code is waiting on anything else. See § 6.
 

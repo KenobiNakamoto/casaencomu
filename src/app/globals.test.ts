@@ -192,8 +192,10 @@ describe("what components are not allowed to write", () => {
     const frame = css.slice(css.indexOf(".map-frame {"), css.indexOf("}", css.indexOf(".map-frame {")));
     // Without scroll-driven animations the map keeps the resting height. Shorter always fits.
     expect(frame).toContain("height: var(--map-h-rest)");
-    // `cqw` is the map column's own width, so this is a 3:2 upright cap, not a guess in pixels.
-    expect(frame).toContain("max-height: 150cqw");
+    // `cqw` is the map column's own width, so the cap is a shape, not a guess in pixels. The
+    // frame and the map inside it must stop at the same one, or a tall screen crops the map.
+    expect(frame).toContain("max-height: 110cqw");
+    expect(css).toContain("height: min(var(--map-h-full), 110cqw)");
     expect(css).toContain("container-type: inline-size");
   });
 

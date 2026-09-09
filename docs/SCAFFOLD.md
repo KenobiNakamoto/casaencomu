@@ -377,7 +377,8 @@ script through `ssh localhost`, which inherits `sshd`'s Full Disk Access. Once:
 ```sh
 ssh air 'test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519; grep -qf ~/.ssh/id_ed25519.pub ~/.ssh/authorized_keys || cat ~/.ssh/id_ed25519.pub >> ~/.ssh/authorized_keys'
 ssh air 'umask 077; mkdir -p ~/.config/casaencomu; openssl rand -base64 32 > ~/.config/casaencomu/backup.pass; cat ~/.config/casaencomu/backup.pass'
-# → paste the printed passphrase into 1Password, then clear the terminal. Without it the backups are noise.
+# → paste the printed passphrase into the family's password store (Apple Passwords), share it
+#   with one other member, then clear the terminal. Without it the backups are noise.
 ```
 
 `air/casaencomu-backup.sh` → `~/.local/bin/` on the Air:
