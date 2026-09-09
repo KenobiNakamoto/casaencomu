@@ -13,6 +13,7 @@ import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { backHref } from "@/lib/filters";
 import { DIMENSION_LABELS, DIMENSIONS, STAGE_LABELS, type Stage } from "@/lib/listing";
+import { markReviewed } from "@/lib/notifications";
 import { familyAverage, matrix, memberAverage, type RatingRow } from "@/lib/ratings";
 
 
@@ -154,6 +155,10 @@ export default async function PropiedadPage({
   );
   const p = prop.rows[0] as unknown as Property | undefined;
   if (!p) notFound();
+
+  // Opening it is reviewing it: this is what takes the home off «Por revisar» for this person.
+  // After `notFound()`, so a link to something that is gone never counts as having looked at it.
+  await markReviewed(user.id, p.id);
 
   const photoIds = photos.rows.map((r) => String(r.id));
   const sourceRows = sources.rows as unknown as Source[];

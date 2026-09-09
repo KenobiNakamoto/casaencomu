@@ -30,3 +30,13 @@ export const fmtDateTime = (iso: string) =>
   });
 
 export const siNo = (v: number | boolean | null | undefined) => (v == null ? SIN_DATOS : v ? "Sí" : "No");
+
+/** How long ago, in words. Used by the activity feed and by the notifications menu. */
+export function ago(iso: string) {
+  const s = (Date.now() - Date.parse(iso)) / 1000;
+  if (s < 60) return "ahora mismo";
+  if (s < 3600) return `hace ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
+  if (s < 172800) return "ayer";
+  return new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric", timeZone: TZ });
+}

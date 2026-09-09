@@ -33,8 +33,8 @@ beforeAll(async () => {
 });
 
 describe("the migration chain", () => {
-  it("reaches version 4 and adds every column the code reads", async () => {
-    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(4);
+  it("reaches version 5 and adds every column the code reads", async () => {
+    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(5);
     const cols = async (table: string) =>
       (await db.execute(`PRAGMA table_info(${table})`)).rows.map((r) => String(r.name));
     expect(await cols("sources")).toEqual(
@@ -50,11 +50,13 @@ describe("the migration chain", () => {
     );
     expect(await cols("properties")).toEqual(expect.arrayContaining(["stage_version", "filled"]));
     expect(await cols("photos")).toContain("source_url");
+    // «Por revisar» is the absence of a row here, so the table has to exist before it can be read.
+    expect(await cols("reviews")).toEqual(expect.arrayContaining(["property_id", "user_id", "reviewed_at"]));
   });
 
   it("is idempotent: running it again changes nothing", async () => {
     await applySchema();
-    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(4);
+    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(5);
   });
 
   // Everything stored before this migration was read the old way, and the record says so: a row

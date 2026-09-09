@@ -1,29 +1,27 @@
 import Link from "next/link";
+import ActivityFeed from "./activity-feed";
 import { currentUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { bellFor, DIGEST_DAYS } from "@/lib/notifications";
 import NavLinks, { type NavItem } from "./nav-links";
+import NotificationsMenu from "./notifications-menu";
 import ThemeToggle from "./theme-toggle";
 
-/** Header + nav. Bottom bar on phones, 80 px top bar with centred tabs on md+. The unread badge counts events since the member last opened Actividad. */
+/**
+ * Header + nav. Bottom bar on phones, 80 px top bar with centred tabs on md+.
+ *
+ * The fourth tab is «Revisar» — the homes this person has not opened yet — and its badge is that
+ * count. What used to be there, «Actividad», is now a tab inside the bell menu, because activity
+ * is something you glance at and reviewing is something you sit down to do.
+ */
 export default async function Nav() {
   const user = await currentUser();
-  // `last_seen_at` is written only by /actividad, so this counts events since the member last
-  // opened it; a member who never has sees everything. Own events never count.
-  // `IS NOT ?` keeps actor-less events (rechecks): a price drop nobody in the family caused is still news.
-  const unread = Number(
-    (
-      await db.execute({
-        sql: "SELECT count(*) AS n FROM events WHERE actor_id IS NOT ? AND created_at > ?",
-        args: [user.id, user.last_seen_at ?? "1970-01-01T00:00:00.000Z"],
-      })
-    ).rows[0].n,
-  );
+  const bell = await bellFor(user);
 
   const items: NavItem[] = [
     { href: "/propiedades", label: "Propiedades", icon: "home" },
     { href: "/mapa", label: "Mapa", icon: "map" },
     { href: "/comparar", label: "Comparar", icon: "compare", count: user.id },
-    { href: "/actividad", label: "Actividad", icon: "bell", badge: unread },
+    { href: "/revisar", label: "Revisar", icon: "review", badge: bell.waiting },
   ];
 
   return (
@@ -40,6 +38,13 @@ export default async function Nav() {
         <div className="ml-auto flex items-center gap-3 lg:ml-0">
           {/* the greeting is the first thing to go: it is the least useful of the six items in this row */}
           <span className="hidden max-w-[14ch] truncate text-sm text-body lg:inline">Hola {user.name}</span>
+          <NotificationsMenu
+            unseen={bell.unseen}
+            digest={bell.digest}
+            days={DIGEST_DAYS}
+            items={bell.items}
+            activity={<ActivityFeed userId={user.id} since={user.last_seen_at} limit={12} />}
+          />
           <ThemeToggle />
           {/* The way to the people in this project, and to your other projects. */}
           <Link

@@ -163,6 +163,18 @@ const MIGRATIONS: Migration[] = [
       "ALTER TABLE properties ADD COLUMN filled INTEGER NOT NULL DEFAULT 1",
     ],
   },
+  {
+    version: 5,
+    owner: "issue #136 — notifications, and a list of what you have not looked at",
+    sql: [
+      // One row per person per home, written the first time they open its page. «Por revisar» is
+      // the absence of a row, so nothing has to be cleared and nothing can drift out of date.
+      `CREATE TABLE IF NOT EXISTS reviews (
+         property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL REFERENCES users(id), reviewed_at TEXT NOT NULL,
+         PRIMARY KEY (property_id, user_id))`,
+    ],
+  },
 ];
 
 /**

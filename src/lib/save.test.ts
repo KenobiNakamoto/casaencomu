@@ -134,10 +134,11 @@ describe("save — a link is kept even when the page could not be read", () => {
   });
 
   it("does not call that first read a change in the advertisement", async () => {
-    // The columns were written — the test above checked them — but nothing was announced. A
+    // The columns were written — the test above checked them — but no *change* was announced. A
     // price appearing where there was a placeholder is not a price cut, and the feed must not
-    // say it is.
-    expect(await events(id)).toEqual(["import"]);
+    // say it is. `completed` is the one thing it does say: the link the person pasted has been
+    // read, which is what their notification is made of.
+    expect(await events(id)).toEqual(["import", "completed"]);
   });
 
   it("a later blocked check never puts a read advertisement back to unread", async () => {

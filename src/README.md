@@ -44,7 +44,7 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 
 | Path | What is in it |
 |---|---|
-| `app/` | routes: seven pages, five API routes, two server-action files |
+| `app/` | routes: ten pages, five API routes, three server-action files |
 | `components/` | presentation only. No SQL, no `fetch` to a portal |
 | `lib/` | everything that is not a route or a component. Pure functions where possible |
 | `lib/__fixtures__/` | saved portal pages the extractor tests run against. See its `README.md` |
@@ -54,6 +54,7 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 | File | Job | Pure? |
 |---|---|---|
 | `control.ts` | the control database: which projects exist, who belongs to each and as what, the open invitations, and which project a capture token opens. The only shared tables there are. `mustOwn()` is the owner rule, and it throws | no |
+| `notifications.ts` | what reaches one person — their own links being saved and read — and what is waiting for them to look at. «Por revisar» is the absence of a `reviews` row | no |
 | `db.ts` | **one libSQL client per project** — `db` finds the caller's project first, so the connection is the tenant. Also `applySchema()` and the ordered migration chain | no |
 | `schema.sql` | the eight tables, all `CREATE TABLE IF NOT EXISTS`. Version 1; everything after it is a migration in `db.ts` | — |
 | `listing.ts` | the zod schema of an extracted listing, plus the stage, dimension and event vocabularies | yes |
