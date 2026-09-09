@@ -97,6 +97,11 @@ function describe(kind: string, p: Record<string, unknown>) {
       return availabilityLine(String(p.to), "Este anuncio").replace("Este anuncio: ", "");
     case "facts_change":
       return "Datos del anuncio actualizados";
+    case "enriched": {
+      // Never "Datos actualizados": the advertisement did not change, our reading of it did.
+      const n = (Array.isArray(p.read) ? p.read.length : 0) + (Array.isArray(p.inferred) ? p.inferred.length : 0);
+      return `Se completaron ${n} dato${n === 1 ? "" : "s"} que faltaban`;
+    }
     case "stage_change":
       return `Etapa: ${stageLabel(p.from)} → ${stageLabel(p.to)}`;
     case "comment":
