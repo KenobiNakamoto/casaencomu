@@ -41,3 +41,36 @@ export const matchesCondition = (haystack: string, key: ConditionKey) => {
   const hay = norm(haystack);
   return CONDITIONS[key].terms.some((t) => hay.includes(t));
 };
+
+/**
+ * `floor` is free text as the portal wrote it — «7ª planta», «Bajo», «Ático», «Entresuelo» — so a
+ * band is decided here rather than in SQL. Four bands, no overlap, and a floor we cannot read
+ * matches none of them: a home is never hidden by a filter nobody set, and never shown by one
+ * that was.
+ */
+export const FLOORS = {
+  bajo: { label: "Bajo", holds: (n: number) => n <= 0 },
+  "1-4": { label: "1–4", holds: (n: number) => n >= 1 && n <= 4 },
+  "5+": { label: "5+", holds: (n: number) => n >= 5 },
+  atico: { label: "Ático", holds: () => false },
+} as const;
+
+export type FloorBand = keyof typeof FLOORS;
+export const isFloorBand = (s: string): s is FloorBand => Object.hasOwn(FLOORS, s);
+
+/** The storey as a number, or null. Ground and below are 0; an attic is its own answer. */
+export function floorNumber(floor: string | null | undefined): number | "atico" | null {
+  const s = norm(floor ?? "").trim();
+  if (!s) return null;
+  if (s.includes("atico") || s.includes("sobreatico")) return "atico";
+  if (/\b(bajo|baja|entresuelo|principal|semisotano|sotano|planta baja)\b/.test(s)) return 0;
+  const m = s.match(/-?\d+/);
+  return m ? Number(m[0]) : null;
+}
+
+export function matchesFloor(floor: string | null | undefined, band: FloorBand): boolean {
+  const n = floorNumber(floor);
+  if (n === null) return false;
+  if (band === "atico") return n === "atico";
+  return n !== "atico" && FLOORS[band].holds(n);
+}

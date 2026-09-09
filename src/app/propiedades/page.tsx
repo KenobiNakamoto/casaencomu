@@ -8,6 +8,7 @@ import { RowsList } from "@/components/propiedades/rows";
 import { SearchBar } from "@/components/propiedades/search-bar";
 import { CompareTray } from "@/components/comparar/controls";
 import { currentUser } from "@/lib/auth";
+import { buckets } from "@/lib/buckets";
 import { db } from "@/lib/db";
 import { STAGE_LABELS, STAGES, type Stage } from "@/lib/listing";
 import { areaChain, findArea } from "@/lib/areas";
@@ -20,6 +21,7 @@ import {
   listSql,
   mapHref,
   parseFilters,
+  SPREAD_SQL,
   qualifies,
   toQuery,
   withArea,
@@ -45,22 +47,25 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   const v = withArea(parsed, area);
   const { sql, args } = listSql(v, COLUMNS);
 
-  const [list, counts, barrios, archived] = await db.batch(
+  const [list, counts, barrios, archived, spread] = await db.batch(
     [
       { sql, args },
       "SELECT COUNT(*) AS n FROM properties",
       "SELECT DISTINCT neighborhood FROM properties WHERE neighborhood IS NOT NULL ORDER BY neighborhood",
       ARCHIVED_COUNT_SQL,
+      SPREAD_SQL,
     ],
     "read",
   );
   const [budget, user] = await Promise.all([getBudget(), currentUser()]);
 
-  const rows = list.rows as unknown as (Listed & { haystack: string })[];
+  const rows = list.rows as unknown as (Listed & { haystack: string; floor: string | null })[];
   const items = rows.filter((p) => qualifies(v, area, p));
   const total = Number(counts.rows[0].n);
   const archivedCount = Number(archived.rows[0].n);
   const neighborhoods = barrios.rows.map((r) => String(r.neighborhood));
+  const prices = buckets(spread.rows.map((r) => r.price_eur as number | null));
+  const areas = buckets(spread.rows.map((r) => r.area_m2 as number | null));
 
   const mappable = items.filter((p) => p.lat !== null && p.lng !== null && p.precision !== "none");
   const markers: MapMarker[] = mappable.map((p) => ({
@@ -109,7 +114,13 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
             )}
           </summary>
           <div className="mt-3 w-full space-y-6 rounded-card border border-hairline bg-raised p-5 shadow-lift md:absolute md:left-4 md:right-4 md:z-20 md:mt-2 md:w-auto lg:left-14 lg:right-14">
-            <FilterBar values={v} neighborhoods={neighborhoods} stages={STAGES.map((s) => [s, STAGE_LABELS[s]])} />
+            <FilterBar
+              values={v}
+              neighborhoods={neighborhoods}
+              stages={STAGES.map((s) => [s, STAGE_LABELS[s]])}
+              prices={prices}
+              areas={areas}
+            />
             <form action={setBudgetAction} className="border-t border-hairline-soft pt-5">
               <p className="text-sm font-semibold text-ink">Presupuesto familiar</p>
               <p className="mb-3 text-xs text-muted">Deja un campo vacío para no poner ese límite. Vacíos los dos, se quita el presupuesto.</p>
