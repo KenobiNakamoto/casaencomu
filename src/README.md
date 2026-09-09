@@ -3,8 +3,9 @@
 _Paths in this file are relative to `src/`._
 
 Next.js 16 App Router, everything server-rendered unless a file says `"use client"`. There are
-five client components in the whole application: the map, the theme toggle, the navigation
-links, the search bar and the filter bar. Nothing else ships JavaScript.
+seven client components in the whole application: the map, the theme toggle, the navigation
+links, the search bar, the filter bar, the gallery and a home's own map. Nothing else ships
+JavaScript.
 
 ## The two paths through the code
 
@@ -83,7 +84,7 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 |---|---|---|
 | `/` | `app/page.tsx` | redirects to `/propiedades` |
 | `/propiedades` | `app/propiedades/page.tsx` | the list. Filters live in the URL, so a link is a saved search. `lib/filters.ts` decides what they mean |
-| `/propiedades/[id]` | `app/propiedades/[id]/page.tsx` | photos, facts, description, ratings, comments, timeline |
+| `/propiedades/[id]` | `app/propiedades/[id]/page.tsx` | photos, facts, description, ratings, comments, timeline, and a full-width map of this home alone |
 | `/mapa` | `app/mapa/page.tsx` | the shell; the map itself is `components/mapa/Mapa.tsx`. Reads the same filters as the list |
 | `/ayuda` and route states | `app/{error,not-found,loading}.tsx` | every flow's own error, missing-page and loading screens |
 | `/comparar` | `app/comparar/page.tsx` | 2 to 4 columns, differing rows highlighted. The `ids` in the URL win; the tray is how they get there |

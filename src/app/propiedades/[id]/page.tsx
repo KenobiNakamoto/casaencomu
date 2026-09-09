@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Cover } from "@/components/propiedades/card";
 import { Chip, StageChip } from "@/components/propiedades/chip";
 import { fmtDate, fmtDateTime, fmtEur, fmtNum, SIN_DATOS, siNo } from "@/components/propiedades/format";
 import { CommentForm } from "@/components/propiedades/comment-form";
+import { Gallery } from "@/components/propiedades/gallery";
+import { LocationMap } from "@/components/propiedades/location-map";
 import { PendingPoll } from "@/components/propiedades/pending-poll";
 import { RatingForm } from "@/components/propiedades/rating-form";
 import { StageForm } from "@/components/propiedades/stage-form";
@@ -35,6 +36,8 @@ type Property = {
   description: string | null;
   address_text: string | null;
   address_precision: string;
+  lat: number | null;
+  lng: number | null;
   neighborhood: string | null;
   created_at: string;
   /** 0 while nothing has been read from the advertisement: the title is a placeholder. */
@@ -189,12 +192,8 @@ export default async function PropiedadPage({
     .filter(Boolean)
     .join(" · ");
 
-  // Photo grid on md+: 1 large + up to 4; fewer photos get a narrower grid.
-  const n = photoIds.length;
-  const shown = n >= 5 ? 5 : n >= 3 ? 3 : n;
-  const gridCols = n >= 5 ? "md:grid-cols-4 md:grid-rows-2" : n >= 3 ? "md:grid-cols-3 md:grid-rows-2" : "md:grid-cols-2 md:grid-rows-1";
-
   return (
+    <>
     <div className="mx-auto max-w-[1120px] px-4 py-5 sm:px-6 lg:px-10">
       <div className="flex items-center justify-between gap-3">
       <Link href={backHref(desde, p.id)} className="inline-flex h-9 items-center gap-1.5 rounded-full px-2 text-sm font-medium text-ink transition hover:bg-surface-soft">
@@ -238,32 +237,7 @@ export default async function PropiedadPage({
         </div>
       </header>
 
-      {photoIds.length > 0 && (
-        <section className="mt-5">
-          <div className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 no-scrollbar md:hidden">
-            {photoIds.map((pid) => (
-              <Cover key={pid} id={pid} className="aspect-[4/3] w-[86vw] shrink-0 snap-center rounded-card" />
-            ))}
-          </div>
-          <div className={`hidden gap-2 overflow-hidden rounded-card md:grid md:h-[420px] ${gridCols}`}>
-            {photoIds.slice(0, shown).map((pid, i) => (
-              <Cover key={pid} id={pid} className={`h-full w-full ${i === 0 && n >= 3 ? "col-span-2 row-span-2" : ""}`} />
-            ))}
-          </div>
-          {n > shown && (
-            <details className="mt-3">
-              <summary className="inline-flex h-10 cursor-pointer items-center rounded-lg border border-ink px-4 text-sm font-medium text-ink transition hover:bg-surface-soft">
-                Ver todas las fotos ({n})
-              </summary>
-              <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
-                {photoIds.map((pid) => (
-                  <Cover key={pid} id={pid} className="aspect-[4/3] w-full rounded-lg" />
-                ))}
-              </div>
-            </details>
-          )}
-        </section>
-      )}
+      {photoIds.length > 0 && <Gallery ids={photoIds} title={p.title} />}
 
       <div className="mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-16">
         {/* Side card: price, stage, your rating. Under the header on phones, sticky right rail on lg. */}
@@ -462,5 +436,31 @@ export default async function PropiedadPage({
         </div>
       </div>
     </div>
+
+    {/* Where it is, at the full width of the window and much wider than it is tall. It sits
+        outside the container rather than breaking out of it with a viewport width, which would
+        add a horizontal scrollbar of exactly the vertical scrollbar's width. */}
+    <section className="mt-12 border-t border-hairline-soft">
+      <div className="mx-auto max-w-[1120px] px-4 pb-3 pt-8 sm:px-6 lg:px-10">
+        <h2 className={h2}>Dónde está</h2>
+        <p className="mt-1 text-sm text-muted">
+          {p.address_text ?? p.neighborhood ?? "Sin dirección en el anuncio"}
+          {p.address_precision === "approx" && " · ubicación aproximada: la zona, no el portal"}
+          {p.address_precision === "exact" && " · ubicación exacta"}
+        </p>
+      </div>
+      {p.lat !== null && p.lng !== null && p.address_precision !== "none" ? (
+        <div className="location-strip">
+          <LocationMap lat={p.lat} lng={p.lng} precision={p.address_precision === "exact" ? "exact" : "approx"} />
+        </div>
+      ) : (
+        <div className="mx-auto max-w-[1120px] px-4 pb-10 sm:px-6 lg:px-10">
+          <p className="rounded-card bg-sunken px-4 py-6 text-sm text-muted">
+            El anuncio no da coordenadas, así que no se puede situar en el mapa.
+          </p>
+        </div>
+      )}
+    </section>
+    </>
   );
 }
