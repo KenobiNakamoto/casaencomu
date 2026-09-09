@@ -11,7 +11,16 @@
 import { NOT_REMOVED_SQL } from "./availability";
 import { isIn, type AreaFeature } from "./geo";
 import { STAGES, type Stage } from "./listing";
-import { HAYSTACK_SQL, isCondition, matchesCondition, matchesQuery, type ConditionKey } from "./search";
+import {
+  HAYSTACK_SQL,
+  isCondition,
+  isFloorBand,
+  matchesCondition,
+  matchesFloor,
+  matchesQuery,
+  type ConditionKey,
+  type FloorBand,
+} from "./search";
 
 export type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -21,7 +30,9 @@ export type Filters = {
   precioMax: string;
   hab: string;
   banos: string;
-  m2: string;
+  m2Min: string;
+  m2Max: string;
+  planta: string;
   estado: string;
   etapa: string;
   barrio: string;
@@ -39,6 +50,8 @@ export type Qualifiable = {
   lat: number | null;
   lng: number | null;
   neighborhood: string | null;
+  /** Free text as the portal wrote it, so the storey bands are decided in JS. See `search.ts`. */
+  floor: string | null;
 };
 
 export const ORDER: Record<string, string> = {
@@ -52,7 +65,7 @@ export const ORDER: Record<string, string> = {
  * caller that had not selected `created_at` used to fail with "no such column" the moment it took
  * the default ordering. The sort must not depend on which columns a screen happens to want.
  */
-const ALWAYS = "p.id, p.created_at, p.price_eur";
+const ALWAYS = "p.id, p.created_at, p.price_eur, p.floor";
 
 /**
  * The first photo that exists, not `position = 0`. A failed download leaves a gap, and the two
@@ -62,23 +75,35 @@ const ALWAYS = "p.id, p.created_at, p.price_eur";
 export const COVER_SQL = "(SELECT id FROM photos WHERE property_id = p.id ORDER BY position LIMIT 1)";
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
+
 export const posInt = (s: string) => (/^\d+$/.test(s) ? Number(s) : null);
 const digits = (s: string) => (posInt(s) === null ? "" : s);
 
+/** `min-max`, or a bare number read as the minimum. Anything else is no filter at all. */
+function range(s: string): [string, string] {
+  const m = s.match(/^(\d*)-(\d*)$/);
+  return m ? [m[1], m[2]] : [digits(s), ""];
+}
+
 /** URL to values. Anything unrecognised becomes empty, so a hand-typed query cannot filter oddly. */
 export function parseFilters(sp: SearchParams): Filters {
-  const precio = first(sp.precio).match(/^(\d*)-(\d*)$/);
+  const precio = range(first(sp.precio));
+  // A bare `m2=80` is a minimum, which is what every link written before the maximum existed says.
+  const m2 = range(first(sp.m2));
   const estado = first(sp.estado);
+  const planta = first(sp.planta);
   const etapa = first(sp.etapa);
   const puntuacion = first(sp.puntuacion);
   const orden = first(sp.orden);
   return {
     q: first(sp.q).trim(),
-    precioMin: precio?.[1] ?? "",
-    precioMax: precio?.[2] ?? "",
+    precioMin: precio[0],
+    precioMax: precio[1],
     hab: digits(first(sp.hab)),
     banos: digits(first(sp.banos)),
-    m2: digits(first(sp.m2)),
+    m2Min: m2[0],
+    m2Max: m2[1],
+    planta: isFloorBand(planta) ? planta : "",
     estado: isCondition(estado) ? estado : "",
     etapa: STAGES.includes(etapa as Stage) ? etapa : "",
     barrio: first(sp.barrio),
@@ -113,7 +138,8 @@ export function listSql(f: Filters, columns: string): { sql: string; args: (stri
   add("p.price_eur <= ?", posInt(f.precioMax));
   add("p.rooms >= ?", posInt(f.hab));
   add("p.bathrooms >= ?", posInt(f.banos));
-  add("p.area_m2 >= ?", posInt(f.m2));
+  add("p.area_m2 >= ?", posInt(f.m2Min));
+  add("p.area_m2 <= ?", posInt(f.m2Max));
   add("p.stage = ?", f.etapa);
   add("p.neighborhood = ?", f.barrio);
   // The archive policy, and the only place it lives (F29). Naming a stage is asking to see that
@@ -131,6 +157,14 @@ export function listSql(f: Filters, columns: string): { sql: string; args: (stri
   return { sql, args };
 }
 
+/**
+ * The two numbers the sliders draw bars from, over the homes the default view shows. It ignores
+ * the price and surface filters on purpose: the bars have to say what is being excluded, which a
+ * distribution of the survivors cannot.
+ */
+export const SPREAD_SQL = `SELECT p.price_eur, p.area_m2 FROM properties p
+  WHERE p.stage != 'descartada' AND ${NOT_REMOVED_SQL}`;
+
 /** How many homes the archive policy is hiding right now, so the count can be said out loud. */
 export const ARCHIVED_COUNT_SQL = `SELECT COUNT(*) AS n FROM properties p
   WHERE p.stage = 'descartada' OR NOT ${NOT_REMOVED_SQL}`;
@@ -143,6 +177,7 @@ export function qualifies(f: Filters, area: AreaFeature | undefined, row: Qualif
   return (
     matchesQuery(row.haystack, f.q) &&
     (!f.estado || matchesCondition(row.haystack, f.estado as ConditionKey)) &&
+    (!f.planta || matchesFloor(row.floor, f.planta as FloorBand)) &&
     (!area || isIn(area, row))
   );
 }
@@ -157,7 +192,8 @@ export function toQuery(f: Filters, patch: Record<string, string> = {}): string 
     precio: f.precioMin || f.precioMax ? `${f.precioMin}-${f.precioMax}` : "",
     hab: f.hab,
     banos: f.banos,
-    m2: f.m2,
+    m2: f.m2Min || f.m2Max ? `${f.m2Min}-${f.m2Max}` : "",
+    planta: f.planta,
     estado: f.estado,
     etapa: f.etapa,
     barrio: f.barrio,
@@ -202,9 +238,19 @@ export function backHref(desde: string, id: string): string {
  * `archivadas` widens the set instead of narrowing it, so it is not counted as a filter.
  */
 export function countFilters(f: Filters): number {
-  return [f.q, f.precioMin || f.precioMax, f.hab, f.banos, f.m2, f.barrio, f.zona, f.puntuacion, f.estado, f.etapa].filter(
-    Boolean,
-  ).length;
+  return [
+    f.q,
+    f.precioMin || f.precioMax,
+    f.hab,
+    f.banos,
+    f.m2Min || f.m2Max,
+    f.planta,
+    f.barrio,
+    f.zona,
+    f.puntuacion,
+    f.estado,
+    f.etapa,
+  ].filter(Boolean).length;
 }
 
 /** Every key `Quitar todo` empties. `archivadas` included: clearing returns the default view. */
@@ -214,6 +260,7 @@ export const CLEARABLE: Record<string, string> = {
   hab: "",
   banos: "",
   m2: "",
+  planta: "",
   barrio: "",
   zona: "",
   puntuacion: "",

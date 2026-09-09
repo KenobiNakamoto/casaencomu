@@ -24,6 +24,7 @@ export default async function MapaPage({ searchParams }: { searchParams: Promise
     lng: number | null;
     precision: "exact" | "approx" | "none";
     haystack: string;
+    floor: string | null;
     cover_id: string | null;
   };
   const { rows } = await db.execute({ sql, args });
