@@ -52,7 +52,13 @@ mount. **Ponytail is on**: nothing is added until a trigger in `docs/PLAN.md` fi
   a JavaScript challenge by running it. Measured in `docs/PORTALS.md` § 4.
 - **A pasted link is never lost.** It becomes a record before anything is read, and the record
   says why it is empty. Layers 2 and 3 (`lib/enrich.ts`) fill what layer 1 missed; a field marked
-  «deducido» was deduced, never stated, and the two must never look alike.
+  «deducido» was deduced, never stated, and the two must never look alike. The model is reached
+  either with an API key or, on the server, through `scripts/ai-bridge.mjs` — the Claude Code CLI
+  behind a Messages-shaped endpoint (issue #113). Neither configured means the two layers are
+  skipped and nothing is marked as done.
+- **Two host processes, never in the container.** `scripts/capture-agent.mjs` and
+  `scripts/ai-bridge.mjs` need a browser and a Keychain, so they run as LaunchAgents beside the
+  container. Runbook: `air/README.md`. The app works without either; it just fills less.
 - **Deploy = `./deploy.sh`** (build on the Pro, `docker load` on the Air). No git clone on the
   Air; `~/srv/casaencomu` holds only `compose.yaml` and `.env`.
 - **Data root is `/Volumes/TimeMachine/casaencomu` on the Air**, bind-mounted as `/data`. Never

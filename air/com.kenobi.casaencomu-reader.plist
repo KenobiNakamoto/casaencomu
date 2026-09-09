@@ -13,7 +13,7 @@
 	<array>
 		<string>/bin/sh</string>
 		<string>-c</string>
-		<string>. "$HOME/.config/casaencomu/reader.env" &amp;&amp; exec /usr/local/bin/node "$HOME/.local/bin/casaencomu-reader.mjs" >>"$HOME/Library/Logs/casaencomu-reader.log" 2>&amp;1</string>
+		<string>. "$HOME/.config/casaencomu/reader.env" &amp;&amp; PATH=/opt/homebrew/bin:/usr/local/bin:$PATH exec node "$HOME/.local/bin/casaencomu-reader.mjs" >>"$HOME/Library/Logs/casaencomu-reader.log" 2>&amp;1</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
