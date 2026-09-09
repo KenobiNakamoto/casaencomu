@@ -52,7 +52,8 @@ data root:  /Volumes/TimeMachine/casaencomu   ← bind-mounted as /data
 - **Backups.** Nightly `VACUUM INTO` → `openssl enc` → iCloud Drive on the Air; 31 dailies plus
   first-of-month. Launched by a LaunchAgent through `ssh localhost`, because launchd cannot read
   `/Volumes`. Restore is tested in Phase 1. Photos are not backed up (re-downloadable while the
-  ad lives). Passphrase in 1Password or the backups are noise.
+  ad lives). Passphrase in the family's own password store
+  (Apple Passwords), shared with one other member, or the backups are noise.
 - **Secrets and PII.** `.env` on the Air only. Family emails live in Cloudflare Access and in
   `users`, never in the repo.
 - **The JWT check is load-bearing.** The port is published on `127.0.0.1`, but Colima port
