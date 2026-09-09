@@ -2,13 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Chip, StageChip } from "@/components/propiedades/chip";
 import { fmtDate, fmtDateTime, fmtEur, fmtNum, SIN_DATOS, siNo } from "@/components/propiedades/format";
-import { CommentForm } from "@/components/propiedades/comment-form";
 import { Gallery } from "@/components/propiedades/gallery";
 import { LocationMap } from "@/components/propiedades/location-map";
+import { OpinionForm } from "@/components/propiedades/opinion-form";
 import { PendingPoll } from "@/components/propiedades/pending-poll";
-import { RatingForm } from "@/components/propiedades/rating-form";
-import { StageForm } from "@/components/propiedades/stage-form";
-import { availabilityLine, AVAILABILITY_LABEL, isStale, type SourceAvailability } from "@/lib/availability";
+import { availabilityLine, AVAILABILITY_LABEL, isStale, propertyAvailability, type SourceAvailability } from "@/lib/availability";
 import { CompareToggle, CompareTray } from "@/components/comparar/controls";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -58,6 +56,7 @@ type Source = {
 type Event = { kind: string; payload_json: string | null; created_at: string; actor: string | null };
 type Comment = { body: string; created_at: string; name: string };
 type Member = { id: string; name: string };
+type MyRating = RatingRow & { updated_at: string };
 
 const AVAILABILITY: Record<string, string> = AVAILABILITY_LABEL;
 const PRECISION: Record<string, string> = { exact: "(exacta)", approx: "(aproximada)" };
@@ -117,7 +116,7 @@ function describe(kind: string, p: Record<string, unknown>) {
 }
 
 const h2 = "text-[22px] font-medium leading-tight";
-const section = "space-y-4 py-8";
+const band = "mt-12";
 const cell = "border-b border-hairline-soft py-2 pr-3 align-top";
 const initial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 const score = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -149,7 +148,7 @@ export default async function PropiedadPage({
         sql: "SELECT e.kind, e.payload_json, e.created_at, u.name AS actor FROM events e LEFT JOIN users u ON u.id = e.actor_id WHERE e.property_id = ? ORDER BY e.created_at DESC",
         args: [id],
       },
-      { sql: "SELECT user_id, dimension, score FROM ratings WHERE property_id = ?", args: [id] },
+      { sql: "SELECT user_id, dimension, score, updated_at FROM ratings WHERE property_id = ?", args: [id] },
       { sql: "SELECT c.body, c.created_at, u.name FROM comments c JOIN users u ON u.id = c.user_id WHERE c.property_id = ? ORDER BY c.created_at", args: [id] },
       "SELECT id, name FROM users ORDER BY created_at",
     ],
@@ -162,12 +161,19 @@ export default async function PropiedadPage({
   const sourceRows = sources.rows as unknown as Source[];
   const eventRows = (events.rows as unknown as Event[]).map((e) => ({ ...e, payload: parse(e.payload_json) }));
   const priceHistory = eventRows.filter((e) => e.kind === "price_change");
-  const ratingRows = ratings.rows as unknown as RatingRow[];
+  const ratingRows = ratings.rows as unknown as MyRating[];
   const commentRows = comments.rows as unknown as Comment[];
   const memberRows = members.rows as unknown as Member[];
   const m = matrix(ratingRows, memberRows.map((u) => u.id), DIMENSIONS);
   const family = familyAverage(ratingRows);
   const perM2 = p.price_eur !== null && p.area_m2 ? fmtEur(Math.round(p.price_eur / p.area_m2)) : null;
+
+  // The state column of the opinion box: what the advertisement is doing, and when each of us
+  // last said something here.
+  const availability = propertyAvailability(sourceRows);
+  const lastChecked = sourceRows.map((s) => s.last_ok_at).filter(Boolean).sort().at(-1) ?? null;
+  const mineAt = ratingRows.filter((r) => r.user_id === user.id).map((r) => r.updated_at).sort().at(-1) ?? null;
+  const voices = new Set([...ratingRows.map((r) => r.user_id)]).size;
 
   const facts: [string, string, string][] = [
     ["Superficie", fmtNum(p.area_m2, "m²"), "area_m2"],
@@ -228,42 +234,39 @@ export default async function PropiedadPage({
         </div>
       )}
 
+      {/* The price sits with the title, where a person looks for it, and not in a card halfway
+          down the page (PIP-07). */}
       <header className="mt-4 space-y-1">
         <h1 className="text-[22px] font-medium leading-tight sm:text-[26px]">{p.title}</h1>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <p className="text-[22px] font-semibold leading-tight text-ink">{fmtEur(p.price_eur, "Sin precio")}</p>
+          {perM2 && <p className="text-sm text-muted">{perM2}/m²</p>}
+        </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] text-body">
           {summary && <span>{summary}</span>}
           <StageChip stage={p.stage} />
-          <span className="text-muted">{family !== null ? `★ ${score(family)}` : "Sin valorar"}</span>
+          <span className="text-muted">{family !== null ? `★ ${score(family)} en familia` : "Sin valorar"}</span>
         </div>
       </header>
 
       {photoIds.length > 0 && <Gallery ids={photoIds} title={p.title} />}
 
-      <div className="mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-16">
-        {/* Side card: price, stage, your rating. Under the header on phones, sticky right rail on lg. */}
-        <aside className="lg:col-start-2 lg:row-start-1 lg:self-start lg:sticky lg:top-28">
-          <div className="space-y-5 rounded-card border border-hairline bg-raised p-6 shadow-tier">
-            <div>
-              <p className="text-[22px] font-semibold leading-tight">{fmtEur(p.price_eur, "Sin precio")}</p>
-              <p className="text-sm text-muted">
-                {perM2 ? `${perM2}/m²` : SIN_DATOS}
-                {family !== null && ` · ★ ${score(family)} en familia`}
-              </p>
-            </div>
-            <StageForm propertyId={p.id} stage={p.stage} version={Number(p.stage_version ?? 0)} />
-            <div className="border-t border-hairline-soft pt-5">
-              <p className="mb-3 text-sm font-semibold text-ink">Tu valoración</p>
-              <RatingForm propertyId={p.id} current={m[user.id]} />
-            </div>
-          </div>
-        </aside>
-
-        <div className="mt-8 divide-y divide-hairline-soft lg:col-start-1 lg:row-start-1 lg:mt-0">
-          <section className="space-y-4 pb-8">
-            <h2 className={h2}>Datos</h2>
-            <dl className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+      {/* ---- band 1: the advertisement's own words, and the facts beside them ---- */}
+      <section className={`${band} grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-12`}>
+        <div>
+          <h2 className={h2}>Descripción</h2>
+          {p.description ? (
+            <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-body">{p.description}</p>
+          ) : (
+            <p className="mt-4 text-sm text-muted">Sin descripción.</p>
+          )}
+        </div>
+        <aside className="lg:col-start-2 lg:row-start-1">
+          <div className="bento">
+            <h2 className="mb-2 text-sm font-semibold text-ink">Datos</h2>
+            <dl>
               {facts.map(([k, val, key]) => (
-                <div key={k} className="flex justify-between gap-4 border-b border-hairline-soft py-2.5 text-sm">
+                <div key={k} className="flex justify-between gap-4 border-b border-hairline-soft py-2.5 text-sm last:border-0">
                   <dt className="text-muted">{k}</dt>
                   <dd className="text-right font-medium text-ink">
                     {val}
@@ -273,173 +276,135 @@ export default async function PropiedadPage({
               ))}
             </dl>
             {facts.some(([, , key]) => deduced(key)) && (
-              <p className="text-xs text-muted">
+              <p className="mt-3 text-xs text-muted">
                 «deducido» lo ha completado la IA a partir del texto o de las fotos. El anuncio no lo dice.
               </p>
             )}
-          </section>
+          </div>
+        </aside>
+      </section>
 
-          <section className={section}>
-            <h2 className={h2}>Descripción</h2>
-            {p.description ? (
-              <p className="whitespace-pre-line text-[15px] leading-relaxed text-body">{p.description}</p>
-            ) : (
-              <p className="text-sm text-muted">Sin descripción.</p>
-            )}
-          </section>
+      {/* ---- band 2: one box, one button ---- */}
+      <section className={band}>
+        <h2 className={h2}>Tu opinión</h2>
+        <p className="mb-4 mt-1 text-sm text-muted">
+          Las respuestas, el comentario y la etapa se guardan a la vez, con el botón de abajo.
+        </p>
+        <OpinionForm propertyId={p.id} current={m[user.id]} stage={p.stage} version={Number(p.stage_version ?? 0)}>
+          <dl className="space-y-2.5 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <dt className="text-muted">Anuncio</dt>
+              <dd>
+                <Chip tone={availability === "active" ? "success" : availability === "unknown" ? "warning" : "danger"}>
+                  {AVAILABILITY[availability] ?? availability}
+                </Chip>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted">Comprobado</dt>
+              <dd className="text-body">{lastChecked ? fmtDateTime(lastChecked) : "Nunca"}</dd>
+            </div>
+            <div>
+              <dt className="text-muted">Tus respuestas</dt>
+              <dd className="text-body">{mineAt ? fmtDate(mineAt) : "Todavía no has valorado"}</dd>
+            </div>
+            <div>
+              <dt className="text-muted">La familia</dt>
+              <dd className="text-body">
+                {voices === 0 ? "Nadie ha valorado" : voices === 1 ? "1 persona ha valorado" : `${voices} personas han valorado`}
+                {` · ${commentRows.length} ${commentRows.length === 1 ? "comentario" : "comentarios"}`}
+              </dd>
+            </div>
+          </dl>
+        </OpinionForm>
+      </section>
 
-          <section className={section}>
-            <h2 className={h2}>Fuentes</h2>
-            {sourceRows.length === 0 ? (
-              <p className="text-sm text-muted">{SIN_DATOS}</p>
-            ) : (
-              <ul className="space-y-3 text-sm">
-                {sourceRows.map((s) => {
-                  const check = s.via === "bookmarklet" || s.availability === "unknown";
+      {/* ---- band 3: the table, and the conversation beside it ---- */}
+      <section className={band}>
+        <h2 className={h2}>Lo que opina la familia</h2>
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+          <div className="bento overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className={`${cell} text-left font-medium text-muted`}>Aspecto</th>
+                  {memberRows.map((u) => (
+                    <th key={u.id} className={`${cell} text-center font-medium ${u.id === user.id ? "text-ink" : "text-muted"}`}>
+                      {u.id === user.id ? "Tú" : u.name}
+                    </th>
+                  ))}
+                  <th className={`${cell} text-center font-medium text-muted`}>Media</th>
+                </tr>
+              </thead>
+              <tbody>
+                {DIMENSIONS.map((dim) => {
+                  const dimRows = ratingRows.filter((r) => r.dimension === dim);
                   return (
-                    <li key={s.url_original} className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium capitalize text-ink">{s.portal}</span>
-                      {/^https?:\/\//.test(s.url_original) && (
-                        <a href={s.url_original} target="_blank" rel="noopener noreferrer" className="font-medium text-ink underline underline-offset-4">
-                          Ver anuncio
-                        </a>
-                      )}
-                      <span className="text-muted">vía {s.via === "bookmarklet" ? "marcador" : s.via}</span>
-                      <Chip tone={s.availability === "active" ? "success" : s.availability === "unknown" ? "warning" : "danger"}>
-                        {AVAILABILITY[s.availability] ?? s.availability}
-                      </Chip>
-                      {s.availability === "active" && isStale(s.last_ok_at, new Date()) && (
-                        <Chip tone="warning">Sin comprobar hace más de 48 h</Chip>
-                      )}
-                      {/* two different facts: when we last tried, and when we last succeeded */}
-                      <span className="text-muted">Comprobado: {s.last_checked_at ? fmtDateTime(s.last_checked_at) : "nunca"}</span>
-                      <span className="text-muted">Visto bien: {s.last_ok_at ? fmtDateTime(s.last_ok_at) : "nunca"}</span>
-                      {check && (
-                        <span className="text-warning-ink">
-                          <Chip tone="warning">Comprobar</Chip> Abre el anuncio y vuelve a pulsar el marcador.
-                        </span>
-                      )}
-                    </li>
+                    <tr key={dim}>
+                      <th scope="row" className={`${cell} text-left font-normal text-body`}>
+                        {DIMENSION_LABELS[dim]}
+                      </th>
+                      {memberRows.map((u) => (
+                        <td key={u.id} className={`${cell} text-center`}>
+                          {m[u.id][dim] ?? "—"}
+                        </td>
+                      ))}
+                      <td className={`${cell} text-center font-medium`}>{familyAverage(dimRows)?.toLocaleString("es-ES") ?? "—"}</td>
+                    </tr>
                   );
                 })}
-              </ul>
-            )}
-          </section>
+                <tr>
+                  <th scope="row" className={`${cell} text-left font-medium`}>
+                    Media
+                  </th>
+                  {memberRows.map((u) => (
+                    <td key={u.id} className={`${cell} text-center font-medium`}>
+                      {memberAverage(ratingRows, u.id)?.toLocaleString("es-ES") ?? "—"}
+                    </td>
+                  ))}
+                  <td className={`${cell} text-center font-semibold`}>{family?.toLocaleString("es-ES") ?? "—"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-          <section className={section}>
-            <h2 className={h2}>Historial de precio</h2>
-            {priceHistory.length === 0 ? (
-              <p className="text-sm text-muted">Sin cambios de precio.</p>
-            ) : (
-              <ul className="space-y-1 text-sm">
-                {priceHistory.map((e, i) => (
-                  <li key={i}>
-                    <span className="text-muted">{fmtDate(e.created_at)}:</span> {describe(e.kind, e.payload)}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className={section}>
-            <h2 className={h2}>Valoraciones</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr>
-                    <th className={`${cell} text-left font-medium text-muted`}>Dimensión</th>
-                    {memberRows.map((u) => (
-                      <th key={u.id} className={`${cell} text-center font-medium ${u.id === user.id ? "text-ink" : "text-muted"}`}>
-                        {u.name}
-                      </th>
-                    ))}
-                    <th className={`${cell} text-center font-medium text-muted`}>Media</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {DIMENSIONS.map((dim) => {
-                    const dimRows = ratingRows.filter((r) => r.dimension === dim);
-                    return (
-                      <tr key={dim}>
-                        <th scope="row" className={`${cell} text-left font-normal text-body`}>
-                          {DIMENSION_LABELS[dim]}
-                        </th>
-                        {memberRows.map((u) => (
-                          <td key={u.id} className={`${cell} text-center`}>
-                            {m[u.id][dim] ?? "—"}
-                          </td>
-                        ))}
-                        <td className={`${cell} text-center font-medium`}>{familyAverage(dimRows)?.toLocaleString("es-ES") ?? "—"}</td>
-                      </tr>
-                    );
-                  })}
-                  <tr>
-                    <th scope="row" className={`${cell} text-left font-medium`}>
-                      Media
-                    </th>
-                    {memberRows.map((u) => (
-                      <td key={u.id} className={`${cell} text-center font-medium`}>
-                        {memberAverage(ratingRows, u.id)?.toLocaleString("es-ES") ?? "—"}
-                      </td>
-                    ))}
-                    <td className={`${cell} text-center font-semibold`}>{family?.toLocaleString("es-ES") ?? "—"}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section className={section}>
-            <h2 className={h2}>Comentarios</h2>
+          <div className="bento flex flex-col">
+            <p className="mb-3 text-sm font-semibold text-ink">Comentarios</p>
             {commentRows.length === 0 ? (
-              <p className="text-sm text-muted">Sin comentarios.</p>
+              <p className="text-sm text-muted">
+                Todavía no hay comentarios. El tuyo se escribe arriba, junto a tus respuestas.
+              </p>
             ) : (
-              <ul className="space-y-5">
-                {commentRows.map((c, i) => (
+              // Newest first in the markup and `column-reverse` on the list: the newest comment
+              // sits at the foot, and the pane opens scrolled to it — where a conversation is read
+              // from. A column-reverse scroller starts at its own start, which is the bottom, so
+              // this costs no JavaScript. It is not stretched to the band: a stretched
+              // column-reverse list packs two comments against the floor and leaves a hole.
+              <ul className="flex max-h-[520px] flex-col-reverse gap-4 overflow-y-auto">
+                {[...commentRows].reverse().map((c, i) => (
                   <li key={i} className="flex gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-strong text-sm font-semibold text-ink" aria-hidden>
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-strong text-sm font-semibold text-ink" aria-hidden>
                       {initial(c.name)}
                     </span>
                     <div className="min-w-0">
-                      <div className="text-sm">
+                      <div className="text-[13px]">
                         <span className="font-semibold text-ink">{c.name}</span>
                         <span className="text-muted"> · {fmtDateTime(c.created_at)}</span>
                       </div>
-                      <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-body">{c.body}</p>
+                      <p className="mt-0.5 whitespace-pre-line text-sm leading-relaxed text-body">{c.body}</p>
                     </div>
                   </li>
                 ))}
               </ul>
             )}
-            <CommentForm propertyId={p.id} />
-          </section>
-
-          <section className={section}>
-            <h2 className={h2}>Actividad</h2>
-            {eventRows.length === 0 ? (
-              <p className="text-sm text-muted">Sin actividad.</p>
-            ) : (
-              <ol className="relative space-y-4 border-l border-hairline pl-5 text-sm">
-                {eventRows.map((e, i) => (
-                  <li key={i} className="relative">
-                    <span className="absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-raised bg-accent" aria-hidden />
-                    <div className="text-muted">
-                      {fmtDateTime(e.created_at)}
-                      {e.actor && ` · ${e.actor}`}
-                    </div>
-                    <div className="text-body">{describe(e.kind, e.payload)}</div>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
 
-    {/* Where it is, at the full width of the window and much wider than it is tall. It sits
-        outside the container rather than breaking out of it with a viewport width, which would
-        add a horizontal scrollbar of exactly the vertical scrollbar's width. */}
+    {/* ---- band 4: where it is, at the full width of the window and much wider than it is tall.
+        It sits outside the container rather than breaking out of it with a viewport width, which
+        would add a horizontal scrollbar of exactly the vertical scrollbar's width. ---- */}
     <section className="mt-12 border-t border-hairline-soft">
       <div className="mx-auto max-w-[1120px] px-4 pb-3 pt-8 sm:px-6 lg:px-10">
         <h2 className={h2}>Dónde está</h2>
@@ -461,6 +426,82 @@ export default async function PropiedadPage({
         </div>
       )}
     </section>
+
+    {/* ---- the record of the advertisement. Not an opinion, so it reads last. ---- */}
+    <div className="mx-auto max-w-[1120px] divide-y divide-hairline-soft px-4 pb-14 sm:px-6 lg:px-10">
+      <section className="space-y-4 py-8">
+        <h2 className={h2}>Fuentes</h2>
+        {sourceRows.length === 0 ? (
+          <p className="text-sm text-muted">{SIN_DATOS}</p>
+        ) : (
+          <ul className="space-y-3 text-sm">
+            {sourceRows.map((s) => {
+              const check = s.via === "bookmarklet" || s.availability === "unknown";
+              return (
+                <li key={s.url_original} className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium capitalize text-ink">{s.portal}</span>
+                  {/^https?:\/\//.test(s.url_original) && (
+                    <a href={s.url_original} target="_blank" rel="noopener noreferrer" className="font-medium text-ink underline underline-offset-4">
+                      Ver anuncio
+                    </a>
+                  )}
+                  <span className="text-muted">vía {s.via === "bookmarklet" ? "marcador" : s.via}</span>
+                  <Chip tone={s.availability === "active" ? "success" : s.availability === "unknown" ? "warning" : "danger"}>
+                    {AVAILABILITY[s.availability] ?? s.availability}
+                  </Chip>
+                  {s.availability === "active" && isStale(s.last_ok_at, new Date()) && (
+                    <Chip tone="warning">Sin comprobar hace más de 48 h</Chip>
+                  )}
+                  {/* two different facts: when we last tried, and when we last succeeded */}
+                  <span className="text-muted">Comprobado: {s.last_checked_at ? fmtDateTime(s.last_checked_at) : "nunca"}</span>
+                  <span className="text-muted">Visto bien: {s.last_ok_at ? fmtDateTime(s.last_ok_at) : "nunca"}</span>
+                  {check && (
+                    <span className="text-warning-ink">
+                      <Chip tone="warning">Comprobar</Chip> Abre el anuncio y vuelve a pulsar el marcador.
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-4 py-8">
+        <h2 className={h2}>Historial de precio</h2>
+        {priceHistory.length === 0 ? (
+          <p className="text-sm text-muted">Sin cambios de precio.</p>
+        ) : (
+          <ul className="space-y-1 text-sm">
+            {priceHistory.map((e, i) => (
+              <li key={i}>
+                <span className="text-muted">{fmtDate(e.created_at)}:</span> {describe(e.kind, e.payload)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-4 py-8">
+        <h2 className={h2}>Actividad</h2>
+        {eventRows.length === 0 ? (
+          <p className="text-sm text-muted">Sin actividad.</p>
+        ) : (
+          <ol className="relative space-y-4 border-l border-hairline pl-5 text-sm">
+            {eventRows.map((e, i) => (
+              <li key={i} className="relative">
+                <span className="absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-raised bg-accent" aria-hidden />
+                <div className="text-muted">
+                  {fmtDateTime(e.created_at)}
+                  {e.actor && ` · ${e.actor}`}
+                </div>
+                <div className="text-body">{describe(e.kind, e.payload)}</div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </div>
     </>
   );
 }

@@ -36,3 +36,15 @@ export function matrix<M extends string, D extends string>(
   }
   return out;
 }
+
+/**
+ * The aspects whose score is new or different. The opinion form always submits all six radios,
+ * so without this every save would write six rows and one «Valoración guardada» event, even when
+ * the person only typed a sentence.
+ */
+export function changedScores<D extends string>(
+  current: Record<string, number | null | undefined>,
+  next: Partial<Record<D, number>>,
+): [D, number][] {
+  return (Object.entries(next) as [D, number][]).filter(([dim, score]) => current[dim] !== score);
+}
