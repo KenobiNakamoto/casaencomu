@@ -38,9 +38,13 @@ detour is the reason this file looks stranger than it should.
 
 A restore has to be practised before it is needed:
 
+The archive holds `control.db` — which projects exist and who belongs to each — plus one file
+per project, named after its id.
+
 ```sh
-openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in casa-<date>.db.enc -out /tmp/casa.db -pass file:<passphrase file>
-sqlite3 /tmp/casa.db 'select count(*) from properties;'
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in casa-<date>.tar.enc -pass file:<passphrase file> | tar -xf - -C /tmp/restore
+sqlite3 /tmp/restore/control.db 'select id, name from projects;'
+sqlite3 /tmp/restore/<project-id>.db 'select count(*) from properties;'
 ```
 
 ## `capture-agent.mjs` — the browser reader

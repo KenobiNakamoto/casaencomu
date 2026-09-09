@@ -4,7 +4,7 @@ import type { InStatement } from "@libsql/client";
 import { z } from "zod";
 import { aiReady, ask, type Image } from "./ai";
 import { canonicalFacts, col, FACT_COLUMNS, factsHash } from "./changes";
-import { db } from "./db";
+import { currentProjectId, db } from "./db";
 import type { Presence, Raw } from "./extract";
 import { Listing } from "./listing";
 import { photoPath } from "./photos";
@@ -177,10 +177,11 @@ async function photosOf(propertyId: string): Promise<Image[]> {
     sql: "SELECT sha256 FROM photos WHERE property_id = ? ORDER BY position LIMIT ?",
     args: [propertyId, MAX_PHOTOS_SENT],
   });
+  const project = await currentProjectId();
   const out: Image[] = [];
   for (const r of rows) {
     try {
-      const buf = await readFile(photoPath(propertyId, String(r.sha256)));
+      const buf = await readFile(photoPath(project, propertyId, String(r.sha256)));
       out.push({ media_type: "image/jpeg", data: buf.toString("base64") });
     } catch {
       /* ponytail: a photo we cannot read is one fewer piece of evidence, not an error */

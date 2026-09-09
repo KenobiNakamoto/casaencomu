@@ -2,18 +2,19 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
-import { db } from "./db";
+import { projectDir } from "./control";
+import { currentProjectId, db } from "./db";
 import { fetchGuarded } from "./fetching";
 import { isAllowedImageHost } from "./url";
 
-const DATA_DIR = process.env.DATA_DIR ?? "./data";
 const MAX_PHOTOS = 40;
 const MAX_BYTES = 5 * 1024 * 1024;
 const PHOTO_TIMEOUT_MS = 5_000;
 const CONCURRENCY = 4;
 
-export const photoPath = (propertyId: string, sha256: string) =>
-  join(DATA_DIR, "photos", propertyId, sha256 + ".jpg");
+/** Photographs live beside their project's database, so deleting a project deletes them too. */
+export const photoPath = (projectId: string, propertyId: string, sha256: string) =>
+  join(projectDir(projectId), "photos", propertyId, sha256 + ".jpg");
 
 /**
  * Original bytes, or null when the response is not a small image. The cap is applied to the
@@ -60,8 +61,9 @@ async function savePhoto(
     .resize({ width: 800, withoutEnlargement: true })
     .jpeg({ quality: 82 })
     .toBuffer({ resolveWithObject: true });
-  await mkdir(join(DATA_DIR, "photos", propertyId), { recursive: true });
-  await writeFile(photoPath(propertyId, sha256), data);
+  const project = await currentProjectId();
+  await mkdir(join(projectDir(project), "photos", propertyId), { recursive: true });
+  await writeFile(photoPath(project, propertyId, sha256), data);
   // OR IGNORE: two workers can race on the same bytes at two URLs; the UNIQUE index settles it.
   const { rowsAffected } = await db.execute({
     sql: `INSERT OR IGNORE INTO photos (id, property_id, position, sha256, width, height, source_url)

@@ -137,16 +137,17 @@ CREATE TABLE IF NOT EXISTS comments (
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 ```
 
-`db.ts`: `createClient({ url: 'file:' + DATA_DIR + '/casa.db' })`, then
-`PRAGMA journal_mode=DELETE; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000`.
-Photo file = `DATA_DIR/photos/<property_id>/<sha256>.jpg`; no path column.
+`db.ts`: one client per project, `file:DATA_DIR/p/<project-id>/casa.db`, then
+`PRAGMA journal_mode=DELETE; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000`. Which project a
+call belongs to is `control.ts`; `docs/SCALE.md` § 4.
+Photo file = `DATA_DIR/p/<project-id>/photos/<property_id>/<sha256>.jpg`; no path column.
 Event kinds: `import duplicate price_change availability_change facts_change stage_change comment rating`.
 Stages: `nueva revisando preseleccionada visita_prevista descartada no_disponible`.
 Dimensions: `ubicacion distribucion luz_vistas estado calidad_precio encaje_familiar`.
 Settings keys: `presupuesto_min presupuesto_max` (integer euros). No seed row — the family
 types the budget in the app (Kenobi, 2026-09-04). Missing keys = no budget = no out-of-range flag.
 
-Check: `sqlite3 data/casa.db .tables` lists eight tables.
+Check: `sqlite3 data/p/*/casa.db .tables` lists eight tables.
 
 ## 3. Auth — `src/proxy.ts`, `src/lib/auth.ts`
 
@@ -386,11 +387,20 @@ ssh air 'umask 077; mkdir -p ~/.config/casaencomu; openssl rand -base64 32 > ~/.
 set -euo pipefail
 export PATH=/opt/homebrew/bin:$PATH COLIMA_HOME=/Volumes/Agents/colima
 DEST="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Backups/casaencomu"; mkdir -p "$DEST"
-docker compose -f ~/srv/casaencomu/compose.yaml exec -T web sqlite3 /data/casa.db "VACUUM INTO '/data/latest.db'"
-openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass "file:$HOME/.config/casaencomu/backup.pass" \
-  -in /Volumes/TimeMachine/casaencomu/latest.db -out "$DEST/casa-$(date +%F).db.enc"
-rm -f /Volumes/TimeMachine/casaencomu/latest.db
-find "$DEST" -name 'casa-*.db.enc' -mtime +31 ! -name '*-01.db.enc' -delete
+# One archive: control.db plus one file per project. The live script is air/casaencomu-backup.sh.
+docker compose -f ~/srv/casaencomu/compose.yaml exec -T web sh -s <<'INNER'
+set -eu
+mkdir -p /data/dump
+sqlite3 /data/control.db "VACUUM INTO '/data/dump/control.db'"
+for d in /data/p/*/; do
+  [ -f "$d/casa.db" ] || continue
+  sqlite3 "$d/casa.db" "VACUUM INTO '/data/dump/$(basename "$d").db'"
+done
+INNER
+tar -cf - -C /Volumes/TimeMachine/casaencomu/dump . | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
+  -pass "file:$HOME/.config/casaencomu/backup.pass" -out "$DEST/casa-$(date +%F).tar.enc"
+rm -rf /Volumes/TimeMachine/casaencomu/dump
+find "$DEST" -name 'casa-*.tar.enc' -mtime +31 ! -name '*-01.tar.enc' -delete
 print "$(date '+%FT%T') ok"
 ```
 
@@ -434,6 +444,6 @@ pnpm dev                                          # Pro, AUTH_DEV_EMAIL in .env.
 pnpm test
 ./deploy.sh
 ssh air 'cd ~/srv/casaencomu && docker compose logs -f --tail 100 web'
-ssh air 'cd ~/srv/casaencomu && docker compose exec web sqlite3 /data/casa.db .tables'
+ssh air 'cd ~/srv/casaencomu && docker compose exec web sqlite3 /data/control.db "select id, name from projects"'
 ssh air '~/.local/bin/casaencomu-backup.sh'; ssh air 'tail -3 ~/Library/Logs/casaencomu-backup.log'
 ```
