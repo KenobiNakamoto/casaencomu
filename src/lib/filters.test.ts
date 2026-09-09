@@ -33,6 +33,7 @@ const row = (over: Partial<Parameters<typeof qualifies>[2]> = {}) => ({
   lat: 0.5,
   lng: 0.5,
   neighborhood: "Gòtic",
+  floor: "3ª planta",
   ...over,
 });
 
@@ -41,7 +42,7 @@ describe("parseFilters", () => {
     const v = f({ hab: "3", banos: "x", m2: "-4", etapa: "inventada", estado: "nope", puntuacion: "9", orden: "azar" });
     expect(v.hab).toBe("3");
     expect(v.banos).toBe("");
-    expect(v.m2).toBe("");
+    expect(v.m2Min).toBe("");
     expect(v.etapa).toBe("");
     expect(v.estado).toBe("");
     expect(v.puntuacion).toBe("");
@@ -78,6 +79,30 @@ describe("listSql — the qualifying set", () => {
     expect(sql).toContain("p.rooms >= ?");
     expect(sql).toContain("p.bathrooms >= ?");
     expect(sql).toContain("p.area_m2 >= ?");
+  });
+
+  it("reads a surface as a range, and a bare number as the minimum it used to be", () => {
+    const both = f({ m2: "70-110" });
+    expect([both.m2Min, both.m2Max]).toEqual(["70", "110"]);
+    expect(listSql(both, cols).args).toEqual([70, 110]);
+
+    const old = f({ m2: "80" });
+    expect([old.m2Min, old.m2Max]).toEqual(["80", ""]);
+    expect(listSql(old, cols).args).toEqual([80]);
+  });
+
+  it("leaves the storey to the JavaScript pass, because the column is free text", () => {
+    // It binds nothing: the column is selected for the pass below, never compared in SQL.
+    expect(listSql(f({ planta: "atico" }), cols).args).toEqual([]);
+    expect(qualifies(f({ planta: "atico" }), undefined, row({ floor: "Ático" }))).toBe(true);
+    expect(qualifies(f({ planta: "atico" }), undefined, row({ floor: "7ª planta" }))).toBe(false);
+    expect(qualifies(f({ planta: "5+" }), undefined, row({ floor: "7ª planta" }))).toBe(true);
+    expect(qualifies(f({ planta: "1-4" }), undefined, row({ floor: "7ª planta" }))).toBe(false);
+  });
+
+  it("hides a home whose storey nobody wrote down, rather than guessing at it", () => {
+    expect(qualifies(f({ planta: "bajo" }), undefined, row({ floor: null }))).toBe(false);
+    expect(qualifies(f({}), undefined, row({ floor: null }))).toBe(true);
   });
 
   it("hides discarded and removed homes by default", () => {
@@ -270,7 +295,11 @@ describe("countFilters", () => {
   });
 
   it("agrees with what the bubbles show", () => {
-    expect(countFilters(f({ q: "a", hab: "3", banos: "2", m2: "80", barrio: "X", puntuacion: "4", estado: "reformado", etapa: "nueva", precio: "1-2" }))).toBe(9);
+    expect(
+      countFilters(
+        f({ q: "a", hab: "3", banos: "2", m2: "80", planta: "atico", barrio: "X", puntuacion: "4", estado: "reformado", etapa: "nueva", precio: "1-2" }),
+      ),
+    ).toBe(10);
   });
 });
 

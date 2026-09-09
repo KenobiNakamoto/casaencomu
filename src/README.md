@@ -72,7 +72,8 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 | `ratings.ts` | averages and the upsert statement. Deliberately has no `db` import, so the test needs no data directory | yes |
 | `selection.ts` | which homes a person picked to compare. Pure: the storage and the React binding are in `components/comparar/` | yes |
 | `filters.ts` | **the one contract for which homes qualify.** Parses the URL, builds the statement, runs the text and area pass, and writes every link back out. The list and the map share it | yes |
-| `search.ts` | free-text matching and the filter presets, accent-insensitive, in JavaScript over the loaded rows | yes |
+| `search.ts` | free-text matching, the condition presets and the storey bands, accent-insensitive, in JavaScript over the loaded rows. `floor` is free text — «7ª planta», «Bajo», «Ático» — so a band is decided here, never in SQL | yes |
+| `buckets.ts` | the bars over a range slider: how many homes fall in each slice, and a round step. Pure, so the page computes them from rows it already has | yes |
 | `geo.ts` | point in polygon for the map's area overlays, and `isIn` for one property. Twenty lines, no dependency. Also the shape of a zone: `rank` 1–6 and `parent` | yes |
 | `areas.ts` | loads `public/areas.geojson` once; `findArea`, and `areaChain` for the zone read widest first | no |
 | `settings.ts` | the key/value table; today it holds only the budget. Either bound alone is valid, and both empty clears it | no |

@@ -1,30 +1,37 @@
 import Link from "next/link";
 import { STAGE_LABELS, type Stage } from "@/lib/listing";
-import { CONDITIONS } from "@/lib/search";
+import { CONDITIONS, FLOORS, type FloorBand } from "@/lib/search";
 import type { Filters } from "@/lib/filters";
 import { fmtEur } from "./format";
 
 type Href = (patch?: Record<string, string>) => string;
-type Param = "hab" | "banos" | "m2" | "estado";
 
 /**
  * One click each. Clicking an active one takes it off again. Every label carries its `+`, because
  * these are minimums and `3 hab` read as exactly three (F31).
+ *
+ * `param` is the URL key and `read` is where the same filter lives once parsed. They differ for
+ * m², which the URL carries as one `min-max` pair.
  */
-const PRESETS: { label: string; param: Param; value: string }[] = [
-  { label: "2+ baños", param: "banos", value: "2" },
-  { label: "3+ hab", param: "hab", value: "3" },
-  { label: "4+ hab", param: "hab", value: "4" },
-  { label: "80+ m²", param: "m2", value: "80" },
-  { label: "100+ m²", param: "m2", value: "100" },
-  ...Object.entries(CONDITIONS).map(([value, c]) => ({ label: c.label, param: "estado" as const, value })),
+const PRESETS: { label: string; param: string; value: string; read: (v: Filters) => string }[] = [
+  { label: "2+ baños", param: "banos", value: "2", read: (v) => v.banos },
+  { label: "3+ hab", param: "hab", value: "3", read: (v) => v.hab },
+  { label: "4+ hab", param: "hab", value: "4", read: (v) => v.hab },
+  { label: "80+ m²", param: "m2", value: "80", read: (v) => v.m2Min },
+  { label: "100+ m²", param: "m2", value: "100", read: (v) => v.m2Min },
+  ...Object.entries(CONDITIONS).map(([value, c]) => ({
+    label: c.label,
+    param: "estado",
+    value,
+    read: (v: Filters) => v.estado,
+  })),
 ];
 
 export function QuickFilters({ v, href }: { v: Filters; href: Href }) {
   return (
     <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10" aria-label="Filtros rápidos">
-      {PRESETS.map(({ label, param, value }) => {
-        const active = v[param] === value;
+      {PRESETS.map(({ label, param, value, read }) => {
+        const active = read(v) === value;
         return (
           <Link
             key={`${param}-${value}`}
@@ -49,13 +56,17 @@ function priceLabel(v: Filters) {
   return v.precioMin ? `Desde ${fmtEur(min)}` : `Hasta ${fmtEur(max)}`;
 }
 
+const areaLabel = (v: Filters) =>
+  v.m2Min && v.m2Max ? `${v.m2Min} – ${v.m2Max} m²` : v.m2Min ? `${v.m2Min}+ m²` : `Hasta ${v.m2Max} m²`;
+
 export function ActiveFilters({ v, href, zonaLabel, clearAllHref }: { v: Filters; href: Href; zonaLabel?: string; clearAllHref: string }) {
   const items: { label: string; patch: Record<string, string> }[] = [];
   if (v.q) items.push({ label: `“${v.q}”`, patch: { q: "" } });
   if (v.precioMin || v.precioMax) items.push({ label: priceLabel(v), patch: { precio: "" } });
   if (v.hab) items.push({ label: `${v.hab}+ hab`, patch: { hab: "" } });
   if (v.banos) items.push({ label: `${v.banos}+ baños`, patch: { banos: "" } });
-  if (v.m2) items.push({ label: `${v.m2}+ m²`, patch: { m2: "" } });
+  if (v.m2Min || v.m2Max) items.push({ label: areaLabel(v), patch: { m2: "" } });
+  if (v.planta) items.push({ label: `Planta ${FLOORS[v.planta as FloorBand].label}`, patch: { planta: "" } });
   if (v.barrio) items.push({ label: v.barrio, patch: { barrio: "" } });
   if (v.zona && zonaLabel) items.push({ label: zonaLabel, patch: { zona: "" } });
   if (v.puntuacion) items.push({ label: `Nota ${v.puntuacion}+`, patch: { puntuacion: "" } });
