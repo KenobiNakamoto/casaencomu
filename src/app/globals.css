@@ -891,6 +891,21 @@ html[data-wipe]::view-transition-new(root) {
     animation: map-fill linear both;
     animation-timeline: scroll(root block);
     animation-range: 0 var(--map-grow);
+    /*
+     * The frame is a window, and only the window grows. A map that followed it would resize its
+     * WebGL buffer once per animation frame — measured at 21 reallocations over one 300 px scroll,
+     * which is the flash and the trailing (#117). So the map is drawn once at the height the frame
+     * settles at, and the growth uncovers what is already there.
+     *
+     * Anchored to the bottom, because every control is: zoom and full-extent bottom-right,
+     * attribution bottom-left. The strip hidden at rest is the empty top of the map.
+     */
+    display: flex;
+    align-items: flex-end;
+  }
+  .map-frame > * {
+    height: min(var(--map-h-full), 150cqw);
+    flex: none;
   }
   @keyframes map-fill {
     to {
