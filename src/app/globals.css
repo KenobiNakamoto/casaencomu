@@ -1162,6 +1162,43 @@ html[data-wipe]::view-transition-new(root) {
  */
 @layer components {
   /* ------------------------------------------------------------------------------------------
+   * A long opinion folds after six lines (#144). One copy of the text, clamped by CSS and
+   * unclamped when the disclosure opens, so it stays selectable and keeps its line breaks. The
+   * `<summary>` is first because only a first child is the disclosure control.
+   * ---------------------------------------------------------------------------------------- */
+  .reason-summary {
+    cursor: pointer;
+    list-style: none;
+  }
+  .reason-summary::-webkit-details-marker {
+    display: none;
+  }
+  .reason-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+    overflow: hidden;
+    white-space: pre-line;
+    font-size: 0.875rem;
+    color: var(--body);
+  }
+  .reason[open] .reason-text {
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+  }
+  .reason-more {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--muted);
+    text-decoration: underline;
+  }
+  .reason[open] .reason-more {
+    display: none;
+  }
+
+  /* ------------------------------------------------------------------------------------------
    * One panel over the page: the opinion editor now, the add and filter panels later (#141).
    *
    * A dialog is a box on a desktop and a sheet on a phone, and that is a width and a height, not

@@ -8,7 +8,7 @@
  * "the list, the map and the markers" while the list never called it (F29).
  */
 
-import { FAMILY_AVG_SQL } from "@/lib/ratings";
+import { FAMILY_AVG_SQL, PARTIAL_SQL, SCORERS_SQL, VOICES_SQL } from "@/lib/ratings";
 import { NOT_REMOVED_SQL } from "./availability";
 import { isIn, type AreaFeature } from "./geo";
 import { STAGES, type Stage } from "./listing";
@@ -124,11 +124,17 @@ export const withArea = (f: Filters, area: AreaFeature | undefined): Filters => 
 
 /**
  * The one statement. A caller chooses its own columns; it does not choose the qualifying set.
- * `cover_id`, `family_avg` and `haystack` are always added because the filters need them.
+ * `cover_id`, `family_avg` and `haystack` are always added because the filters need them, and the
+ * three opinion counts because a card that shows a number has to say what it rests on (#144).
+ *
+ * `viewer` is the reader's own id, and it buys one thing: their own stance on each card. It is
+ * bound, not interpolated, and its `?` comes first because these columns are written before the
+ * `WHERE` that the rest of the arguments belong to.
  */
-export function listSql(f: Filters, columns: string): { sql: string; args: (string | number)[] } {
+export function listSql(f: Filters, columns: string, viewer?: string): { sql: string; args: (string | number)[] } {
   const where: string[] = [];
   const args: (string | number)[] = [];
+  if (viewer) args.push(viewer);
   const add = (cond: string, val: string | number | null) => {
     if (val !== null && val !== "") {
       where.push(cond);
@@ -155,6 +161,10 @@ export function listSql(f: Filters, columns: string): { sql: string; args: (stri
       SELECT ${ALWAYS}${columns ? `, ${columns}` : ""},
         ${COVER_SQL} AS cover_id,
         ROUND(${FAMILY_AVG_SQL}, 1) AS family_avg,
+        ${VOICES_SQL} AS voices,
+        ${SCORERS_SQL} AS scorers,
+        ${PARTIAL_SQL} AS partial,
+        ${viewer ? "(SELECT o.stance FROM opinions o WHERE o.property_id = p.id AND o.user_id = ? AND o.withdrawn = 0)" : "NULL"} AS my_stance,
         ${HAYSTACK_SQL} AS haystack
       FROM properties p ${where.length ? "WHERE " + where.join(" AND ") : ""}
     ) ${f.puntuacion ? "WHERE family_avg >= ?" : ""} ORDER BY ${ORDER[f.orden]}`;

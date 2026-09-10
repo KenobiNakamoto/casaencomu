@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { CompareToggle } from "@/components/comparar/controls";
 import { budgetFit, type Budget } from "@/lib/listing";
+import { type Stance } from "@/lib/opinion-input";
+import { OpinionSummary } from "./opinion-summary";
 import { Badge, StageBadge } from "./chip";
 import { fmtEur, fmtNum } from "./format";
 
@@ -15,6 +17,11 @@ export type Listed = {
   neighborhood: string | null;
   cover_id: string | null;
   family_avg: number | null;
+  /** How many people hold an opinion, how many of them scored, and whether anybody skipped. */
+  voices: number;
+  scorers: number;
+  partial: number;
+  my_stance: Stance | null;
   lat: number | null;
   lng: number | null;
   precision: "exact" | "approx" | "none";
@@ -90,6 +97,9 @@ export function PropertyCard({ p, budget, href, userId }: { p: Listed; budget: B
           <span className="font-semibold">{fmtEur(p.price_eur, "Sin precio")}</span>
           {perM2 && <span className="text-muted"> · {perM2}/m²</span>}
         </p>
+        {/* The corner badge is the number; this line is what the number rests on. A card with a
+            star and nothing else invites the family to argue with an average (#144). */}
+        <OpinionSummary p={p} className="truncate" />
       </Link>
     </li>
   );

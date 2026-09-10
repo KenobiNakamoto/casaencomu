@@ -1,3 +1,4 @@
+import { currentUser } from "@/lib/auth";
 import Link from "next/link";
 import Mapa, { type MapMarker } from "@/components/mapa/Mapa";
 import { findArea } from "@/lib/areas";
@@ -17,7 +18,7 @@ export default async function MapaPage({ searchParams }: { searchParams: Promise
   const parsed = parseFilters(sp);
   const area = await findArea(parsed.zona);
   const v = withArea(parsed, area);
-  const { sql, args } = listSql(v, COLUMNS);
+  const { sql, args } = listSql(v, COLUMNS, (await currentUser()).id);
 
   type Row = Omit<MapMarker, "precision" | "cover" | "lat" | "lng"> & {
     lat: number | null;

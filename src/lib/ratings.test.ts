@@ -12,6 +12,7 @@ import {
   isPartial,
   matrix,
   memberAverage,
+  splits,
   UPSERT_RATING_SQL,
   type RatingRow,
 } from "./ratings";
@@ -94,6 +95,29 @@ describe("memberAverage", () => {
     expect(memberAverage(rows, "u1")).toBe(4);
     expect(memberAverage(rows, "u2")).toBe(1.5);
     expect(memberAverage(rows, "u3")).toBeNull();
+  });
+});
+
+describe("splits — where the family actually differs", () => {
+  const at = (user: string, dimension: string, score: number) => ({ user_id: user, dimension, score });
+
+  it("needs two people and a gap of two", () => {
+    expect(splits([at("a", "estado", 3), at("b", "estado", 5)])).toHaveLength(1);
+    // 4 against 5 is the same opinion written twice.
+    expect(splits([at("a", "estado", 4), at("b", "estado", 5)])).toEqual([]);
+    // One person cannot disagree with themselves.
+    expect(splits([at("a", "estado", 1)])).toEqual([]);
+  });
+
+  it("names both sides, because a number tells nobody who to ask", () => {
+    const [gap] = splits([at("a", "ubicacion", 5), at("b", "ubicacion", 2), at("c", "ubicacion", 2)]);
+    expect(gap).toMatchObject({ dimension: "ubicacion", min: 2, max: 5, high: ["a"] });
+    expect(gap.low.sort()).toEqual(["b", "c"]);
+  });
+
+  it("looks at each aspect on its own", () => {
+    const rows = [at("a", "estado", 1), at("b", "estado", 5), at("a", "ubicacion", 4), at("b", "ubicacion", 4)];
+    expect(splits(rows).map((g) => g.dimension)).toEqual(["estado"]);
   });
 });
 

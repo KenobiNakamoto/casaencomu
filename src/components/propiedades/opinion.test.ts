@@ -189,6 +189,34 @@ describe("the save is one write, and writes only what changed", () => {
   });
 });
 
+describe("what the family thinks, in words before numbers (#144)", () => {
+  it("puts the person cards above the grid of numbers", () => {
+    const band = page.slice(at("{/* ---- band 3"), at("{/* ---- band 4"));
+    expect(band.indexOf("<OpinionCards")).toBeGreaterThan(-1);
+    expect(band.indexOf("<OpinionCards")).toBeLessThan(band.indexOf("<table"));
+    expect(band.indexOf("<Disagreements")).toBeLessThan(band.indexOf("<table"));
+  });
+
+  it("reads only opinions that were published and not withdrawn", () => {
+    expect(page).toContain("WHERE o.property_id = ? AND o.withdrawn = 0");
+    // Never a draft: `opinion_drafts` is not in this page's batch at all.
+    expect(page).not.toContain("opinion_drafts");
+  });
+
+  it("does not present the known accounts as the whole family", () => {
+    const cards = read("./opinion-cards.tsx");
+    expect(cards).toContain("Personas registradas sin opinión");
+    expect(cards).toContain("no la familia entera");
+    // Nothing sorts people by how positive they were.
+    expect(cards).toContain('a.name.localeCompare(b.name, "es")');
+  });
+
+  it("never folds away an impediment", () => {
+    const cards = read("./opinion-cards.tsx");
+    expect(cards).toContain("const fold = o.reasoning.length > LONG && !o.blocker;");
+  });
+});
+
 describe("what the family thinks", () => {
   it("the table has a column and a row of averages, and a corner", () => {
     const table = page.slice(at("{/* ---- band 3"), at("{/* ---- band 4"));

@@ -10,6 +10,13 @@ import { DIMENSIONS, type Dimension } from "./listing";
 export const STANCES = ["me_interesa", "dudas", "no_me_encaja"] as const;
 export type Stance = (typeof STANCES)[number];
 
+/** For a card or a chip, where the sentence has to fit on one line beside a price. */
+export const STANCE_SHORT: Record<Stance, string> = {
+  me_interesa: "Me interesa",
+  dudas: "Dudas",
+  no_me_encaja: "No encaja",
+};
+
 export const BASES = ["listing", "visit"] as const;
 export type Basis = (typeof BASES)[number];
 
