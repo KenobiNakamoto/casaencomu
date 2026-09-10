@@ -133,9 +133,12 @@ describe("the save is one write, and writes only what changed", () => {
 describe("what the family thinks", () => {
   it("the table has a column and a row of averages, and a corner", () => {
     const table = page.slice(at("{/* ---- band 3"), at("{/* ---- band 4"));
-    expect(table).toContain("familyAverage(dimRows)");
+    // One aspect and one person use their own helpers: each is already one score per person,
+    // while the corner has to average people rather than rows (#130).
+    expect(table).toContain("dimensionAverage(dimRows)");
     expect(table).toContain("memberAverage(ratingRows, u.id)");
-    expect(table).toContain("{family?.toLocaleString(\"es-ES\") ?? \"—\"}");
+    expect(table).toContain("{fmtScore(family)}");
+    expect(table).toContain("Parcial");
     // A person who did not score reads as a dash. Zero is a score; missing is not.
     expect(table).toContain('{m[u.id][dim] ?? "—"}');
   });

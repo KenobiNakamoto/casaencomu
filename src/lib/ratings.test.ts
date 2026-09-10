@@ -3,7 +3,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { DIMENSIONS } from "./listing";
-import { changedScores, familyAverage, matrix, memberAverage, UPSERT_RATING_SQL, type RatingRow } from "./ratings";
+import {
+  changedScores,
+  contributors,
+  dimensionAverage,
+  FAMILY_AVG_SQL,
+  familyAverage,
+  isPartial,
+  matrix,
+  memberAverage,
+  UPSERT_RATING_SQL,
+  type RatingRow,
+} from "./ratings";
 
 // Two members, second one has rated only two of six dimensions.
 const rows: RatingRow[] = [
@@ -15,20 +26,66 @@ const rows: RatingRow[] = [
 ];
 
 describe("familyAverage", () => {
-  it("is the mean over present scores only, 1 decimal", () => {
-    expect(familyAverage(rows)).toBe(3); // (5+3+4+2+1)/5
-    expect(familyAverage(rows.slice(0, 2))).toBe(4);
-    expect(familyAverage([{ user_id: "u1", dimension: "estado", score: 2 }, { user_id: "u2", dimension: "estado", score: 5 }])).toBe(3.5);
+  // The whole point of #130. Averaging rows lets whoever answered most decide the number.
+  const six5s: RatingRow[] = DIMENSIONS.map((d) => ({ user_id: "a", dimension: d, score: 5 }));
+  const one1: RatingRow[] = [{ user_id: "b", dimension: "ubicacion", score: 1 }];
+
+  it("gives each person the same weight, whatever they filled", () => {
+    expect(familyAverage([...six5s, ...one1])).toBe(3); // (5,0 + 1,0) / 2, not (5×6 + 1) / 7
   });
 
-  it("ignores missing dimensions and members", () => {
-    // A third member who has not rated, and four unrated dimensions, change nothing.
-    expect(familyAverage(rows)).toBe(familyAverage([...rows]));
+  it("is not the mean of the rows", () => {
+    const rowMean = [...six5s, ...one1].reduce((a, r) => a + r.score, 0) / 7;
+    expect(Math.round(rowMean * 10) / 10).toBe(4.4);
+    expect(familyAverage([...six5s, ...one1])).not.toBe(4.4);
+  });
+
+  it("does not round a person before averaging people", () => {
+    // a: (5+4)/2 = 4,5 · b: 4 → 4,25 → 4,3. Rounding a first would give (4,5 + 4)/2 = 4,3 too,
+    // so use a case where it differs: a: (5+5+4)/3 = 4,666… · b: 1 → 2,8, not (4,7 + 1)/2 = 2,9.
+    const a: RatingRow[] = [
+      { user_id: "a", dimension: "ubicacion", score: 5 },
+      { user_id: "a", dimension: "distribucion", score: 5 },
+      { user_id: "a", dimension: "luz_vistas", score: 4 },
+    ];
+    expect(familyAverage([...a, { user_id: "b", dimension: "ubicacion", score: 1 }])).toBe(2.8);
+  });
+
+  it("ignores members who have not rated, and unrated dimensions", () => {
+    expect(familyAverage(rows)).toBe(2.8); // u1 (5+3+4)/3 = 4,0 · u2 (2+1)/2 = 1,5 → 2,75
     expect(familyAverage([{ user_id: "u9", dimension: "encaje_familiar", score: 4 }])).toBe(4);
   });
 
-  it("is null when nobody has rated", () => {
+  it("is null when nobody has rated, never zero", () => {
     expect(familyAverage([])).toBeNull();
+  });
+});
+
+describe("dimensionAverage", () => {
+  it("is one score per person, so the plain mean is already fair", () => {
+    expect(dimensionAverage(rows.filter((r) => r.dimension === "ubicacion"))).toBe(3.5); // (5+2)/2
+    expect(dimensionAverage([])).toBeNull();
+  });
+});
+
+describe("contributors and isPartial", () => {
+  it("counts people, not rows", () => {
+    expect(contributors(rows)).toBe(2);
+    expect(contributors([])).toBe(0);
+  });
+
+  it("is partial while anybody who answered left an aspect empty", () => {
+    expect(isPartial(rows, DIMENSIONS.length)).toBe(true);
+    const full = DIMENSIONS.map((d) => ({ user_id: "a", dimension: d, score: 4 }));
+    expect(isPartial(full, DIMENSIONS.length)).toBe(false);
+    expect(isPartial([], DIMENSIONS.length)).toBe(false);
+  });
+});
+
+describe("FAMILY_AVG_SQL", () => {
+  it("groups by person before it averages, like familyAverage does", () => {
+    expect(FAMILY_AVG_SQL).toContain("GROUP BY user_id");
+    expect(FAMILY_AVG_SQL).toContain("AVG(person_mean)");
   });
 });
 
