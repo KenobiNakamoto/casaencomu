@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createProject, isMember, projectDir, projectsOf } from "./control";
+import { decode, WORDS } from "./entities";
 
 /** The cookie the project switcher writes. Only a preference: membership is still checked. */
 export const PROJECT_COOKIE = "casa_p";
@@ -250,6 +251,37 @@ const MIGRATIONS: Migration[] = [
         // text out of the history and stop writing it (V21).
         "UPDATE events SET payload_json = json_remove(payload_json, '$.body') WHERE kind = 'comment' AND payload_json IS NOT NULL",
       ];
+    },
+  },
+  {
+    version: 8,
+    owner: "issue #143 — the words a portal wrote, not the entities it wrote them with",
+    /**
+     * `decode()` knew six entity names, so every accent an Idealista agency wrote as `&oacute;`
+     * was stored as those nine characters. 19 of the family's 24 descriptions read that way.
+     *
+     * The extractor is fixed, but a corrected extractor never comes back to a row it has already
+     * read: `filled = 1` and the recheck only looks for what changed. So the repair is here, once,
+     * over the columns a page's own words reach.
+     */
+    sql: async () => {
+      const cols = WORDS.join(", ");
+      const { rows } = await db.execute(
+        `SELECT id, ${cols} FROM properties WHERE ${WORDS.map((c) => `${c} GLOB '*&*;*'`).join(" OR ")}`,
+      );
+      const stmts: InStatement[] = [];
+      for (const r of rows) {
+        const now = WORDS.map((c) => (r[c] == null ? null : decode(String(r[c]))));
+        // A row whose `&` was never an entity — "Pisos & Casas" — matches the GLOB and decodes to
+        // itself. Writing it would be a no-op with a cost, so it is not written.
+        if (WORDS.every((c, i) => (r[c] ?? null) === now[i])) continue;
+        stmts.push({
+          sql: `UPDATE properties SET ${WORDS.map((c) => `${c} = ?`).join(", ")} WHERE id = ?`,
+          args: [...now, String(r.id)],
+        });
+      }
+      if (stmts.length) console.log(`[db] decoding the entities in ${stmts.length} listing(s)`);
+      return stmts;
     },
   },
 ];
