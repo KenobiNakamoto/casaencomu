@@ -4,6 +4,7 @@ import { Chip, StageChip } from "@/components/propiedades/chip";
 import { fmtDate, fmtDateTime, fmtEur, fmtNum, SIN_DATOS, siNo } from "@/components/propiedades/format";
 import { Gallery } from "@/components/propiedades/gallery";
 import { LocationMap } from "@/components/propiedades/location-map";
+import { OpinionCards, Disagreements, type PublishedOpinion } from "@/components/propiedades/opinion-cards";
 import { OpinionForm } from "@/components/propiedades/opinion-form";
 import { PendingPoll } from "@/components/propiedades/pending-poll";
 import { availabilityLine, AVAILABILITY_LABEL, isStale, propertyAvailability, type SourceAvailability } from "@/lib/availability";
@@ -145,8 +146,8 @@ export default async function PropiedadPage({
   const faltan = Number(one(sp.faltan) ?? 0);
   const user = await currentUser();
 
-  // ponytail: one batch, seven statements, no joins to untangle
-  const [prop, photos, sources, events, ratings, comments, members] = await db.batch(
+  // ponytail: one batch, eight statements, no joins to untangle
+  const [prop, photos, sources, events, ratings, comments, members, opinions] = await db.batch(
     [
       { sql: "SELECT * FROM properties WHERE id = ?", args: [id] },
       { sql: "SELECT id FROM photos WHERE property_id = ? ORDER BY position", args: [id] },
@@ -158,6 +159,13 @@ export default async function PropiedadPage({
       { sql: "SELECT user_id, dimension, score, updated_at FROM ratings WHERE property_id = ?", args: [id] },
       { sql: "SELECT c.body, c.created_at, u.name FROM comments c JOIN users u ON u.id = c.user_id WHERE c.property_id = ? ORDER BY c.created_at", args: [id] },
       "SELECT id, name FROM users ORDER BY created_at",
+      // Published and not withdrawn: the only opinions that exist for anyone but their author.
+      {
+        sql: `SELECT o.user_id, o.stance, o.reasoning, o.blocker, o.basis, o.published_at, o.updated_at, u.name
+              FROM opinions o JOIN users u ON u.id = o.user_id
+              WHERE o.property_id = ? AND o.withdrawn = 0`,
+        args: [id],
+      },
     ],
     "read",
   );
@@ -175,6 +183,8 @@ export default async function PropiedadPage({
   const ratingRows = ratings.rows as unknown as MyRating[];
   const commentRows = comments.rows as unknown as Comment[];
   const memberRows = members.rows as unknown as Member[];
+  const opinionRows = opinions.rows as unknown as PublishedOpinion[];
+  const silent = memberRows.filter((u) => !opinionRows.some((o) => o.user_id === u.id));
   const m = matrix(ratingRows, memberRows.map((u) => u.id), DIMENSIONS);
   const family = familyAverage(ratingRows);
   const perM2 = p.price_eur !== null && p.area_m2 ? fmtEur(Math.round(p.price_eur / p.area_m2)) : null;
@@ -338,53 +348,65 @@ export default async function PropiedadPage({
       {/* ---- band 3: the table, and the conversation beside it ---- */}
       <section className={band}>
         <h2 className={h2}>Lo que opina la familia</h2>
+        <p className="mb-4 mt-1 text-sm text-muted">
+          {opinionRows.length === 0
+            ? "Nadie ha opinado todavía."
+            : `${opinionRows.length} ${opinionRows.length === 1 ? "persona ha opinado" : "personas han opinado"}` +
+              (voices > 0 ? ` · ${voices} con puntuaciones${partial ? " · Parcial" : ""}` : "")}
+        </p>
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-          <div className="bento overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  <th className={`${cell} text-left font-medium text-muted`}>Aspecto</th>
-                  {memberRows.map((u) => (
-                    <th key={u.id} className={`${cell} text-center font-medium ${u.id === user.id ? "text-ink" : "text-muted"}`}>
-                      {u.id === user.id ? "Tú" : u.name}
-                    </th>
-                  ))}
-                  <th className={`${cell} text-center font-medium text-muted`}>Media</th>
-                </tr>
-              </thead>
-              <tbody>
-                {DIMENSIONS.map((dim) => {
-                  const dimRows = ratingRows.filter((r) => r.dimension === dim);
-                  return (
-                    <tr key={dim}>
-                      <th scope="row" className={`${cell} text-left font-normal text-body`}>
-                        {DIMENSION_LABELS[dim]}
+          <div className="space-y-4">
+            {/* What each person wrote comes before any grid of numbers: the numbers summarise
+                this, not the other way round (doc 04 § 5). */}
+            <OpinionCards opinions={opinionRows} ratings={ratingRows} readerId={user.id} silent={silent} />
+            <Disagreements opinions={opinionRows} ratings={ratingRows} readerId={user.id} />
+            <div className="bento overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className={`${cell} text-left font-medium text-muted`}>Aspecto</th>
+                    {memberRows.map((u) => (
+                      <th key={u.id} className={`${cell} text-center font-medium ${u.id === user.id ? "text-ink" : "text-muted"}`}>
+                        {u.id === user.id ? "Tú" : u.name}
                       </th>
-                      {memberRows.map((u) => (
-                        <td key={u.id} className={`${cell} text-center`}>
-                          {m[u.id][dim] ?? "—"}
-                        </td>
-                      ))}
-                      <td className={`${cell} text-center font-medium`}>{fmtScore(dimensionAverage(dimRows))}</td>
-                    </tr>
-                  );
-                })}
-                <tr>
-                  <th scope="row" className={`${cell} text-left font-medium`}>
-                    Media
-                  </th>
-                  {memberRows.map((u) => (
-                    <td key={u.id} className={`${cell} text-center font-medium`}>
-                      {fmtScore(memberAverage(ratingRows, u.id))}
+                    ))}
+                    <th className={`${cell} text-center font-medium text-muted`}>Media</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {DIMENSIONS.map((dim) => {
+                    const dimRows = ratingRows.filter((r) => r.dimension === dim);
+                    return (
+                      <tr key={dim}>
+                        <th scope="row" className={`${cell} text-left font-normal text-body`}>
+                          {DIMENSION_LABELS[dim]}
+                        </th>
+                        {memberRows.map((u) => (
+                          <td key={u.id} className={`${cell} text-center`}>
+                            {m[u.id][dim] ?? "—"}
+                          </td>
+                        ))}
+                        <td className={`${cell} text-center font-medium`}>{fmtScore(dimensionAverage(dimRows))}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr>
+                    <th scope="row" className={`${cell} text-left font-medium`}>
+                      Media
+                    </th>
+                    {memberRows.map((u) => (
+                      <td key={u.id} className={`${cell} text-center font-medium`}>
+                        {fmtScore(memberAverage(ratingRows, u.id))}
+                      </td>
+                    ))}
+                    <td className={`${cell} text-center font-semibold`}>
+                      {fmtScore(family)}
+                      {partial && <span className="block text-xs font-normal text-muted">Parcial</span>}
                     </td>
-                  ))}
-                  <td className={`${cell} text-center font-semibold`}>
-                    {fmtScore(family)}
-                    {partial && <span className="block text-xs font-normal text-muted">Parcial</span>}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="bento flex flex-col">

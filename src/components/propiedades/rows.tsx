@@ -1,3 +1,4 @@
+import { OpinionSummary } from "./opinion-summary";
 import Link from "next/link";
 import { CompareToggle } from "@/components/comparar/controls";
 import { budgetFit, type Budget } from "@/lib/listing";
@@ -52,6 +53,7 @@ function Row({ p, budget, href, userId }: { p: Listed; budget: Budget | null; hr
           </div>
 
           <p className="mt-1 truncate text-sm text-muted">{meta || "Sin datos"}</p>
+          <OpinionSummary p={p} className="mt-1 truncate" />
 
           {/* The stage and the price sit at the foot of the row, apart from the description, so a
               column of rows reads down the two things a decision is made on. */}

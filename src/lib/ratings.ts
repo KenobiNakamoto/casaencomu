@@ -18,6 +18,16 @@ export const UPSERT_RATING_SQL =
 export const FAMILY_AVG_SQL =
   "(SELECT AVG(person_mean) FROM (SELECT AVG(score) AS person_mean FROM ratings WHERE property_id = p.id GROUP BY user_id))";
 
+/** How many people hold a published opinion here. Never the size of the family (doc 04 § 6). */
+export const VOICES_SQL = "(SELECT count(*) FROM opinions o WHERE o.property_id = p.id AND o.withdrawn = 0)";
+
+/** How many of those put a number on anything. A stance alone is an opinion, not a score. */
+export const SCORERS_SQL = "(SELECT count(DISTINCT user_id) FROM ratings WHERE property_id = p.id)";
+
+/** 1 while somebody who scored left an aspect empty, so the number rests on less than it looks. */
+export const PARTIAL_SQL =
+  "(SELECT min(n) FROM (SELECT count(*) AS n FROM ratings WHERE property_id = p.id GROUP BY user_id)) < 6";
+
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const printed = (n: number | null) => (n === null ? null : Math.round(n * 10) / 10);
 
@@ -92,4 +102,42 @@ export function changedScores<D extends string>(
   next: Partial<Record<D, number>>,
 ): [D, number][] {
   return (Object.entries(next) as [D, number][]).filter(([dim, score]) => current[dim] !== score);
+}
+
+/** Two people at least two points apart on one aspect. One point apart is not a disagreement. */
+export type Split = { dimension: string; low: string[]; high: string[]; min: number; max: number };
+
+/**
+ * Where the family actually differs, aspect by aspect. Two scores at minimum, and a gap of two —
+ * 4 against 5 is the same opinion written twice, 3 against 5 is a conversation worth having.
+ *
+ * It names both sides. A number on its own tells nobody who to ask (doc 04 § 6).
+ */
+export function splits(rows: RatingRow[]): Split[] {
+  const out: Split[] = [];
+  for (const [dimension, group] of byDimension(rows)) {
+    if (group.length < 2) continue;
+    const scores = group.map((r) => r.score);
+    const min = Math.min(...scores);
+    const max = Math.max(...scores);
+    if (max - min < 2) continue;
+    out.push({
+      dimension,
+      min,
+      max,
+      low: group.filter((r) => r.score === min).map((r) => r.user_id),
+      high: group.filter((r) => r.score === max).map((r) => r.user_id),
+    });
+  }
+  return out;
+}
+
+function byDimension(rows: RatingRow[]) {
+  const out = new Map<string, RatingRow[]>();
+  for (const r of rows) {
+    const group = out.get(r.dimension);
+    if (group) group.push(r);
+    else out.set(r.dimension, [r]);
+  }
+  return out;
 }

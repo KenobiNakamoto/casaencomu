@@ -46,7 +46,10 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   // The full chain from the autonomous community down is six names and does not fit a chip.
   const zonaLabel = (await areaChain(parsed.zona)).slice(-3).map((a) => a.properties.name).join(" › ") || undefined;
   const v = withArea(parsed, area);
-  const { sql, args } = listSql(v, COLUMNS);
+  // Before the query, not beside it: the reader's own stance is one of its columns, and nobody
+  // else's stance is on their cards.
+  const [budget, user] = await Promise.all([getBudget(), currentUser()]);
+  const { sql, args } = listSql(v, COLUMNS, user.id);
 
   const [list, counts, barrios, archived, spread] = await db.batch(
     [
@@ -58,7 +61,6 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
     ],
     "read",
   );
-  const [budget, user] = await Promise.all([getBudget(), currentUser()]);
 
   const rows = list.rows as unknown as (Listed & { haystack: string; floor: string | null })[];
   const items = rows.filter((p) => qualifies(v, area, p));
