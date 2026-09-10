@@ -3,6 +3,7 @@ import { CompareTable, type Prop } from "@/components/comparar/table";
 import { NOT_REMOVED_SQL } from "@/lib/availability";
 import { db } from "@/lib/db";
 import { COVER_SQL } from "@/lib/filters";
+import { FAMILY_AVG_SQL } from "@/lib/ratings";
 import { MAX, MIN, parseIds } from "@/lib/selection";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -38,7 +39,7 @@ export default async function CompararPage({ searchParams }: { searchParams: Sea
 
   const { rows } = await db.execute({
     sql: `SELECT p.*, ${COVER_SQL} AS cover,
-            (SELECT AVG(score) FROM ratings WHERE property_id = p.id) AS rating,
+            ${FAMILY_AVG_SQL} AS rating,
             NOT ${NOT_REMOVED_SQL} AS gone
           FROM properties p WHERE p.id IN (${wanted.map(() => "?").join(",")})`,
     args: wanted,
