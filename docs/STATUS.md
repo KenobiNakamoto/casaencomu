@@ -11,17 +11,21 @@ no evidence is not a claim, it is a plan, and it belongs in `WORKPLAN.md`.
 
 ## 1. In one paragraph
 
-**Release A is finished**, and **Release B's opinion work with it**: what a person thinks is now
-published, versioned, drafted and withdrawable (PIP-09, PIP-10), the family average counts people
-rather than rating rows, and the conversation takes replies, corrections and removals (PIP-11).
-The top bar carries the account rather than a `?` (#148). `main` is green at **590 tests,
-3 skipped**, with lint, types and build clean. Two and a half packages are left in Release B:
-PIP-07, PIP-13, and the rest of PIP-14.
+**Release A and Release B are both finished, merged and deployed.** What a person thinks is
+published, versioned, drafted and withdrawable; the family average counts people rather than
+rating rows; the conversation takes replies, corrections and removals; the top bar carries the
+account; the activity feed stays unread until somebody presses a button; the facts panel names
+what is missing instead of printing «Sin datos» twelve times; and the budget says whose decision
+it was. `main` is green at **660 tests, 3 skipped**, with lint, types and build clean.
 
-**Nothing since 9 September is deployed.** The Air runs an older image, so the family has none of
-the above; `./deploy.sh` is the whole procedure. A real domain is still blocked on three items
-only Kenobi can do. To let him look at the app anyway, it runs on the Air, reachable over
-Tailscale, behind a shared password. That preview is not the deployment.
+**It is deployed and the data is backed up.** The Air runs `e56f743`, built 2026-09-10, migrated
+in place — 19 descriptions repaired, schema at version 9. The nightly backup is installed and a
+restore has been carried out (#21).
+
+**It is not on a domain, and it asks for no password.** `PREVIEW_OPEN_AS` is set on the Air, so
+anyone who reaches the port is one identity; the tailnet is the only perimeter. Cloudflare Access
+is not configured. Both wait on Kenobi's #1 and #2. **Read `docs/RELEASE-B-PROOF.md` § 5** for
+that and the seven other things nobody has checked — a real phone has never opened this app.
 
 ---
 
@@ -439,8 +443,9 @@ Kenobi's approval before anyone writes code. Do not pick them up.
 
 ### PIP-16
 
-Not a package to build once. It is the proof step run for each release. **Not yet run for
-Release A**, because Release A is not finished.
+Not a package to build once. It is the proof step run for each release. **Run for Release B on
+2026-09-10 (#158).** The evidence, and the eight things nobody has checked, are in
+`docs/RELEASE-B-PROOF.md` — read § 5 of it before claiming anything is verified.
 
 ---
 
