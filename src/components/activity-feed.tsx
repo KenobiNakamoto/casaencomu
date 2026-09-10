@@ -1,24 +1,13 @@
 import Link from "next/link";
 import { availabilityLine } from "@/lib/availability";
-import { db } from "@/lib/db";
+import type { Row } from "@/lib/activity";
 import { STAGE_LABELS } from "@/lib/listing";
 import { ago } from "./propiedades/format";
-
-type Row = {
-  id: string;
-  property_id: string;
-  kind: string;
-  payload_json: string | null;
-  actor_id: string | null;
-  created_at: string;
-  title: string | null;
-  actor: string | null;
-};
 
 const eur = (n: unknown) => (typeof n === "number" ? `${n.toLocaleString("es-ES")} €` : "—");
 const stage = (s: unknown) => (STAGE_LABELS as Record<string, string>)[String(s)] ?? String(s ?? "—");
 
-function line(e: Row) {
+export function line(e: Row) {
   const who = e.actor ?? "Alguien";
   const t = `«${e.title ?? "sin título"}»`;
   let p: Record<string, unknown> = {};
@@ -51,7 +40,7 @@ function line(e: Row) {
     case "stage_change":
       return `${who} pasó ${t} a ${stage(p.to)}`;
     case "comment":
-      return `${who} comentó en ${t}`;
+      return `${who} ${p.reply ? "respondió en" : "comentó en"} ${t}`;
     case "rating":
       return `${who} puntuó ${t}`;
     case "opinion":
@@ -66,37 +55,32 @@ function line(e: Row) {
 const initial = (name: string | null) => (name ?? "?").trim().charAt(0).toUpperCase() || "?";
 
 /**
- * Everything that happened in this project, newest first. It is one component because it is shown
- * in two places: the «Actividad» tab of the bell menu, and the page behind «Ver todo».
+ * Everything that happened in this project, newest first. One component, shown in two places: the
+ * «Actividad» tab of the bell menu, and the page behind «Ver todo».
+ *
+ * It reads nothing and writes nothing. The rows and the read marks are handed in, because the
+ * page has to know which ids it drew in order to say that those, and only those, have been read
+ * (PIP-13). Rendering used to be what marked them, and a prefetch renders.
  */
-export default async function ActivityFeed({
+export default function ActivityFeed({
+  rows,
+  read,
   userId,
-  since,
-  limit = 200,
 }: {
+  rows: Row[];
+  /** The ids this person has already read. Anything else by somebody else is «nuevo». */
+  read: Set<string>;
   userId: string;
-  since: string | null;
-  limit?: number;
 }) {
-  const { rows } = await db.execute({
-    sql: `SELECT e.id, e.property_id, e.kind, e.payload_json, e.actor_id, e.created_at,
-                 p.title, u.name AS actor
-            FROM events e
-            LEFT JOIN properties p ON p.id = e.property_id
-            LEFT JOIN users u ON u.id = e.actor_id
-           ORDER BY e.created_at DESC LIMIT ?`,
-    args: [limit],
-  });
-  const events = rows as unknown as Row[];
-
-  if (events.length === 0) return <p className="px-3 py-6 text-muted">Todavía no hay actividad.</p>;
+  if (rows.length === 0) return <p className="px-3 py-6 text-muted">Todavía no hay actividad.</p>;
 
   return (
     <ol className="divide-y divide-hairline-soft">
-      {events.map((e) => {
-        const isNew = !!since && e.created_at > since && e.actor_id !== userId;
+      {rows.map((e) => {
+        const isNew = !read.has(e.id) && e.actor_id !== userId;
         return (
-          <li key={e.id}>
+          // The anchor a deep link lands on, clear of the header that would otherwise cover it.
+          <li key={e.id} id={`e-${e.id}`} className="scroll-mt-[calc(var(--header-h)+16px)]">
             <Link
               href={`/propiedades/${e.property_id}`}
               className="flex min-h-11 items-start gap-3 rounded-lg px-3 py-3 transition hover:bg-surface-soft"

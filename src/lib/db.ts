@@ -284,6 +284,24 @@ const MIGRATIONS: Migration[] = [
       return stmts;
     },
   },
+  {
+    version: 9,
+    owner: "issue #151 — activity that stays unread until you have read it (PIP-13)",
+    sql: [
+      `CREATE TABLE IF NOT EXISTS event_reads (
+         user_id TEXT NOT NULL REFERENCES users(id),
+         event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+         read_at TEXT NOT NULL,
+         PRIMARY KEY (user_id, event_id))`,
+      // What each person had already seen under the old single timestamp, written down before it
+      // stops meaning anything here. Without this everybody opens the page to a wall of «nuevo»
+      // over lines they read last week — and `last_seen_at` keeps its own job, the bell.
+      `INSERT OR IGNORE INTO event_reads (user_id, event_id, read_at)
+       SELECT u.id, e.id, u.last_seen_at FROM users u JOIN events e
+        WHERE u.last_seen_at IS NOT NULL AND e.created_at <= u.last_seen_at`,
+      "CREATE INDEX IF NOT EXISTS events_newest ON events(created_at DESC, id DESC)",
+    ],
+  },
 ];
 
 /**

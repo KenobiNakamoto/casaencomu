@@ -34,4 +34,11 @@ CREATE TABLE IF NOT EXISTS reviews (
   property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id), reviewed_at TEXT NOT NULL,
   PRIMARY KEY (property_id, user_id));
+-- Which lines of the activity feed a person has read. One row each, because a timestamp cannot
+-- say "the newest fifty and not the four hundred behind them" (PIP-13).
+CREATE TABLE IF NOT EXISTS event_reads (
+  user_id TEXT NOT NULL REFERENCES users(id),
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  read_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, event_id));
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
