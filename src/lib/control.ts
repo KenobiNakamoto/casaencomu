@@ -2,6 +2,16 @@ import { createClient } from "@libsql/client";
 import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
+import {
+  DESCRIPTION_MAX,
+  NAME_MAX,
+  PURPOSE_MAX,
+  type Invite,
+  type Member,
+  type Mine,
+  type Project,
+  type Role,
+} from "./project-shape";
 
 /**
  * The control database: which projects exist, who belongs to each one, and who has been invited.
@@ -38,30 +48,21 @@ const ready = control
        created_at TEXT NOT NULL, expires_at TEXT NOT NULL, accepted_at TEXT);
      CREATE INDEX IF NOT EXISTS invites_project ON invites(project_id);`,
   )
-  // A control database written before roles existed. It succeeds once and fails every time after,
-  // which is the whole migration: there is one column and it has a default.
+  // A control database written before roles or descriptions existed. Each of these succeeds once
+  // and fails every time after, which is the whole migration: every column is nullable or has a
+  // default, so there is nothing to fill in and nothing to order.
   .then(() =>
-    control
-      .execute("ALTER TABLE memberships ADD COLUMN role TEXT NOT NULL DEFAULT 'member'")
-      .then(
-        () => {},
-        () => {},
-      ),
+    Promise.all(
+      [
+        "ALTER TABLE memberships ADD COLUMN role TEXT NOT NULL DEFAULT 'member'",
+        "ALTER TABLE projects ADD COLUMN purpose TEXT",
+        "ALTER TABLE projects ADD COLUMN description TEXT",
+      ].map((sql) => control.execute(sql).then(() => {}, () => {})),
+    ).then(() => {}),
   );
 
-export type Role = "owner" | "member";
-export type Project = { id: string; name: string; created_at: string };
-export type Member = { email: string; role: Role; created_at: string };
-export type Invite = {
-  token: string;
-  project_id: string;
-  project_name: string;
-  email: string;
-  invited_by: string;
-  created_at: string;
-  expires_at: string;
-  accepted_at: string | null;
-};
+/** The shapes and the limits, in a file a `"use client"` component can import. */
+export * from "./project-shape";
 
 /**
  * One spelling of an address, everywhere in this file. A membership written as `Ana@…` and looked
@@ -78,11 +79,15 @@ const project = (r: Record<string, unknown>): Project => ({
   id: String(r.id),
   name: String(r.name),
   created_at: String(r.created_at),
+  purpose: String(r.purpose ?? ""),
+  description: String(r.description ?? ""),
 });
 
 /** Every project on this server, oldest first. The two background loops walk this list. */
 export async function listProjects(): Promise<Project[]> {
-  return (await rowsOf("SELECT id, name, created_at FROM projects ORDER BY created_at, id")).map(project);
+  return (
+    await rowsOf("SELECT id, name, created_at, purpose, description FROM projects ORDER BY created_at, id")
+  ).map(project);
 }
 
 /**
@@ -91,17 +96,43 @@ export async function listProjects(): Promise<Project[]> {
  * The owner comes with it, because two projects can carry the same name — everybody who starts
  * alone gets one called «Mi búsqueda» — and «de ana@example.com» is what tells them apart.
  */
-export async function projectsOf(email: string): Promise<(Project & { role: Role; owner: string })[]> {
+export async function projectsOf(email: string): Promise<Mine[]> {
   return (
     await rowsOf(
-      `SELECT p.id, p.name, p.created_at, m.role,
+      `SELECT p.id, p.name, p.created_at, p.purpose, p.description, m.role,
               (SELECT o.email FROM memberships o
-               WHERE o.project_id = p.id AND o.role = 'owner' LIMIT 1) AS owner
+               WHERE o.project_id = p.id AND o.role = 'owner' LIMIT 1) AS owner,
+              (SELECT COUNT(*) FROM memberships c WHERE c.project_id = p.id) AS people
        FROM projects p JOIN memberships m ON m.project_id = p.id
        WHERE m.email = ? ORDER BY p.created_at, p.id`,
       [norm(email)],
     )
-  ).map((r) => ({ ...project(r), role: String(r.role) as Role, owner: String(r.owner ?? "") }));
+  ).map((r) => ({
+    ...project(r),
+    role: String(r.role) as Role,
+    owner: String(r.owner ?? ""),
+    people: Number(r.people ?? 0),
+  }));
+}
+
+/**
+ * The name, the purpose and the description, all three at once, because they are one form. Owner
+ * only. An empty field is stored as an empty string rather than removed: there is nothing to
+ * distinguish "never written" from "cleared", and no query asks.
+ */
+export async function updateProject(
+  projectId: string,
+  by: string,
+  fields: { name: string; purpose: string; description: string },
+): Promise<boolean> {
+  await mustOwn(by, projectId);
+  const name = fields.name.trim().slice(0, NAME_MAX);
+  if (!name) return false;
+  await control.execute({
+    sql: "UPDATE projects SET name = ?, purpose = ?, description = ? WHERE id = ?",
+    args: [name, fields.purpose.trim().slice(0, PURPOSE_MAX), fields.description.trim().slice(0, DESCRIPTION_MAX), projectId],
+  });
+  return true;
 }
 
 /**

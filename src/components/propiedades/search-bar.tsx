@@ -242,7 +242,7 @@ export function SearchBar({ q, hidden, clearHref }: { q: string; hidden: Record<
             {state.kind === "unsupported" && (
               <span className="text-body">
                 Este portal no se puede importar por enlace.{" "}
-                <Link href="/ayuda" className="font-semibold text-ink underline underline-offset-4">
+                <Link href="/ajustes" className="font-semibold text-ink underline underline-offset-4">
                   Usa el marcador
                 </Link>
                 .

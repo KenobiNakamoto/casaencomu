@@ -1,9 +1,17 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { buildBookmarklet } from "@/lib/bookmarklet";
+import { input } from "@/components/propiedades/format";
+import { PERSON_NAME_MAX } from "@/lib/project-shape";
+import { renombrarseAction } from "./actions";
 
-export default async function AyudaPage() {
-  const { capture_token } = await currentUser();
+/**
+ * Everything about you rather than about a home: what the family sees you called, and the
+ * bookmarklet that carries your name onto whatever you save. They are one page because they are
+ * one thing — the account — and because there was never enough of either to be a page on its own.
+ */
+export default async function AjustesPage() {
+  const { capture_token, name, email } = await currentUser();
   const publicUrl = process.env.PUBLIC_URL || "http://localhost:3000";
   const bookmarklet = buildBookmarklet(publicUrl, capture_token);
   const now = new Date().toLocaleString("es-ES", { timeZone: "Europe/Madrid" });
@@ -18,7 +26,33 @@ export default async function AyudaPage() {
   const h2 = "text-lg font-medium";
   return (
     <div className="mx-auto max-w-2xl divide-y divide-hairline-soft px-4 py-6 sm:px-6">
-      <h1 className="pb-6 text-[22px] font-medium">Ayuda</h1>
+      <h1 className="pb-6 text-[22px] font-medium">Ajustes</h1>
+
+      <section className="space-y-3 py-8">
+        <h2 className={h2}>Tu nombre</h2>
+        <p className="text-body">
+          Es como te ve el resto en las opiniones y en la actividad. Solo en este proyecto: en otro
+          puedes llamarte de otra manera.
+        </p>
+        <form action={renombrarseAction} className="flex gap-2">
+          <input
+            type="text"
+            name="nombre"
+            required
+            maxLength={PERSON_NAME_MAX}
+            defaultValue={name}
+            aria-label="Tu nombre"
+            className={input}
+          />
+          <button
+            type="submit"
+            className="h-12 shrink-0 rounded-lg bg-ink px-5 text-base font-medium text-canvas transition hover:opacity-90"
+          >
+            Guardar
+          </button>
+        </form>
+        <p className="text-sm text-muted">Entras como {email}.</p>
+      </section>
 
       <section className="space-y-3 py-8">
         <h2 className={h2}>Guardar desde el navegador</h2>
