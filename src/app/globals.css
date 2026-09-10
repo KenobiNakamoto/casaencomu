@@ -1162,6 +1162,45 @@ html[data-wipe]::view-transition-new(root) {
  */
 @layer components {
   /* ------------------------------------------------------------------------------------------
+   * One panel over the page: the opinion editor now, the add and filter panels later (#141).
+   *
+   * A dialog is a box on a desktop and a sheet on a phone, and that is a width and a height, not
+   * two components. 640 px is the reading width doc 04 asks for; under it the panel takes the
+   * whole screen, keeps its footer above the home indicator, and lets only its body scroll.
+   * ---------------------------------------------------------------------------------------- */
+  body:has(dialog.panel[open]) {
+    overflow: hidden;
+  }
+
+  .panel {
+    width: min(640px, 100vw);
+    max-width: none;
+    max-height: min(90dvh, 900px);
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-card);
+    background: var(--canvas);
+    color: var(--ink);
+    overscroll-behavior: contain;
+  }
+  .panel::backdrop {
+    background: rgb(0 0 0 / 0.45);
+    backdrop-filter: blur(2px);
+  }
+  @media (max-width: 640px) {
+    .panel {
+      width: 100vw;
+      height: 100dvh;
+      max-height: none;
+      border: 0;
+      border-radius: 0;
+      /* The footer sits on the home indicator without it. */
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+
+  /* ------------------------------------------------------------------------------------------
    * The photographs, over the page (issue #122).
    *
    * Two native <dialog>s, nested. The browser gives the top layer, Escape, the focus trap and the

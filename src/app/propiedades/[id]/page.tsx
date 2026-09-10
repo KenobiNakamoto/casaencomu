@@ -13,6 +13,7 @@ import { db } from "@/lib/db";
 import { backHref } from "@/lib/filters";
 import { DIMENSION_LABELS, DIMENSIONS, STAGE_LABELS, type Stage } from "@/lib/listing";
 import { markReviewed } from "@/lib/notifications";
+import { readMine } from "@/lib/opinions";
 import { contributors, dimensionAverage, familyAverage, isPartial, matrix, memberAverage, type RatingRow } from "@/lib/ratings";
 
 
@@ -183,6 +184,8 @@ export default async function PropiedadPage({
   const availability = propertyAvailability(sourceRows);
   const lastChecked = sourceRows.map((s) => s.last_ok_at).filter(Boolean).sort().at(-1) ?? null;
   const mineAt = ratingRows.filter((r) => r.user_id === user.id).map((r) => r.updated_at).sort().at(-1) ?? null;
+  // The author's own opinion and unsent draft. Nobody else's draft is read here or anywhere.
+  const mine = await readMine(id, user.id);
   const voices = contributors(ratingRows);
   // Somebody answered part of the form, so the family number is thinner than it looks (#130).
   const partial = isPartial(ratingRows, DIMENSIONS.length);
@@ -300,9 +303,9 @@ export default async function PropiedadPage({
       <section className={band}>
         <h2 className={h2}>Tu opinión</h2>
         <p className="mb-4 mt-1 text-sm text-muted">
-          Las respuestas, el comentario y la etapa se guardan a la vez, con el botón de abajo.
+          Tu opinión se publica aparte, cuando tú quieras. El comentario y la etapa se guardan con el botón de abajo.
         </p>
-        <OpinionForm propertyId={p.id} current={m[user.id]} stage={p.stage} version={Number(p.stage_version ?? 0)}>
+        <OpinionForm propertyId={p.id} mine={mine} stage={p.stage} version={Number(p.stage_version ?? 0)}>
           <dl className="space-y-2.5 text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <dt className="text-muted">Anuncio</dt>

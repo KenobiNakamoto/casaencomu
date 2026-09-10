@@ -1,12 +1,15 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, type ReactNode } from "react";
 import { opinionAction, type OpinionState } from "@/app/propiedades/actions";
-import { DIMENSION_LABELS, DIMENSIONS, STAGE_LABELS, STAGES, type Dimension } from "@/lib/listing";
+import { OpinionEditor } from "@/components/propiedades/opinion-editor";
+import { STAGE_LABELS, STAGES } from "@/lib/listing";
+import { type Mine } from "@/lib/opinion-input";
 
 type Props = {
   propertyId: string;
-  current: Record<Dimension, number | null>;
+  /** The author's own opinion and draft, for the editor this box opens. */
+  mine: Mine;
   stage: string;
   version: number;
   /** The state of this home, written by the server: what the advertisement is doing, and when. */
@@ -14,29 +17,17 @@ type Props = {
 };
 
 /**
- * One opinion, one box, one button.
+ * The box under the photographs: your opinion, the family's conversation, and the state of the
+ * home. Three quarters, and one button under the right one.
  *
- * The questions take the left quarter, the comment the middle half, and the state of the home the
- * right quarter. That right column is shorter than the other two on purpose: the button sits in
- * the space it leaves, at the foot of the box, where it reads as the end of the whole box rather
- * than the end of one column.
- *
- * React empties the form once the action returns. That is what clears the comment box, and it is
- * also what emptied the radios on screen while React's own copy still said they were chosen. So
- * the questions are re-mounted after every save, from the answers the server has just confirmed —
- * or, when the save was refused, from the ones that were submitted, because losing what somebody
- * chose is the same failure as losing what they typed (F25).
+ * The six radios used to live in the left quarter and write straight into the database. They now
+ * live in the editor this box opens, because a score is part of an opinion — versioned, drafted
+ * and withdrawable — and not a thing that can be saved on its own (#141). What is left in this
+ * form is the comment and the stage: the conversation and the decision, neither of which belongs
+ * to one person.
  */
-export function OpinionForm({ propertyId, current, stage, version, children }: Props) {
+export function OpinionForm({ propertyId, mine, stage, version, children }: Props) {
   const [state, action, pending] = useActionState<OpinionState, FormData>(opinionAction, null);
-  // One number per answer from the server, adjusted during the render that sees a new one. It is
-  // the key the questions are drawn under, and re-mounting them is what puts the marks back.
-  const [seen, setSeen] = useState(state);
-  const [generation, setGeneration] = useState(0);
-  if (seen !== state) {
-    setSeen(state);
-    setGeneration((g) => g + 1);
-  }
   const failed = state && !state.ok ? state : null;
 
   return (
@@ -44,8 +35,11 @@ export function OpinionForm({ propertyId, current, stage, version, children }: P
       <input type="hidden" name="propertyId" value={propertyId} readOnly />
       <input type="hidden" name="version" value={version} readOnly />
 
-      {/* ---- the quarter: the questions, and nothing else ---- */}
-      <Questions key={generation} answers={{ ...current, ...(failed?.scores ?? {}) }} />
+      {/* ---- the quarter: your opinion, which opens over the page ---- */}
+      <div className="bento flex flex-col gap-3">
+        <p className="text-sm font-semibold text-ink">Tu opinión</p>
+        <OpinionEditor propertyId={propertyId} mine={mine} />
+      </div>
 
       {/* ---- the half: what you actually think ---- */}
       <div className="bento flex flex-col">
@@ -105,43 +99,5 @@ export function OpinionForm({ propertyId, current, stage, version, children }: P
         </div>
       </div>
     </form>
-  );
-}
-
-/**
- * The six aspects, one row of five choices each. Its own state, so the count under it moves as
- * the person answers; mounted fresh by its parent whenever the server has a newer answer.
- */
-function Questions({ answers }: { answers: Record<string, number | null> }) {
-  const [scores, setScores] = useState(answers);
-  const rated = DIMENSIONS.filter((d) => scores[d] != null).length;
-
-  return (
-    <fieldset className="bento space-y-4">
-      <legend className="mb-3 text-sm font-semibold text-ink">Tus respuestas</legend>
-      {DIMENSIONS.map((dim) => (
-        <div key={dim} role="radiogroup" aria-label={DIMENSION_LABELS[dim]} className="space-y-1.5">
-          <p className="text-[13px] font-medium text-body">{DIMENSION_LABELS[dim]}</p>
-          <div className="flex gap-1.5">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <label key={n} className="flex-1 cursor-pointer">
-                <input
-                  type="radio"
-                  name={dim}
-                  value={n}
-                  checked={scores[dim] === n}
-                  onChange={() => setScores((s) => ({ ...s, [dim]: n }))}
-                  className="peer sr-only"
-                />
-                <span className="flex h-11 w-full items-center justify-center rounded-lg border border-hairline bg-raised text-sm font-medium text-ink transition peer-checked:border-ink peer-checked:bg-ink peer-checked:text-canvas peer-focus-visible:ring-2 peer-focus-visible:ring-focus hover:border-ink">
-                  {n}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-      ))}
-      <p className="text-xs text-muted">{rated} de {DIMENSIONS.length} aspectos valorados</p>
-    </fieldset>
   );
 }
