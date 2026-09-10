@@ -4,7 +4,7 @@ import type { InStatement } from "@libsql/client";
 import { z } from "zod";
 import { aiReady, ask, type Image } from "./ai";
 import { canonicalFacts, col, FACT_COLUMNS, factsHash } from "./changes";
-import { db } from "./db";
+import { currentProjectId, db } from "./db";
 import type { Presence, Raw } from "./extract";
 import { Listing } from "./listing";
 import { photoPath } from "./photos";
@@ -74,6 +74,29 @@ function clean(field: string, value: unknown): string | number | boolean | null 
   return s.slice(0, field === "description" ? MAX_DESCRIPTION : MAX_TEXT);
 }
 
+/** Accents off, case off, spaces collapsed. The same words, however the page happens to write them. */
+const flat = (s: string) =>
+  s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
+
+/**
+ * `outdoor` is asked for as a comma list, so layer 2 has to compose it out of separate words.
+ * Every other readable field is one thing the page either says or does not.
+ */
+const COMPOSED = new Set(["outdoor"]);
+
+/**
+ * **Layer 2 may only copy, and this is what checks it.** The prompt says every value has to appear
+ * in the page; asking is not enforcing. A value the model composed from two places, or brought
+ * from what it already knows, would be stored as «del portal» — and a guess that looks like a
+ * stated fact is the one failure this app must not have.
+ *
+ * Measured: 1 of 5 listings, where the model joined an agent's name to the network named in the
+ * page's own privacy notice. Only strings are checked. A number is written a dozen ways
+ * («338.000», «338000 €»), so containment would reject good answers, and `RANGE` already guards it.
+ */
+const copiedFromPage = (field: string, value: string | number | boolean | null, page: string) =>
+  typeof value !== "string" || COMPOSED.has(field) || flat(page).includes(flat(value));
+
 /** `Listing`'s own shape for the requested fields, so the tool schema can never drift from it. */
 const schemaFor = (fields: string[]) =>
   z.object(
@@ -109,11 +132,18 @@ export async function fill(opts: {
   const inferred: string[] = [];
 
   const gaps = (fields: string[]) => fields.filter((f) => out[f] == null);
-  const take = (fields: string[], got: Record<string, unknown> | null, layer: "ai_read" | "ai_inferred", into: string[]) => {
+  const take = (
+    fields: string[],
+    got: Record<string, unknown> | null,
+    layer: "ai_read" | "ai_inferred",
+    into: string[],
+    page?: string,
+  ) => {
     if (!got) return;
     for (const f of fields) {
       const v = clean(f, got[f]);
       if (v === null) continue;
+      if (page !== undefined && !copiedFromPage(f, v, page)) continue;
       out[f] = v;
       presence[f] = "present";
       origin[f] = layer;
@@ -139,6 +169,7 @@ export async function fill(opts: {
       }),
       "ai_read",
       read,
+      text,
     );
   }
 
@@ -177,10 +208,11 @@ async function photosOf(propertyId: string): Promise<Image[]> {
     sql: "SELECT sha256 FROM photos WHERE property_id = ? ORDER BY position LIMIT ?",
     args: [propertyId, MAX_PHOTOS_SENT],
   });
+  const project = await currentProjectId();
   const out: Image[] = [];
   for (const r of rows) {
     try {
-      const buf = await readFile(photoPath(propertyId, String(r.sha256)));
+      const buf = await readFile(photoPath(project, propertyId, String(r.sha256)));
       out.push({ media_type: "image/jpeg", data: buf.toString("base64") });
     } catch {
       /* ponytail: a photo we cannot read is one fewer piece of evidence, not an error */

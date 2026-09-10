@@ -11,7 +11,7 @@ const ICONS = {
   home: "M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10",
   map: "M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14",
   compare: "M4 5h6v14H4zM14 5h6v14h-6z",
-  bell: "M6 8a6 6 0 0112 0v5l2 3H4l2-3zM10 20a2 2 0 004 0",
+  review: "M9 11l3 3 8-8M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9",
 };
 
 /** Client only for the active highlight; the items (and the badge count) come from the server. */

@@ -8,15 +8,23 @@ export async function register() {
     process.env.NEXT_PHASE === "phase-production-build"
   )
     return;
-  const { applySchema } = await import("./lib/db");
-  await applySchema();
+  // Adopts anything left from before projects existed, then migrates every project's database.
+  const { bootstrap, listProjects } = await import("./lib/control");
+  const { inProject } = await import("./lib/db");
+  await bootstrap();
+
+  // ponytail: both loops walk every project in turn, one at a time. With many projects the
+  // recheck round trip grows; give each project its own timer when that matters.
+  const eachProject = async (fn: () => Promise<unknown>) => {
+    for (const p of await listProjects()) await inProject(p.id, fn);
+  };
 
   const { runRechecks } = await import("./lib/recheck");
   const tick = async () => {
     if (running) return;
     running = true;
     try {
-      await runRechecks();
+      await eachProject(() => runRechecks());
     } catch (e) {
       console.error("[recheck] run failed", e);
     } finally {
@@ -36,7 +44,7 @@ export async function register() {
     if (filling) return;
     filling = true;
     try {
-      await runEnrichment();
+      await eachProject(() => runEnrichment());
     } catch (e) {
       console.error("[enrich] run failed", e);
     } finally {

@@ -1,16 +1,111 @@
-import { createClient, type InStatement } from "@libsql/client";
+import { createClient, type Client, type InStatement, type TransactionMode } from "@libsql/client";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { createProject, isMember, projectDir, projectsOf } from "./control";
 
-const DATA_DIR = process.env.DATA_DIR ?? "./data";
-mkdirSync(DATA_DIR, { recursive: true });
+/** The cookie the project switcher writes. Only a preference: membership is still checked. */
+export const PROJECT_COOKIE = "casa_p";
 
-export const db = createClient({ url: "file:" + DATA_DIR + "/casa.db" });
-// ponytail: one connection per process, so the pragmas are set once here, synchronously
-db.executeMultiple(
-  "PRAGMA journal_mode=DELETE; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000",
-);
+/**
+ * One SQLite file per project. `db` is a router, not a connection: every call finds the caller's
+ * project first, so the connection *is* the tenant and no query can read another project's data
+ * by forgetting a `WHERE`. Call sites are unchanged — `db.execute(...)` still reads the same.
+ *
+ * A project comes from, in order: an explicit `inProject()` scope (the background loops, the
+ * scripts, the capture routes), or the request — the `x-user-email` the proxy set, plus the
+ * project cookie, both checked against `memberships`. `docs/SCALE.md` § 4.
+ */
+const scope = new AsyncLocalStorage<string>();
+const clients = new Map<string, { c: Client; ready: Promise<void> }>();
+
+function clientFor(id: string) {
+  let slot = clients.get(id);
+  if (!slot) {
+    mkdirSync(projectDir(id), { recursive: true });
+    const c = createClient({ url: "file:" + join(projectDir(id), "casa.db") });
+    // ponytail: unbounded map — one open file per active project. An LRU when that hurts.
+    slot = {
+      c,
+      ready: c.executeMultiple("PRAGMA journal_mode=DELETE; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000"),
+    };
+    clients.set(id, slot);
+  }
+  return slot;
+}
+
+/**
+ * One render runs several queries at once, and each one resolves the project again. The lookup
+ * *and* the creation share one promise per person, so three parallel queries that all find no
+ * project cannot each create one — a second lookup issued before the first insert would still be
+ * reading the old, empty answer when it returns.
+ *
+ * ponytail: in-process, because one container writes. Two containers would need the database to
+ * settle it — a UNIQUE index on the first membership would do it.
+ *
+ * Exported because the project switcher needs the same answer, and because a test can drive it
+ * without a request.
+ */
+const resolving = new Map<string, Promise<string>>();
+
+export async function resolveProject(email: string | null, cookie: string | undefined): Promise<string> {
+  if (!email) throw Object.assign(new Error("unauthorized"), { status: 401 });
+  if (cookie && (await isMember(email, cookie))) return cookie;
+
+  let pending = resolving.get(email);
+  if (!pending) {
+    pending = (async () => {
+      const mine = await projectsOf(email);
+      // ponytail: somebody with no project gets one, rather than an error page they cannot act
+      // on. Invitations (the next issue) are the other way in; this is the way to start alone.
+      return mine.length ? mine[0].id : await createProject("Mi búsqueda", email);
+    })().finally(() => resolving.delete(email));
+    resolving.set(email, pending);
+  }
+  return pending;
+}
+
+/** The project this call belongs to. Throws rather than guess: a wrong guess is a data leak. */
+export async function currentProjectId(): Promise<string> {
+  const scoped = scope.getStore();
+  if (scoped) return scoped;
+
+  let headers: Headers | null = null;
+  let cookie: string | undefined;
+  try {
+    // ponytail: lazy import — this module loads in vitest and in scripts, with no request scope
+    const next = await import("next/headers");
+    headers = await next.headers();
+    try {
+      cookie = (await next.cookies()).get(PROJECT_COOKIE)?.value;
+    } catch {
+      // a route that can read headers but not cookies: the fallback below is still correct
+    }
+  } catch {
+    headers = null;
+  }
+  // Inside a request the membership check is the only answer; it never falls back.
+  if (headers) return resolveProject(headers.get("x-user-email"), cookie);
+  // Outside one — a test, a script, a loop that forgot `inProject()` — there is no identity to
+  // check, and there is no request to leak into either.
+  return process.env.CASA_PROJECT ?? "default";
+}
+
+async function current(): Promise<Client> {
+  const slot = clientFor(await currentProjectId());
+  await slot.ready;
+  return slot.c;
+}
+
+/** Runs `fn` against one project, for callers with no request: the loops, the scripts, captures. */
+export const inProject = <T>(id: string, fn: () => Promise<T>): Promise<T> => scope.run(id, fn);
+
+export const db = {
+  execute: async (stmt: InStatement) => (await current()).execute(stmt),
+  batch: async (stmts: InStatement[], mode?: TransactionMode) => (await current()).batch(stmts, mode),
+  executeMultiple: async (sql: string) => (await current()).executeMultiple(sql),
+};
 
 /**
  * Every migration after the version-1 bootstrap, in order. A fresh database and an existing one
@@ -66,6 +161,18 @@ const MIGRATIONS: Migration[] = [
       // 0 while nothing has been read from the advertisement yet: the row exists, the link is
       // safe, and the title is a placeholder built from the URL. It never goes back to 0.
       "ALTER TABLE properties ADD COLUMN filled INTEGER NOT NULL DEFAULT 1",
+    ],
+  },
+  {
+    version: 5,
+    owner: "issue #136 — notifications, and a list of what you have not looked at",
+    sql: [
+      // One row per person per home, written the first time they open its page. «Por revisar» is
+      // the absence of a row, so nothing has to be cleared and nothing can drift out of date.
+      `CREATE TABLE IF NOT EXISTS reviews (
+         property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL REFERENCES users(id), reviewed_at TEXT NOT NULL,
+         PRIMARY KEY (property_id, user_id))`,
     ],
   },
 ];

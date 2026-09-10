@@ -1,6 +1,6 @@
-import { userByCaptureToken } from "@/lib/auth";
+import { captureIdentity } from "@/lib/auth";
 import { COLLECT } from "@/lib/bookmarklet";
-import { db } from "@/lib/db";
+import { db, inProject } from "@/lib/db";
 import { siteName } from "@/lib/url";
 
 /**
@@ -20,16 +20,18 @@ const LIMIT = 20;
  * Authenticated by the capture token alone, like the capture itself — the reader has no session.
  */
 export async function GET(req: Request) {
-  const user = await userByCaptureToken(req.headers.get("x-capture-token") ?? "");
-  if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
+  const who = await captureIdentity(req.headers.get("x-capture-token") ?? "");
+  if (!who) return Response.json({ error: "unauthorized" }, { status: 401 });
 
   const now = Date.now();
-  const { rows } = await db.execute({
-    sql: `SELECT s.url_original AS url FROM sources s JOIN properties p ON p.id = s.property_id
-          WHERE p.filled = 0 AND s.last_check_outcome IS NOT 'removed' AND s.first_seen_at > ?
-          ORDER BY s.first_seen_at ASC LIMIT ?`,
-    args: [new Date(now - GIVE_UP_AFTER_MS).toISOString(), LIMIT],
-  });
+  const { rows } = await inProject(who.projectId, () =>
+    db.execute({
+      sql: `SELECT s.url_original AS url FROM sources s JOIN properties p ON p.id = s.property_id
+            WHERE p.filled = 0 AND s.last_check_outcome IS NOT 'removed' AND s.first_seen_at > ?
+            ORDER BY s.first_seen_at ASC LIMIT ?`,
+      args: [new Date(now - GIVE_UP_AFTER_MS).toISOString(), LIMIT],
+    }),
+  );
 
   return Response.json({
     collect: COLLECT,

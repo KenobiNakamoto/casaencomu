@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { userByCaptureToken } from "@/lib/auth";
+import { captureIdentity } from "@/lib/auth";
 import { runEnrichment } from "@/lib/enrich";
 import { extractResult, rawOf } from "@/lib/extract";
 import { IMPORT_DEADLINE_MS, MAX_CAPTURE_BYTES, pendingRecord, successLocation } from "@/lib/intake";
+import { inProject } from "@/lib/db";
 import { save } from "@/lib/save";
 import { normalizeUrl } from "@/lib/url";
 
@@ -43,8 +44,11 @@ export async function POST(req: Request) {
   const body = await req.arrayBuffer();
   if (body.byteLength > MAX_CAPTURE_BYTES) return fail(413, "La captura es demasiado grande");
   const fd = await new Response(body, { headers: { "content-type": req.headers.get("content-type") ?? "" } }).formData();
-  const user = await userByCaptureToken(String(fd.get("token") ?? ""));
-  if (!user) return fail(403, "Marcador no válido. Vuelve a instalarlo desde Ayuda");
+  // The token names the project as well as the member, so everything below reads and writes
+  // that project's database and nothing else.
+  const who = await captureIdentity(String(fd.get("token") ?? ""));
+  if (!who) return fail(403, "Marcador no válido. Vuelve a instalarlo desde Ayuda");
+  const user = who.user;
 
   const parsed = Form.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return fail(400, "Datos del marcador incompletos");
@@ -65,18 +69,22 @@ export async function POST(req: Request) {
   // reads it afterwards. Throwing it away made the person collect it twice for nothing.
   const record = r.kind === "listing" ? r : pendingRecord(url, norm.portalRef);
 
-  const saved = await save(
-    record.listing,
-    { url_original: url, url_normalized: norm.normalized, portal: norm.portal, portal_ref: norm.portalRef },
-    {
-      user,
-      via: "bookmarklet",
-      presence: record.presence,
-      raw: r.kind === "blocked" ? null : rawOf(page),
-      pending: r.kind === "listing" ? null : r.kind,
-      deadline: AbortSignal.timeout(IMPORT_DEADLINE_MS),
-    },
+  const saved = await inProject(who.projectId, () =>
+    save(
+      record.listing,
+      { url_original: url, url_normalized: norm.normalized, portal: norm.portal, portal_ref: norm.portalRef },
+      {
+        user,
+        via: "bookmarklet",
+        presence: record.presence,
+        raw: r.kind === "blocked" ? null : rawOf(page),
+        pending: r.kind === "listing" ? null : r.kind,
+        deadline: AbortSignal.timeout(IMPORT_DEADLINE_MS),
+      },
+    ),
   );
-  void runEnrichment({ limit: 1 }).catch((e) => console.error("[enrich] pass failed", e));
+  void inProject(who.projectId, () => runEnrichment({ limit: 1 })).catch((e) =>
+    console.error("[enrich] pass failed", e),
+  );
   return new Response(null, { status: 303, headers: { Location: successLocation(saved) } });
 }

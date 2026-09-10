@@ -166,6 +166,10 @@ async function refresh(
     });
   }
   if (!firstRead) for (const c of changes) stmts.push(event(row.property_id, c.kind, c.payload, user.id, at));
+  // The first real reading of a link that was accepted empty. Not a change — there was nothing to
+  // change from — but it is the thing the person who pasted it is waiting for, so it is recorded
+  // once, here, and `lib/notifications.ts` turns it into their notification.
+  else if (!pending) stmts.push(event(row.property_id, "completed", { title: facts.title }, user.id, at));
   await db.batch(stmts, "write");
 
   // ponytail: a refresh writes no event of its own. The changes are the record; a "checked,

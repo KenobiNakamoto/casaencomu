@@ -2,7 +2,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { currentUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { currentProjectId, db } from "@/lib/db";
 import { photoPath } from "@/lib/photos";
 
 const notFound = () => Response.json({ error: "not found" }, { status: 404 });
@@ -19,7 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     args: [id],
   });
   if (!rows.length) return notFound();
-  const path = photoPath(String(rows[0].property_id), String(rows[0].sha256));
+  const path = photoPath(await currentProjectId(), String(rows[0].property_id), String(rows[0].sha256));
   const size = await stat(path).then((s) => s.size, () => null);
   if (size === null) return notFound();
   return new Response(Readable.toWeb(createReadStream(path)) as ReadableStream, {

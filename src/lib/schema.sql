@@ -30,4 +30,8 @@ CREATE TABLE IF NOT EXISTS ratings (
 CREATE TABLE IF NOT EXISTS comments (
   id TEXT PRIMARY KEY, property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id), body TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS reviews (
+  property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id), reviewed_at TEXT NOT NULL,
+  PRIMARY KEY (property_id, user_id));
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);

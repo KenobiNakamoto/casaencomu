@@ -96,9 +96,9 @@ export async function currentUser(): Promise<User> {
   const email = (await headers()).get("x-user-email");
   if (!email) throw Object.assign(new Error("unauthorized"), { status: 401 });
 
-  const { db } = await import("./db");
+  const { currentProjectId, db } = await import("./db");
   const now = new Date().toISOString();
-  await db.execute({
+  const created = await db.execute({
     sql: "INSERT OR IGNORE INTO users (id, email, name, capture_token, created_at) VALUES (?, ?, ?, ?, ?)",
     args: [randomUUID(), email, email.split("@")[0], randomBytes(24).toString("base64url"), now],
   });
@@ -106,7 +106,30 @@ export async function currentUser(): Promise<User> {
     sql: "SELECT id, email, name, capture_token, last_seen_at FROM users WHERE email = ?",
     args: [email],
   });
+  const user = rows[0] as unknown as User;
+  // Only on the visit that created the row: the control database has to know which project a
+  // bookmarklet opens, and a write on every page view would be for nothing.
+  if (created.rowsAffected > 0) {
+    const { rememberCaptureToken } = await import("./control");
+    await rememberCaptureToken(user.capture_token, await currentProjectId(), email);
+  }
   // ponytail: last_seen_at is written only by /actividad, so the unread badge means
   // "since you last opened Actividad", not "since your last page view"
-  return rows[0] as unknown as User;
+  return user;
+}
+
+/**
+ * The whole identity of a request that carries no session: the bookmarklet and the browser reader.
+ * The token says which project to open, and who inside it to credit. Both capture routes sit
+ * outside the proxy, so this is the only check they have.
+ */
+export async function captureIdentity(
+  token: string,
+): Promise<{ projectId: string; user: User } | null> {
+  const { projectForCaptureToken } = await import("./control");
+  const projectId = await projectForCaptureToken(token);
+  if (!projectId) return null;
+  const { inProject } = await import("./db");
+  const user = await inProject(projectId, () => userByCaptureToken(token));
+  return user ? { projectId, user } : null;
 }

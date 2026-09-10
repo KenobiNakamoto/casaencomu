@@ -45,7 +45,7 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 
 | Path | What is in it |
 |---|---|
-| `app/` | routes: five pages, five API routes, one server-action file |
+| `app/` | routes: ten pages, five API routes, three server-action files |
 | `components/` | presentation only. No SQL, no `fetch` to a portal |
 | `lib/` | everything that is not a route or a component. Pure functions where possible |
 | `lib/__fixtures__/` | saved portal pages the extractor tests run against. See its `README.md` |
@@ -54,7 +54,9 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 
 | File | Job | Pure? |
 |---|---|---|
-| `db.ts` | the libSQL client, `applySchema()` which runs `schema.sql`, and the ordered migration chain after it | no |
+| `control.ts` | the control database: which projects exist, who belongs to each and as what, the open invitations, and which project a capture token opens. The only shared tables there are. `mustOwn()` is the owner rule, and it throws | no |
+| `notifications.ts` | what reaches one person — their own links being saved and read — and what is waiting for them to look at. «Por revisar» is the absence of a `reviews` row | no |
+| `db.ts` | **one libSQL client per project** — `db` finds the caller's project first, so the connection is the tenant. Also `applySchema()` and the ordered migration chain | no |
 | `schema.sql` | the eight tables, all `CREATE TABLE IF NOT EXISTS`. Version 1; everything after it is a migration in `db.ts` | — |
 | `listing.ts` | the zod schema of an extracted listing, plus the stage, dimension and event vocabularies | yes |
 | `auth.ts` | verifies the Access JWT (`jose`); `currentUser()` maps the email to a `users` row | half |
@@ -65,7 +67,7 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 | `ai.ts` | the whole model client: one POST to the Messages API, structured output through one tool whose schema comes from `Listing` itself. No key → every call answers null. `AI_BASE_URL` points it at `scripts/ai-bridge.mjs` on the server, which needs no key at all | half |
 | `enrich.ts` | layers 2 and 3, and the pass that walks the queue. `sources.enriched_at` **is** the queue: a new observation sets it back to NULL | half |
 | `bookmarklet.ts` | the collector both readers run, and the bookmarklet that wraps it in a form post | yes |
-| `photos.ts` | downloads, deduplicates by sha256, resizes to one 800 px JPEG, stores under `DATA_DIR`. 40 per property, not per call | no |
+| `photos.ts` | downloads, deduplicates by sha256, resizes to one 800 px JPEG, stores under the project's own directory. 40 per property, not per call | no |
 | `save.ts` | the one way an observation reaches the database. A new source becomes a property; a known source is **refreshed** — freshness only when nothing moved, facts and one event per change when something did | no |
 | `changes.ts` | canonical form and hash of the facts, what changed between two extractions, and the `properties` column allowlist | yes |
 | `availability.ts` | whether the advertisement is still up — the gone streak, the property's status from all its sources, staleness, and the Spanish for each. Deliberately not a stage | yes |

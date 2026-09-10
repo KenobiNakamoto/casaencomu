@@ -64,6 +64,9 @@ export const DIMENSION_LABELS: Record<Dimension, string> = {
 
 export const EVENT_KINDS = [
   "import",
+  // A link that was saved before it could be read has now been read. It is the moment the person
+  // who pasted it has been waiting for, and until this existed nothing recorded it.
+  "completed",
   "duplicate",
   "price_change",
   "availability_change",
