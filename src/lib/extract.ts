@@ -1,3 +1,4 @@
+import { decode } from "./entities";
 import { Listing } from "./listing";
 import { isAllowedImageHost, normalizeUrl, type Portal } from "./url";
 
@@ -53,15 +54,6 @@ const PRICE = /(\d[\d.]{4,})\s*€(?!\s*\/)/;
 const AREA = /(\d[\d.]*)\s*m(?:²|2\b)/i;
 const ROOMS = /(\d+)\s*(?:hab\b|habs?\b|habitacion|dormitorio)/i;
 const BATHS = /(\d+)\s*(?:baños?|banys?|aseos?)\b/i;
-
-const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-const decode = (s: string) =>
-  s.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, e: string) => {
-    if (e[0] !== "#") return ENTITIES[e.toLowerCase()] ?? m;
-    const hex = e[1] === "x" || e[1] === "X";
-    const n = parseInt(e.slice(hex ? 2 : 1), hex ? 16 : 10);
-    return Number.isFinite(n) ? String.fromCodePoint(n) : m;
-  });
 
 /** Tags out, line breaks kept (`<br>` and block ends), entities decoded — roughly `innerText`. */
 const toText = (html: string) =>

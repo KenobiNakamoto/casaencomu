@@ -33,8 +33,8 @@ beforeAll(async () => {
 });
 
 describe("the migration chain", () => {
-  it("reaches version 7 and adds every column the code reads", async () => {
-    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(7);
+  it("reaches version 8 and adds every column the code reads", async () => {
+    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(8);
     const cols = async (table: string) =>
       (await db.execute(`PRAGMA table_info(${table})`)).rows.map((r) => String(r.name));
     expect(await cols("sources")).toEqual(
@@ -65,7 +65,7 @@ describe("the migration chain", () => {
 
   it("is idempotent: running it again changes nothing", async () => {
     await applySchema();
-    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(7);
+    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(8);
   });
 
   // Everything stored before this migration was read the old way, and the record says so: a row
@@ -173,5 +173,52 @@ describe("restoring a stage a recheck overwrote", () => {
 
   it("has nothing left to do once it has run", async () => {
     expect(await stageRepairStatements()).toEqual([]);
+  });
+});
+
+/**
+ * Issue #143. The entities were already in the database when the extractor was fixed, and a
+ * corrected extractor never returns to a row it has already read.
+ */
+describe("the descriptions that kept their entities", () => {
+  const saved = async (id: string, description: string, title = "Piso") => {
+    await db.execute({
+      sql: "INSERT INTO properties (id, title, description, agency, stage, created_at, updated_at) VALUES (?, ?, ?, ?, 'nueva', ?, ?)",
+      args: [id, title, description, "Pisos & Casas", at(0), at(0)],
+    });
+    return id;
+  };
+  const wordsOf = async (id: string) =>
+    (await db.execute({ sql: "SELECT title, description, agency FROM properties WHERE id = ?", args: [id] })).rows[0];
+
+  it("rewrites a stored description in the letters it was written in", async () => {
+    const id = await saved(randomUUID(), "&iexcl;Descubre este &aacute;tico de 72 m&sup2;!", "&Aacute;tico");
+    await db.execute("PRAGMA user_version = 7");
+    await applySchema();
+
+    const row = await wordsOf(id);
+    expect(row.description).toBe("¡Descubre este ático de 72 m²!");
+    expect(row.title).toBe("Ático");
+    // An ampersand that was never an entity is text, and text is left alone.
+    expect(row.agency).toBe("Pisos & Casas");
+  });
+
+  it("leaves a row that has nothing to decode exactly as it is", async () => {
+    const clean = "Piso reformado en el Eixample, muy luminoso.";
+    const id = await saved(randomUUID(), clean);
+    await db.execute("PRAGMA user_version = 7");
+    await applySchema();
+    expect((await wordsOf(id)).description).toBe(clean);
+  });
+
+  it("runs again over its own output without changing it", async () => {
+    const id = await saved(randomUUID(), "Junto al mercado de Sant Antoni &ndash; &uacute;nico");
+    await db.execute("PRAGMA user_version = 7");
+    await applySchema();
+    const once = (await wordsOf(id)).description;
+    await db.execute("PRAGMA user_version = 7");
+    await applySchema();
+    expect((await wordsOf(id)).description).toBe(once);
+    expect(once).toBe("Junto al mercado de Sant Antoni – único");
   });
 });
