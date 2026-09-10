@@ -4,15 +4,23 @@
 <dict>
 	<!-- CasaEnComú nightly backup — docs/SCAFFOLD.md § 8.4. Install: cp to ~/Library/LaunchAgents/ then
 	     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kenobi.casaencomu-backup.plist
-	     launchd cannot read /Volumes, so the script runs through `ssh localhost` (inherits sshd's Full Disk Access).
-	     launchd does not expand ~, so /bin/sh resolves $HOME for the log; ssh's remote shell expands ~ for the script. -->
+	     It goes through `ssh localhost`, and both halves of that are load-bearing (measured, #21):
+	       - launchd's own process may reach Docker but may NOT write into iCloud Drive. It answers
+	         EINTR, "Interrupted system call", which reads like a hardware fault and is not one.
+	       - an ssh session may write iCloud but may NOT read /Volumes, where the data lives.
+	     So the script does every read inside the container, which has the disk bind-mounted, and only
+	     the encrypted stream crosses out — and that write happens in the ssh session, which is allowed.
+	     `-F /dev/null` because ~/.ssh/config includes a colima file on /Volumes: ssh dies parsing it
+	     before it ever tries to connect. Nothing on this Mac has Full Disk Access; granting it to sshd
+	     would remove the first constraint but not this file, so it is not the fix.
+	     launchd does not expand ~, so /bin/sh resolves $HOME for the log; the remote shell expands ~. -->
 	<key>Label</key>
 	<string>com.kenobi.casaencomu-backup</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/bin/sh</string>
 		<string>-c</string>
-		<string>exec /usr/bin/ssh -o BatchMode=yes localhost ~/.local/bin/casaencomu-backup.sh >>"$HOME/Library/Logs/casaencomu-backup.log" 2>&amp;1</string>
+		<string>exec /usr/bin/ssh -F /dev/null -o BatchMode=yes -o StrictHostKeyChecking=no localhost '~/.local/bin/casaencomu-backup.sh' >>"$HOME/Library/Logs/casaencomu-backup.log" 2>&amp;1</string>
 	</array>
 	<key>StartCalendarInterval</key>
 	<dict>

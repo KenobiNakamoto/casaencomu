@@ -470,7 +470,6 @@ Each of these is small, and each one is his to make.
 1. **Deploy what is built.** Release B's opinion work is merged and nothing of it is on the Air:
    the running image is from 9 September. `./deploy.sh` is the whole procedure. Until then the
    family sees none of the editor, the person cards, the conversation, or the corrected average.
-   The data still has no backup either — issue **#21**.
 2. **Enable HTTPS certificates on the tailnet?** One toggle at the Tailscale admin console,
    DNS → HTTPS Certificates. It turns the preview into a real `https://` address with a valid
    certificate. Two minutes of work after that.
@@ -498,9 +497,11 @@ These are real, and none of them is fixed.
   by source assertions only. Where a phone branch mattered — the comparison pair view — it was
   exercised by pointing its media query at 4000 px temporarily, which proves the branch and not
   the breakpoint. **Do not claim any of it is visually verified.**
-- **No backup restore drill.** Issue #21. The backup script and its LaunchAgent exist in `air/`
-  but have not been installed or exercised. Nobody has restored a database and confirmed it
-  works.
+- ~~**No backup restore drill.**~~ **Done 2026-09-10 (#21).** The script and the LaunchAgent are
+  installed on the Air, the agent has fired at exit status 0, and a restore was carried out: both
+  files pass `integrity_check`, and every count matches the live database — 24 properties, 3
+  opinions, 3 comments, 18 ratings, 57 events, 7 users. Photographs are still not backed up, on
+  purpose; `air/README.md` says so where a restore would find it.
 - **The map's group chooser has no real data behind it.** All 19 mappable properties have
   distinct coordinates. The chooser was verified by forcing three onto one point in a throwaway
   copy of the database. It is unit-tested, and it has never fired on real data.
