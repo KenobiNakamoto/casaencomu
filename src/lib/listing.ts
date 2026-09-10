@@ -81,7 +81,7 @@ export const EVENT_KINDS = [
 ] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
-export const SETTINGS_KEYS = ["presupuesto_min", "presupuesto_max"] as const;
+export const SETTINGS_KEYS = ["presupuesto_min", "presupuesto_max", "presupuesto_por", "presupuesto_el"] as const;
 export type SettingsKey = (typeof SETTINGS_KEYS)[number];
 
 /**

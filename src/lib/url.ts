@@ -33,6 +33,25 @@ export function routeFor(url: string): Route {
   return CAPTURE.has(host) ? "capture" : "unsupported";
 }
 /**
+ * The six portals as a person reads them. Built from the allowlist and the router above, so the
+ * help page can never claim to support a site the app would refuse, or miss one it accepts.
+ */
+const PORTAL_NAMES: Record<string, string> = {
+  "idealista.com": "Idealista",
+  "fotocasa.es": "Fotocasa",
+  "habitaclia.com": "Habitaclia",
+  "housfy.com": "Housfy",
+  "vivalta.es": "Vivalta",
+  "iadespana.es": "iad España",
+};
+
+export const PORTALS: { host: string; name: string; route: Route }[] = [...ALLOWED_HOSTS].map((host) => ({
+  host,
+  name: PORTAL_NAMES[host] ?? host,
+  route: routeFor(`https://${host}/`),
+}));
+
+/**
  * Hosts `savePhotos` is allowed to download from. A download allowlist, not a display filter:
  * anything else in a page's image list is simply never fetched. That is what keeps a tracking
  * pixel (`www.facebook.com`) or a static map tile (`api.mapbox.com`) out of the photo store.

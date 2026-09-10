@@ -4,7 +4,7 @@ import { MapFit } from "@/components/mapa/map-fit";
 import { PropertyCard, type Listed } from "@/components/propiedades/card";
 import { FilterBar } from "@/components/propiedades/filter-bar";
 import { ActiveFilters, QuickFilters } from "@/components/propiedades/filters-row";
-import { fmtEur, input } from "@/components/propiedades/format";
+import { ago, fmtEur, input } from "@/components/propiedades/format";
 import { RowsList } from "@/components/propiedades/rows";
 import { SearchBar } from "@/components/propiedades/search-bar";
 import { CompareTray } from "@/components/comparar/controls";
@@ -48,7 +48,8 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
   const v = withArea(parsed, area);
   // Before the query, not beside it: the reader's own stance is one of its columns, and nobody
   // else's stance is on their cards.
-  const [budget, user] = await Promise.all([getBudget(), currentUser()]);
+  const [presupuesto, user] = await Promise.all([getBudget(), currentUser()]);
+  const budget = presupuesto.budget;
   const { sql, args } = listSql(v, COLUMNS, user.id);
 
   const [list, counts, barrios, archived, spread] = await db.batch(
@@ -126,7 +127,19 @@ export default async function PropiedadesPage({ searchParams }: { searchParams: 
             />
             <form action={setBudgetAction} className="border-t border-hairline-soft pt-5">
               <p className="text-sm font-semibold text-ink">Presupuesto familiar</p>
-              <p className="mb-3 text-xs text-muted">Deja un campo vacío para no poner ese límite. Vacíos los dos, se quita el presupuesto.</p>
+              {/* It is one number for everybody, so it says so, and it says whose hand it was. A
+                  figure that appears from nowhere reads as a rule rather than as a decision
+                  somebody made and can be talked about (PIP-14, F30). */}
+              <p className="mb-3 text-xs text-muted">
+                Es el de todos: si lo cambias, cambia para toda la familia.
+                {presupuesto.by && presupuesto.at ? (
+                  <>
+                    {" "}
+                    Lo puso <span className="font-semibold text-body">{presupuesto.by}</span> {ago(presupuesto.at)}.
+                  </>
+                ) : null}{" "}
+                Deja un campo vacío para no poner ese límite. Vacíos los dos, se quita el presupuesto.
+              </p>
               <div className="flex flex-wrap items-end gap-3">
                 <label className="flex flex-col gap-1.5 text-xs font-semibold text-muted">
                   Mínimo

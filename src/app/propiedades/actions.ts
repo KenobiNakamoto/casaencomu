@@ -24,13 +24,13 @@ const nonNegInt = (v: FormDataEntryValue | null) => {
 };
 
 export async function setBudgetAction(formData: FormData) {
-  await currentUser();
+  const user = await currentUser();
   const a = nonNegInt(formData.get("min"));
   const b = nonNegInt(formData.get("max"));
   // Either bound alone is a budget, and two empty fields clear it (F30).
   // ponytail: a reversed pair is a typo, not an error — swap it
   const [min, max] = a !== null && b !== null ? [Math.min(a, b), Math.max(a, b)] : [a, b];
-  await setBudget(min, max);
+  await setBudget(min, max, user.id);
   revalidatePath(LIST);
 }
 

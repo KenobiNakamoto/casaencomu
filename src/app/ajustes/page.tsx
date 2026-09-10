@@ -1,14 +1,21 @@
 import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { buildBookmarklet } from "@/lib/bookmarklet";
+import { PORTALS } from "@/lib/url";
 import { input } from "@/components/propiedades/format";
 import { PERSON_NAME_MAX } from "@/lib/project-shape";
+import { CopyBox } from "./copy";
 import { renombrarseAction } from "./actions";
 
 /**
- * Everything about you rather than about a home: what the family sees you called, and the
- * bookmarklet that carries your name onto whatever you save. They are one page because they are
- * one thing — the account — and because there was never enough of either to be a page on its own.
+ * Everything about you rather than about a home: what the family sees you called, and how a home
+ * gets in. They are one page because they are one thing — the account — and because there was
+ * never enough of either to be a page on its own.
+ *
+ * It used to lead with dragging a bookmarklet to a desktop toolbar. Since issue #111 that is the
+ * exception: a pasted link is opened by a real browser on the server, and every portal below is
+ * on the paste allowlist. So «Añadir enlace» reads first and the marker reads second, as the
+ * thing you reach for when neither of those works (F37, PIP-14).
  */
 export default async function AjustesPage() {
   const { capture_token, name, email } = await currentUser();
@@ -55,51 +62,79 @@ export default async function AjustesPage() {
       </section>
 
       <section className="space-y-3 py-8">
-        <h2 className={h2}>Guardar desde el navegador</h2>
+        <h2 className={h2}>Cómo añadir un piso</h2>
+        <p className="text-body">
+          Copia el enlace del anuncio y pégalo en{" "}
+          <Link href="/propiedades" className="font-medium text-ink underline underline-offset-4">
+            Propiedades
+          </Link>{" "}
+          → «Añadir enlace». Eso es todo, también desde el móvil.
+        </p>
+        <p className="text-body">
+          Se guarda al momento. Si el portal no deja leerlo desde el servidor, el anuncio se abre
+          solo en un navegador de verdad y se lee unos minutos después. Verás «Sin leer» hasta
+          entonces, y te avisa la campana cuando esté.
+        </p>
+        {/* The list is built from the allowlist itself, so it cannot promise a portal the app
+            would refuse, or forget one it accepts. */}
+        <ul className="divide-y divide-hairline-soft border-y border-hairline-soft">
+          {PORTALS.map((p) => (
+            <li key={p.host} className="flex items-center gap-3 py-2.5 text-sm">
+              <span className="flex-1 font-medium text-ink">{p.name}</span>
+              <span className="text-muted">
+                {p.route === "server" ? "Se lee al momento" : "Se lee en un navegador, unos minutos después"}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-sm text-muted">
+          De otro portal no podemos leer el enlace. Ábrelo en el navegador y usa el marcador de abajo.
+        </p>
+      </section>
+
+      <section className="space-y-3 py-8">
+        <h2 className={h2}>El marcador, para lo demás</h2>
+        <p className="text-body">
+          Guarda la página que tengas abierta, sea del portal que sea. Es lo que hay que usar con un
+          portal que no está en la lista, y también si un anuncio lleva mucho «Sin leer».
+        </p>
         <p className="text-body">Arrástralo a la barra de marcadores (no hagas clic aquí):</p>
         <p dangerouslySetInnerHTML={{ __html: link }} />
         <p className="text-sm text-muted">
           Después, abre un anuncio y pulsa el marcador. Se abre una pestaña con el piso guardado.
         </p>
-      </section>
 
-      <section className="space-y-3 py-8">
-        <h2 className={h2}>En el iPhone (Safari)</h2>
+        <h3 className="pt-3 text-[15px] font-medium text-ink">En el iPhone (Safari)</h3>
+        <p className="text-sm text-muted">
+          No hay nada que instalar desde la App Store: es un marcador normal al que se le cambia la
+          dirección.
+        </p>
         <ol className="list-decimal space-y-2 pl-5 text-body">
           <li>Guarda cualquier página en Favoritos: botón Compartir → «Añadir marcador».</li>
           <li>Abre Marcadores → «Editar» y toca ese marcador.</li>
           <li>Cámbiale el nombre a «Guardar en CasaEnComú» y sustituye la dirección por el código de abajo.</li>
           <li>Abre un anuncio, toca la barra de direcciones y elige el marcador.</li>
         </ol>
-        <p className="text-sm text-muted">Mantén pulsado el cuadro → «Seleccionar todo» → «Copiar».</p>
-        {/* ponytail: no select-on-focus client component; long-press → Seleccionar todo works on iOS */}
-        <textarea
-          readOnly
-          value={bookmarklet}
-          rows={4}
-          className="w-full rounded-lg border border-control-border p-3 font-mono text-xs break-all focus:border-ink"
-        />
-      </section>
-
-      <section className="space-y-3 py-8">
-        <h2 className={h2}>Cómo añadir un piso</h2>
-        <p className="text-body">
-          <strong className="text-ink">Fotocasa o Habitaclia:</strong> copia el enlace del anuncio y pégalo en{" "}
-          <Link href="/propiedades" className="font-medium text-ink underline underline-offset-4">
-            Propiedades
-          </Link>{" "}
-          → «Añadir enlace».
-        </p>
-        <p className="text-body">
-          <strong className="text-ink">Idealista:</strong> bloquea al servidor. Abre el anuncio en el navegador y pulsa el marcador.
-        </p>
-      </section>
-
-      <section className="space-y-3 py-8">
-        <h2 className={h2}>Estado</h2>
         <p className="text-sm text-muted">
-          Servidor en marcha desde hace {uptimeMin} min · {now}
+          Copiar el código no es instalarlo: hay que pegarlo en el marcador del paso 3.
         </p>
+        <CopyBox value={bookmarklet} label="Código del marcador" />
+      </section>
+
+      <section className="py-8">
+        {/* ponytail: a native <details>. Uptime and a clock are for whoever is debugging the
+            server, and they were sitting under a heading of their own. */}
+        <details className="group">
+          <summary className="touch-target inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-body transition hover:text-ink">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition group-open:rotate-90" aria-hidden>
+              <path d="M9 5l7 7-7 7" />
+            </svg>
+            Detalles técnicos
+          </summary>
+          <p className="mt-3 text-sm text-muted">
+            Servidor en marcha desde hace {uptimeMin} min · {now}
+          </p>
+        </details>
       </section>
     </div>
   );
