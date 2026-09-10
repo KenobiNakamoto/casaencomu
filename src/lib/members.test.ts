@@ -14,14 +14,17 @@ const {
   control,
   createInvite,
   createProject,
+  DESCRIPTION_MAX,
   membersOf,
   pendingInvites,
   projectForCaptureToken,
   projectsOf,
+  PURPOSE_MAX,
   rememberCaptureToken,
   removeMember,
   revokeInvite,
   roleOf,
+  updateProject,
 } = await import("./control");
 
 const ANA = "ana@example.com";
@@ -123,5 +126,52 @@ describe("removing somebody", () => {
     expect(await removeMember(casa, ANA, ANA)).toBe(false);
     expect(await roleOf(ANA, casa)).toBe("owner");
     expect((await membersOf(casa))[0]).toMatchObject({ email: ANA, role: "owner" });
+  });
+});
+
+/** The card is the project, so what a card shows has to survive the round trip (#148). */
+describe("what a project says about itself", () => {
+  const only = async (email: string, id: string) => (await projectsOf(email)).find((p) => p.id === id)!;
+
+  it("starts with nothing written and keeps what is written", async () => {
+    const fresh = await createProject("Piso para el verano", ANA);
+    expect((await only(ANA, fresh)).purpose).toBe("");
+    expect((await only(ANA, fresh)).description).toBe("");
+
+    expect(
+      await updateProject(fresh, ANA, {
+        name: "Verano en Gràcia",
+        purpose: "Alquiler para septiembre",
+        description: "Dos habitaciones, ascensor, cerca del metro.",
+      }),
+    ).toBe(true);
+
+    const after = await only(ANA, fresh);
+    expect(after.name).toBe("Verano en Gràcia");
+    expect(after.purpose).toBe("Alquiler para septiembre");
+    expect(after.description).toBe("Dos habitaciones, ascensor, cerca del metro.");
+  });
+
+  it("counts the people in it, so the card never has to ask a second time", async () => {
+    expect((await only(ANA, casa)).people).toBe((await membersOf(casa)).length);
+  });
+
+  it("refuses a project with no name at all, and keeps the one it had", async () => {
+    expect(await updateProject(casa, ANA, { name: "   ", purpose: "x", description: "y" })).toBe(false);
+    expect((await only(ANA, casa)).name).toBe("Casa de Ana");
+  });
+
+  it("cuts what is too long instead of refusing it", async () => {
+    await updateProject(casa, ANA, { name: "Casa de Ana", purpose: "p".repeat(500), description: "d".repeat(5000) });
+    const after = await only(ANA, casa);
+    expect(after.purpose).toHaveLength(PURPOSE_MAX);
+    expect(after.description).toHaveLength(DESCRIPTION_MAX);
+  });
+
+  it("lets nobody but the owner rewrite it", async () => {
+    await expect(
+      updateProject(casa, BRUNO, { name: "Casa de Bruno", purpose: "", description: "" }),
+    ).rejects.toThrow("forbidden");
+    expect((await only(ANA, casa)).name).toBe("Casa de Ana");
   });
 });

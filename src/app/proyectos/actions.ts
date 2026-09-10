@@ -3,8 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { acceptInvite, createInvite, createProject, isMember, removeMember, revokeInvite } from "@/lib/control";
-import { currentProjectId, PROJECT_COOKIE } from "@/lib/db";
+import {
+  acceptInvite,
+  createInvite,
+  createProject,
+  isMember,
+  removeMember,
+  revokeInvite,
+  updateProject,
+} from "@/lib/control";
+import { PROJECT_COOKIE } from "@/lib/db";
 
 const PAGE = "/proyectos";
 
@@ -14,6 +22,14 @@ async function me(): Promise<string> {
   if (!email) throw Object.assign(new Error("unauthorized"), { status: 401 });
   return email;
 }
+
+/**
+ * Which project a form is about. It is a field now rather than the cookie, because the cards show
+ * every project at once and you manage the one whose panel is open, not the one you are looking
+ * at. It is safe to take from the form: every function it reaches asks `mustOwn` first, so an id
+ * typed in by hand only buys a 403.
+ */
+const which = (formData: FormData) => String(formData.get("proyecto") ?? "");
 
 /**
  * The cookie names the project the person is looking at. It is a preference, not a permission:
@@ -29,6 +45,9 @@ async function look(projectId: string) {
   });
 }
 
+/** What a panel says back. Nothing navigates, so the panel stays open and the words appear in it. */
+export type Aviso = { ok: boolean; msg: string } | null;
+
 export async function crearProyectoAction(formData: FormData) {
   const email = await me();
   const name = String(formData.get("nombre") ?? "").trim().slice(0, 60);
@@ -39,29 +58,46 @@ export async function crearProyectoAction(formData: FormData) {
 
 export async function cambiarProyectoAction(formData: FormData) {
   const email = await me();
-  const id = String(formData.get("proyecto") ?? "");
+  const id = which(formData);
   // Checked here as well, so a forged form cannot even set the cookie.
   if (await isMember(email, id)) await look(id);
   redirect("/propiedades");
 }
 
-export async function invitarAction(formData: FormData) {
+export async function guardarProyectoAction(_prev: Aviso, formData: FormData): Promise<Aviso> {
   const email = await me();
-  const result = await createInvite(await currentProjectId(), email, String(formData.get("correo") ?? ""));
-  if ("refused" in result) redirect(`${PAGE}?e=${result.refused}`);
+  const saved = await updateProject(which(formData), email, {
+    name: String(formData.get("nombre") ?? ""),
+    purpose: String(formData.get("proposito") ?? ""),
+    description: String(formData.get("descripcion") ?? ""),
+  });
+  if (!saved) return { ok: false, msg: "Ponle un nombre al proyecto." };
   revalidatePath(PAGE);
-  redirect(`${PAGE}?nuevo=${result.token}`);
+  return { ok: true, msg: "Guardado." };
+}
+
+const REFUSED = {
+  member: "Esa persona ya está en el proyecto.",
+  invalid: "Esa dirección de correo no es válida.",
+};
+
+export async function invitarAction(_prev: Aviso, formData: FormData): Promise<Aviso> {
+  const email = await me();
+  const result = await createInvite(which(formData), email, String(formData.get("correo") ?? ""));
+  if ("refused" in result) return { ok: false, msg: REFUSED[result.refused] };
+  revalidatePath(PAGE);
+  return { ok: true, msg: "Listo. Copia el enlace y mándaselo." };
 }
 
 export async function revocarAction(formData: FormData) {
   const email = await me();
-  await revokeInvite(await currentProjectId(), email, String(formData.get("token") ?? ""));
+  await revokeInvite(which(formData), email, String(formData.get("token") ?? ""));
   revalidatePath(PAGE);
 }
 
 export async function expulsarAction(formData: FormData) {
   const email = await me();
-  await removeMember(await currentProjectId(), email, String(formData.get("correo") ?? ""));
+  await removeMember(which(formData), email, String(formData.get("correo") ?? ""));
   revalidatePath(PAGE);
 }
 

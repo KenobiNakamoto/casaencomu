@@ -89,20 +89,23 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 | `/propiedades` | `app/propiedades/page.tsx` | the list. Filters live in the URL, so a link is a saved search. `lib/filters.ts` decides what they mean |
 | `/propiedades/[id]` | `app/propiedades/[id]/page.tsx` | four bands: the description with the facts beside it, the opinion box, the family's table beside the conversation, and a full-width map of this home alone. The advertisement's own record — sources, price history, activity — reads last |
 | `/mapa` | `app/mapa/page.tsx` | the shell; the map itself is `components/mapa/Mapa.tsx`. Reads the same filters as the list |
-| `/ayuda` and route states | `app/{error,not-found,loading}.tsx` | every flow's own error, missing-page and loading screens |
+| route states | `app/{error,not-found,loading}.tsx` | every flow's own error, missing-page and loading screens |
 | `/comparar` | `app/comparar/page.tsx` | 2 to 4 columns, differing rows highlighted. The `ids` in the URL win; the tray is how they get there |
 | `/actividad` | `app/actividad/page.tsx` | the `events` table, newest first |
-| `/ayuda` | `app/ayuda/page.tsx` | the bookmarklet to drag, and how to use it |
+| `/ajustes` | `app/ajustes/page.tsx` | your own name, then the bookmarklet to drag and how to use it. `/ayuda` redirects here (`next.config.ts`) |
+| `/proyectos` | `app/proyectos/page.tsx` | one card per project; the three dots open its name, its people and its invitations |
+| `GET /salir` | `app/salir/route.ts` | Cloudflare's logout when Access is configured, a fresh Basic challenge in preview |
 | `POST /api/capture` | `app/api/capture/route.ts` | the bookmarklet and browser-reader target. Outside the proxy: the request arrives with `Origin: null` and no cookie, so `capture_token` is both the guard and the identity |
 | `POST /api/import` | `app/api/import/route.ts` | a pasted URL. Refuses only a host outside `ALLOWED_HOSTS`; a page it cannot read is saved anyway |
 | `GET /api/capture/pending` | `app/api/capture/pending/route.ts` | the links still unread, and the collector to run in them. Read by the browser reader on the host |
 | `GET /api/photos/[id]` | `app/api/photos/[id]/route.ts` | streams a stored photo; authenticated like every other route |
 | `GET /api/health` | `app/api/health/route.ts` | the container health check. The only route the proxy lets through unauthenticated |
 
-Mutations are server actions in `app/propiedades/actions.ts`. There are two: `opinionAction`,
-which writes the scores, the comment and the stage of one home in one transaction — each part
-only if it changed — and `setBudgetAction`. They call `revalidatePath`, so there is no
-client-side cache to invalidate.
+Mutations are server actions, one `actions.ts` per route folder: `propiedades` (the opinion, the
+stage, the conversation and the budget), `proyectos` (who is in a project and what it is called)
+and `ajustes` (your own name). They call `revalidatePath`, so there is no client-side cache to
+invalidate, and the ones a panel calls return their answer rather than redirecting — a redirect
+would close the panel the person is still working in.
 
 ## Boot
 

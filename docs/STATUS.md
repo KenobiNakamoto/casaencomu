@@ -14,8 +14,9 @@ no evidence is not a claim, it is a plan, and it belongs in `WORKPLAN.md`.
 **Release A is finished**, and **Release B's opinion work with it**: what a person thinks is now
 published, versioned, drafted and withdrawable (PIP-09, PIP-10), the family average counts people
 rather than rating rows, and the conversation takes replies, corrections and removals (PIP-11).
-`main` is green at **569 tests, 3 skipped**, with lint, types and build clean. Three packages are
-left in Release B: PIP-07, PIP-13 and PIP-14.
+The top bar carries the account rather than a `?` (#148). `main` is green at **590 tests,
+3 skipped**, with lint, types and build clean. Two and a half packages are left in Release B:
+PIP-07, PIP-13, and the rest of PIP-14.
 
 **Nothing since 9 September is deployed.** The Air runs an older image, so the family has none of
 the above; `./deploy.sh` is the whole procedure. A real domain is still blocked on three items
@@ -424,9 +425,12 @@ opinion references, #146). The fair family average that F21 named landed with th
 number is now the mean of each person's mean, not the mean of the rating rows.
 
 Left: **PIP-07** (detail and listing hierarchy, partly consumed by #122 and #126), **PIP-13**
-(activity and freshness, partly done by the bell and the «Revisar» tab in #137), **PIP-14**
-(profile and capture help, P2). Also split out of #144 and not yet filed: the person selector on
-the comparison page.
+(activity and freshness, partly done by the bell and the «Revisar» tab in #137). **PIP-14** is
+half done: #148 made `/ajustes` — your own editable name over the capture help that used to be
+`/ayuda` — and took the `?` out of the top bar, where the icon of several people became the
+account menu (Ajustes · Proyectos · Cerrar sesión). What PIP-14 still wants is the shared budget
+stated as shared, and instructions for the portals beyond the three named today. Also split out of
+#144 and not yet filed: the person selector on the comparison page.
 
 ### Deferred by the proposal itself
 

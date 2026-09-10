@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AccountMenu from "./account-menu";
 import ActivityFeed from "./activity-feed";
 import { currentUser } from "@/lib/auth";
 import { bellFor, DIGEST_DAYS } from "@/lib/notifications";
@@ -12,6 +13,9 @@ import ThemeToggle from "./theme-toggle";
  * The fourth tab is «Revisar» — the homes this person has not opened yet — and its badge is that
  * count. What used to be there, «Actividad», is now a tab inside the bell menu, because activity
  * is something you glance at and reviewing is something you sit down to do.
+ *
+ * The right-hand end is three controls, not five: the bell, the theme, and you. The greeting went
+ * into the account menu, where the name sits over the address it belongs to.
  */
 export default async function Nav() {
   const user = await currentUser();
@@ -36,8 +40,6 @@ export default async function Nav() {
         </Link>
         <NavLinks items={items} />
         <div className="ml-auto flex items-center gap-3 lg:ml-0">
-          {/* the greeting is the first thing to go: it is the least useful of the six items in this row */}
-          <span className="hidden max-w-[14ch] truncate text-sm text-body lg:inline">Hola {user.name}</span>
           <NotificationsMenu
             unseen={bell.unseen}
             digest={bell.digest}
@@ -46,25 +48,9 @@ export default async function Nav() {
             activity={<ActivityFeed userId={user.id} since={user.last_seen_at} limit={12} />}
           />
           <ThemeToggle />
-          {/* The way to the people in this project, and to your other projects. */}
-          <Link
-            href="/proyectos"
-            aria-label="Proyectos y personas"
-            title="Proyectos y personas"
-            className="touch-target flex h-11 w-11 items-center justify-center rounded-full border border-control-border text-ink transition hover:shadow-tier"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M16 19v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 9a3 3 0 100-6 3 3 0 000 6M22 19v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-            </svg>
-          </Link>
-          <Link
-            href="/ayuda"
-            aria-label="Ayuda"
-            title="Ayuda"
-            className="touch-target flex h-11 w-11 items-center justify-center rounded-full border border-control-border text-sm font-semibold text-ink transition hover:shadow-tier"
-          >
-            ?
-          </Link>
+          {/* You: your settings, your projects, and the way out. The `?` that used to sit beside
+              this is gone, and its page is the first section of «Ajustes» (#148). */}
+          <AccountMenu name={user.name} email={user.email} />
         </div>
       </div>
     </header>
