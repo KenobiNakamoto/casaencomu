@@ -29,7 +29,9 @@ export const fmtDateTime = (iso: string) =>
     timeZone: TZ,
   });
 
-export const siNo = (v: number | boolean | null | undefined) => (v == null ? SIN_DATOS : v ? "Sí" : "No");
+/** Yes, no, or `null` for «the advertisement does not say» — which is not a value and never
+ * becomes words. It used to return «Sin datos», which is how twelve rows of it reached one panel. */
+export const yesNo = (v: number | boolean | null | undefined) => (v == null ? null : v ? "Sí" : "No");
 
 /** How long ago, in words. Used by the activity feed and by the notifications menu. */
 export function ago(iso: string) {

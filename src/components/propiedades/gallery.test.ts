@@ -15,10 +15,13 @@ const css = read("../../app/globals.css");
 
 describe("the page draws each photograph once", () => {
   it("the detail page owns no photograph markup of its own", () => {
-    // The <details> block used to draw every photograph a second time under the hero grid.
+    // A <details> block under the hero grid used to draw every photograph a second time. What
+    // matters is not that the tag is absent — the record's fold is one — but that there is
+    // exactly one photo surface on the page, and it is this component.
+    expect(page.match(/<Gallery\b/g) ?? []).toHaveLength(1);
     expect(page).toContain("<Gallery ids={photoIds}");
-    expect(page).not.toContain("<details");
     expect(page).not.toMatch(/<Cover\b/);
+    expect(page).not.toMatch(/<img\b/);
     expect(page).not.toContain("/api/photos/");
   });
 
