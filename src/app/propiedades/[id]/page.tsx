@@ -12,7 +12,7 @@ import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { backHref } from "@/lib/filters";
 import { DIMENSION_LABELS, DIMENSIONS, STAGE_LABELS, type Stage } from "@/lib/listing";
-import { familyAverage, matrix, memberAverage, type RatingRow } from "@/lib/ratings";
+import { contributors, dimensionAverage, familyAverage, isPartial, matrix, memberAverage, type RatingRow } from "@/lib/ratings";
 
 
 type Property = {
@@ -120,6 +120,7 @@ const band = "mt-12";
 const cell = "border-b border-hairline-soft py-2 pr-3 align-top";
 const initial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 const score = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fmtScore = (n: number | null) => (n === null ? "—" : score(n));
 
 export default async function PropiedadPage({
   params,
@@ -173,7 +174,9 @@ export default async function PropiedadPage({
   const availability = propertyAvailability(sourceRows);
   const lastChecked = sourceRows.map((s) => s.last_ok_at).filter(Boolean).sort().at(-1) ?? null;
   const mineAt = ratingRows.filter((r) => r.user_id === user.id).map((r) => r.updated_at).sort().at(-1) ?? null;
-  const voices = new Set([...ratingRows.map((r) => r.user_id)]).size;
+  const voices = contributors(ratingRows);
+  // Somebody answered part of the form, so the family number is thinner than it looks (#130).
+  const partial = isPartial(ratingRows, DIMENSIONS.length);
 
   const facts: [string, string, string][] = [
     ["Superficie", fmtNum(p.area_m2, "m²"), "area_m2"],
@@ -312,6 +315,7 @@ export default async function PropiedadPage({
               <dt className="text-muted">La familia</dt>
               <dd className="text-body">
                 {voices === 0 ? "Nadie ha valorado" : voices === 1 ? "1 persona ha valorado" : `${voices} personas han valorado`}
+                {partial ? " (parcial)" : ""}
                 {` · ${commentRows.length} ${commentRows.length === 1 ? "comentario" : "comentarios"}`}
               </dd>
             </div>
@@ -349,7 +353,7 @@ export default async function PropiedadPage({
                           {m[u.id][dim] ?? "—"}
                         </td>
                       ))}
-                      <td className={`${cell} text-center font-medium`}>{familyAverage(dimRows)?.toLocaleString("es-ES") ?? "—"}</td>
+                      <td className={`${cell} text-center font-medium`}>{fmtScore(dimensionAverage(dimRows))}</td>
                     </tr>
                   );
                 })}
@@ -359,10 +363,13 @@ export default async function PropiedadPage({
                   </th>
                   {memberRows.map((u) => (
                     <td key={u.id} className={`${cell} text-center font-medium`}>
-                      {memberAverage(ratingRows, u.id)?.toLocaleString("es-ES") ?? "—"}
+                      {fmtScore(memberAverage(ratingRows, u.id))}
                     </td>
                   ))}
-                  <td className={`${cell} text-center font-semibold`}>{family?.toLocaleString("es-ES") ?? "—"}</td>
+                  <td className={`${cell} text-center font-semibold`}>
+                    {fmtScore(family)}
+                    {partial && <span className="block text-xs font-normal text-muted">Parcial</span>}
+                  </td>
                 </tr>
               </tbody>
             </table>

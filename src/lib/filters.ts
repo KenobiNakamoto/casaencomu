@@ -8,6 +8,7 @@
  * "the list, the map and the markers" while the list never called it (F29).
  */
 
+import { FAMILY_AVG_SQL } from "@/lib/ratings";
 import { NOT_REMOVED_SQL } from "./availability";
 import { isIn, type AreaFeature } from "./geo";
 import { STAGES, type Stage } from "./listing";
@@ -145,12 +146,15 @@ export function listSql(f: Filters, columns: string): { sql: string; args: (stri
   // The archive policy, and the only place it lives (F29). Naming a stage is asking to see that
   // stage, so an explicit `etapa` filter opts out of it as plainly as `archivadas=1` does.
   if (!f.archivadas && !f.etapa) where.push(`p.stage != 'descartada' AND ${NOT_REMOVED_SQL}`);
+  // Rounded here, and only here: `puntuacion` compares against this column, so the number the
+  // filter reads has to be the number the card prints. A card saying 4,0 must not be dropped by
+  // «4 o más» because the unrounded mean was 3,96.
   if (f.puntuacion) args.push(Number(f.puntuacion));
 
   const sql = `SELECT * FROM (
       SELECT ${ALWAYS}${columns ? `, ${columns}` : ""},
         ${COVER_SQL} AS cover_id,
-        (SELECT ROUND(AVG(score), 1) FROM ratings WHERE property_id = p.id) AS family_avg,
+        ROUND(${FAMILY_AVG_SQL}, 1) AS family_avg,
         ${HAYSTACK_SQL} AS haystack
       FROM properties p ${where.length ? "WHERE " + where.join(" AND ") : ""}
     ) ${f.puntuacion ? "WHERE family_avg >= ?" : ""} ORDER BY ${ORDER[f.orden]}`;
