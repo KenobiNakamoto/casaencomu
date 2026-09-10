@@ -114,13 +114,15 @@ describe("the add control grows out of its own button", () => {
 });
 
 describe("a refused save keeps the words (F25)", () => {
-  it("the comment comes back with its text, and the scores with it", () => {
+  it("the comment comes back with its text, and the opinion keeps every field", () => {
     expect(actions).toContain("text: string");
-    expect(actions).toContain("const back = { text: raw, scores };");
+    expect(actions).toContain("const back = { text: raw };");
     expect(opinion).toContain("defaultValue={failed?.text ?? \"\"}");
-    // The radios are held in React, because React resets an uncontrolled field when the action
-    // returns — a refused save would otherwise throw away every choice the person just made.
-    expect(opinion).toContain("checked={scores[dim] === n}");
+    // The editor holds every answer in React and a refusal never writes to that state, so a
+    // refused publication costs nothing the person typed or chose (#141).
+    const editor = read("./propiedades/opinion-editor.tsx");
+    expect(editor).toContain("checked={input.scores[dim] === n}");
+    expect(editor.slice(editor.indexOf("if (!result.ok)"), editor.indexOf("setSaved(input);"))).not.toContain("setInput");
   });
 
   it("a stage change is conditional on the version it was drawn from", () => {

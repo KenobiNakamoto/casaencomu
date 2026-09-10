@@ -11,6 +11,8 @@ const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.ur
 const page = read("../../app/propiedades/[id]/page.tsx");
 const form = read("./opinion-form.tsx");
 const actions = read("../../app/propiedades/actions.ts");
+const editor = read("./opinion-editor.tsx");
+const panel = read("../panel.tsx");
 
 const at = (marker: string) => {
   const i = page.indexOf(marker);
@@ -59,8 +61,8 @@ describe("one box, one button", () => {
     expect(form).toContain("lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]");
   });
 
-  it("carries the questions, the comment and the state, in that order", () => {
-    const q = form.indexOf("<Questions ");
+  it("carries your opinion, the comment and the state, in that order", () => {
+    const q = form.indexOf("<OpinionEditor ");
     const c = form.indexOf('name="body"');
     const s = form.indexOf('name="etapa"');
     expect(q).toBeGreaterThan(-1);
@@ -75,26 +77,73 @@ describe("one box, one button", () => {
   });
 
   it("keeps a 44 px target on every choice and on the button", () => {
-    expect(form).toContain("h-11 w-full"); // the five choices
-    expect(form).toContain("h-12 w-full"); // the stage control and the button
-  });
-
-  it("says how much of the questionnaire is answered, and counts it live", () => {
-    expect(form).toContain("const rated = DIMENSIONS.filter((d) => scores[d] != null).length;");
-    expect(form).toContain("{rated} de {DIMENSIONS.length} aspectos valorados");
-  });
-
-  it("re-draws the answers after every save, because React empties the form", () => {
-    // Without the re-mount the radios go blank on screen while React still believes they are
-    // chosen: React resets the fields when the action returns, and a `checked` prop that did not
-    // change is not written to the DOM again.
-    expect(form).toContain("if (seen !== state) {");
-    expect(form).toContain("<Questions key={generation} answers={{ ...current, ...(failed?.scores ?? {}) }} />");
+    expect(editor).toContain("h-11 w-full"); // the five scores
+    expect(editor).toContain("h-12 w-full"); // the stance choices and the publish button
+    expect(form).toContain("h-12 w-full"); // the stage control and the save button
   });
 
   it("writes no colour of its own", () => {
-    expect(form.match(/#[0-9a-f]{3,8}\b/gi) ?? []).toEqual([]);
-    expect(form.match(/\brgba?\(/g) ?? []).toEqual([]);
+    for (const src of [form, editor, panel]) {
+      // «(#141)» is an issue, not a colour.
+      expect(src.replace(/\(#\d+\)/g, "").match(/#[0-9a-f]{3,8}\b/gi) ?? []).toEqual([]);
+      expect(src.match(/\brgba?\(/g) ?? []).toEqual([]);
+    }
+  });
+});
+
+describe("the opinion editor (#141)", () => {
+  it("asks in the order the contract sets", () => {
+    const order = ["¿Cómo lo ves?", "Por qué lo ves así", "Hay un impedimento importante para mí", "Valorar por aspectos", "¿En qué te basas?"].map(
+      (t) => {
+        const i = editor.indexOf(t);
+        expect(i, `missing: ${t}`).toBeGreaterThan(-1);
+        return i;
+      },
+    );
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it("counts the aspects answered, and does not preselect one", () => {
+    expect(editor).toContain('const rated = DIMENSIONS.filter((d) => typeof input.scores[d] === "number").length;');
+    expect(editor).toContain("{rated} de {DIMENSIONS.length} aspectos valorados");
+    expect(editor).not.toContain("defaultChecked");
+  });
+
+  it("offers «No lo sé», which is how a published score is removed", () => {
+    expect(editor).toContain("No lo sé");
+    expect(editor).toContain("setScore(dim, null)");
+  });
+
+  it("saves a draft only when asked: no timer, no blur, no autosave", () => {
+    expect(editor).not.toContain("setTimeout");
+    expect(editor).not.toContain("onBlur");
+    expect(editor).toContain("Guardar borrador");
+  });
+
+  it("keeps every word on a refusal, and names the two kinds", () => {
+    expect(editor).toContain('result.reason === "conflict"');
+    // The refusal path touches no field: `setInput` appears nowhere inside it.
+    const refusal = editor.slice(editor.indexOf("if (!result.ok)"), editor.indexOf("setSaved(input);"));
+    expect(refusal).not.toContain("setInput");
+  });
+
+  it("asks before withdrawing, in the contract's words", () => {
+    expect(editor).toContain("Dejará de mostrarse a la familia. Puedes volver a publicarla más adelante.");
+    // The call lives inside the branch the question opens, so it cannot be reached in one click.
+    expect(editor.indexOf("{confirming ? (")).toBeLessThan(editor.indexOf("withdrawOpinionAction(propertyId"));
+  });
+
+  it("offers the three ways out of an unsaved editor", () => {
+    for (const t of ["Seguir editando", "Guardar borrador", "Descartar los cambios"]) expect(editor).toContain(t);
+    // Never a browser dialog: it cannot be read, styled or undone.
+    expect(editor).not.toContain("window.confirm");
+    expect(panel).not.toContain("confirm(");
+  });
+
+  it("is one native dialog, and lets the browser do what a dialog already does", () => {
+    expect(panel).toContain("showModal()");
+    expect(panel).toContain("onCancel");
+    expect(panel).not.toContain("addEventListener(\"keydown\"");
   });
 });
 
@@ -110,9 +159,19 @@ describe("the save is one write, and writes only what changed", () => {
     expect(body).toContain('await db.batch(writes, "write");');
   });
 
-  it("an unchanged score writes no row and no event", () => {
-    expect(actions).toContain("const changed = changedScores(current, scores);");
-    expect(actions).toContain("if (changed.length > 0) {");
+  it("no longer writes a score at all: that only happens through a publication", () => {
+    expect(actions).not.toContain("UPSERT_RATING_SQL");
+    expect(actions).not.toContain('event(propertyId, "rating"');
+    const body = actions.slice(actions.indexOf("export async function opinionAction"));
+    expect(body).not.toContain("INSERT INTO ratings");
+  });
+
+  it("names the author from the session, never from the request", () => {
+    for (const fn of ["publishOpinionAction", "saveDraftAction", "withdrawOpinionAction"]) {
+      const body = actions.slice(actions.indexOf(`export async function ${fn}`));
+      expect(body.slice(0, body.indexOf("}"))).toContain("await currentUser()");
+    }
+    expect(actions).not.toContain("formData.get(\"userId\")");
   });
 
   it("an empty box writes no comment, and the stage it is already in writes nothing", () => {

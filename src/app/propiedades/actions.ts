@@ -5,8 +5,8 @@ import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { DIMENSIONS, STAGE_LABELS, STAGES, type Dimension, type EventKind, type Stage } from "@/lib/listing";
-import { changedScores, UPSERT_RATING_SQL } from "@/lib/ratings";
+import { STAGE_LABELS, STAGES, type EventKind, type Stage } from "@/lib/listing";
+import { publish, saveDraft, withdraw, type OpinionInput, type Result } from "@/lib/opinions";
 import { setBudget } from "@/lib/settings";
 
 const LIST = "/propiedades";
@@ -38,50 +38,37 @@ export async function setBudgetAction(formData: FormData) {
 }
 
 /**
- * What the form has to show afterwards. A refused save gives back the words **and** the scores:
- * losing what somebody typed is the one failure they cannot undo (F25), and the scores are typed
- * as much as the sentence is.
+ * What the box has to show afterwards. A refused save gives the words back: losing what somebody
+ * typed is the one failure they cannot undo (F25).
  */
 export type OpinionState =
   | { ok: true; saved: string }
-  | { ok: false; message: string; text: string; scores: Partial<Record<Dimension, number>> }
+  | { ok: false; message: string; text: string }
   | null;
 
 /**
- * One opinion, one write. The scores, the comment and the stage arrive from one box with one
- * button, and they reach the database in one transaction — so half an opinion is not a state the
- * family can end up in.
+ * The comment and the stage, in one write. The scores used to travel with them and no longer do:
+ * a score is part of an opinion, and an opinion is published through `publishOpinionAction` so it
+ * can be versioned, drafted and withdrawn (#141). A comment is the family's conversation and the
+ * stage is the family's decision — neither is one person's opinion, so both stay here.
  *
- * Each part is written only if it actually changed: an unchanged score writes no row and no
- * event, an empty box writes no comment, and the stage the home is already in writes nothing.
- * Otherwise the activity feed would fill with «Valoración guardada» every time somebody typed a
- * sentence, because the six radios are always submitted.
+ * Each part is written only if it changed: an empty box writes no comment, and the stage the home
+ * is already in writes nothing.
  */
 export async function opinionAction(_prev: OpinionState, formData: FormData): Promise<OpinionState> {
   const propertyId = String(formData.get("propertyId") ?? "");
   const user = await currentUser();
 
-  const scores: Partial<Record<Dimension, number>> = {};
-  for (const dim of DIMENSIONS) {
-    const n = Number(formData.get(dim));
-    if (Number.isInteger(n) && n >= 1 && n <= 5) scores[dim] = n;
-  }
   const raw = String(formData.get("body") ?? "");
   const body = raw.trim().slice(0, 4000);
   const to = String(formData.get("etapa") ?? "");
   const seen = Number(formData.get("version"));
-  const back = { text: raw, scores };
+  const back = { text: raw };
 
   if (!STAGES.includes(to as Stage)) return { ok: false, message: "Esa etapa no existe.", ...back };
   if (!Number.isInteger(seen)) return { ok: false, message: "Vuelve a cargar la página e inténtalo otra vez.", ...back };
 
-  const [prop, mine] = await db.batch(
-    [
-      { sql: "SELECT stage, stage_version FROM properties WHERE id = ?", args: [propertyId] },
-      { sql: "SELECT dimension, score FROM ratings WHERE property_id = ? AND user_id = ?", args: [propertyId, user.id] },
-    ],
-    "read",
-  );
+  const prop = await db.execute({ sql: "SELECT stage, stage_version FROM properties WHERE id = ?", args: [propertyId] });
   const from = prop.rows[0]?.stage;
   if (typeof from !== "string") return { ok: false, message: "Esta propiedad ya no existe.", ...back };
   if (Number(prop.rows[0].stage_version) !== seen) {
@@ -92,19 +79,10 @@ export async function opinionAction(_prev: OpinionState, formData: FormData): Pr
     };
   }
 
-  const current = Object.fromEntries(mine.rows.map((r) => [String(r.dimension), Number(r.score)]));
-  const changed = changedScores(current, scores);
   const now = new Date().toISOString();
   const writes: InStatement[] = [];
   const done: string[] = [];
 
-  if (changed.length > 0) {
-    writes.push(
-      ...changed.map(([dim, s]): InStatement => ({ sql: UPSERT_RATING_SQL, args: [propertyId, user.id, dim, s, now] })),
-      event(propertyId, "rating", { scores: Object.fromEntries(changed) }, user.id, now),
-    );
-    done.push(changed.length === 1 ? "un aspecto" : `${changed.length} aspectos`);
-  }
   if (body) {
     const id = randomUUID();
     writes.push(
@@ -132,4 +110,41 @@ export async function opinionAction(_prev: OpinionState, formData: FormData): Pr
   revalidatePath(detail(propertyId));
   revalidatePath(LIST);
   return { ok: true, saved: listOf(done) };
+}
+
+/* -------------------------------------------------------------------------------------------
+ * The opinion itself (#141). Three actions, one rule: the author is `currentUser()` and never a
+ * field in the request. An id that arrives with the form is a claim, not an identity, and a draft
+ * is the one thing in this application that nobody else may read.
+ *
+ * Each one carries the version and revision the person's page was drawn from, so a second device
+ * cannot be overwritten silently. `lib/opinions.ts` decides; this only names the caller and tells
+ * Next.js what to redraw.
+ * ----------------------------------------------------------------------------------------- */
+
+type Expected = { version: number; revision: number };
+
+const redraw = (propertyId: string) => {
+  revalidatePath(detail(propertyId));
+  revalidatePath(LIST);
+};
+
+export async function publishOpinionAction(propertyId: string, input: OpinionInput, expected: Expected): Promise<Result> {
+  const user = await currentUser();
+  const result = await publish(propertyId, user.id, input, expected);
+  if (result.ok) redraw(propertyId);
+  return result;
+}
+
+export async function saveDraftAction(propertyId: string, input: OpinionInput, expected: Expected): Promise<Result> {
+  const user = await currentUser();
+  // No path is revalidated: a draft changes nothing anybody else can see.
+  return saveDraft(propertyId, user.id, input, { revision: expected.revision });
+}
+
+export async function withdrawOpinionAction(propertyId: string, expected: Expected): Promise<Result> {
+  const user = await currentUser();
+  const result = await withdraw(propertyId, user.id, expected);
+  if (result.ok) redraw(propertyId);
+  return result;
 }
