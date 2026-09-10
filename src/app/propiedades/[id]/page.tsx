@@ -111,6 +111,10 @@ function describe(kind: string, p: Record<string, unknown>) {
       return `Comentario: «${String(p.body ?? "").slice(0, 80)}${String(p.body ?? "").length > 80 ? "…" : ""}»`;
     case "rating":
       return "Valoración guardada";
+    case "opinion":
+      return "Opinión publicada";
+    case "opinion_withdrawn":
+      return "Opinión retirada";
     default:
       return kind;
   }
