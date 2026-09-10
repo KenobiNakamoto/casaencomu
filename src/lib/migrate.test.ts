@@ -33,8 +33,8 @@ beforeAll(async () => {
 });
 
 describe("the migration chain", () => {
-  it("reaches version 8 and adds every column the code reads", async () => {
-    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(8);
+  it("reaches version 9 and adds every column the code reads", async () => {
+    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(9);
     const cols = async (table: string) =>
       (await db.execute(`PRAGMA table_info(${table})`)).rows.map((r) => String(r.name));
     expect(await cols("sources")).toEqual(
@@ -61,11 +61,13 @@ describe("the migration chain", () => {
     expect(await cols("comments")).toEqual(
       expect.arrayContaining(["parent_id", "opinion_user_id", "updated_at", "deleted_at", "version"]),
     );
+    // Which lines of the feed a person has read, one row each rather than one timestamp.
+    expect(await cols("event_reads")).toEqual(expect.arrayContaining(["user_id", "event_id", "read_at"]));
   });
 
   it("is idempotent: running it again changes nothing", async () => {
     await applySchema();
-    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(8);
+    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(9);
   });
 
   // Everything stored before this migration was read the old way, and the record says so: a row

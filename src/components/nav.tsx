@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AccountMenu from "./account-menu";
 import ActivityFeed from "./activity-feed";
+import { feed } from "@/lib/activity";
 import { currentUser } from "@/lib/auth";
 import { bellFor, DIGEST_DAYS } from "@/lib/notifications";
 import NavLinks, { type NavItem } from "./nav-links";
@@ -19,7 +20,7 @@ import ThemeToggle from "./theme-toggle";
  */
 export default async function Nav() {
   const user = await currentUser();
-  const bell = await bellFor(user);
+  const [bell, recent] = await Promise.all([bellFor(user), feed(user.id, undefined, 12)]);
 
   const items: NavItem[] = [
     { href: "/propiedades", label: "Propiedades", icon: "home" },
@@ -45,7 +46,8 @@ export default async function Nav() {
             digest={bell.digest}
             days={DIGEST_DAYS}
             items={bell.items}
-            activity={<ActivityFeed userId={user.id} since={user.last_seen_at} limit={12} />}
+            activity={<ActivityFeed rows={recent.rows} read={recent.read} userId={user.id} />}
+            unread={recent.unread}
           />
           <ThemeToggle />
           {/* You: your settings, your projects, and the way out. The `?` that used to sit beside

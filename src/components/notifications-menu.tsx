@@ -17,6 +17,14 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
+/** The count beside a tab's name. Nothing at all when there is nothing waiting. */
+const Count = ({ n }: { n: number }) =>
+  n ? (
+    <span className="ml-1.5 rounded-full bg-surface-strong px-1.5 py-0.5 text-[11px] font-semibold leading-none text-body">
+      {n > 99 ? "99+" : n}
+    </span>
+  ) : null;
+
 function Row({ item }: { item: Item }) {
   return (
     <li>
@@ -46,12 +54,16 @@ export default function NotificationsMenu({
   days,
   items,
   activity,
+  unread,
 }: {
   unseen: number;
   digest: number;
   days: number;
   items: Item[];
   activity: React.ReactNode;
+  /** How much of the feed this person has not read. Beside the tab, never on the bell itself:
+      the bell is what reached *them*, and the feed is what the family did. */
+  unread: number;
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("notificaciones");
@@ -131,6 +143,7 @@ export default function NotificationsMenu({
                 }`}
               >
                 {label}
+                {id === "actividad" ? <Count n={unread} /> : null}
               </button>
             ))}
           </div>
