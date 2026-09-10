@@ -91,7 +91,11 @@ export function PropertyCard({ p, budget, href, userId }: { p: Listed; budget: B
         </div>
       </div>
       <Link href={href} className="mt-3 block space-y-0.5">
-        <h2 className="truncate text-[15px] font-medium text-ink">{p.title}</h2>
+        {/* Two lines, like the list view already gives it. One line ended «UNA REFORMA INTEGRAL
+            EN PLENA DIAGON…», which is the part of the title that says least (F36). The height is
+            fixed at both of them so the prices below still line up across a row — a gallery is
+            read by scanning down one column. */}
+        <h2 className="line-clamp-2 min-h-[2.75em] text-[15px] font-medium leading-snug text-ink">{p.title}</h2>
         <p className="truncate text-sm text-muted">{meta || "Sin datos"}</p>
         <p className="text-[15px] text-ink">
           <span className="font-semibold">{fmtEur(p.price_eur, "Sin precio")}</span>

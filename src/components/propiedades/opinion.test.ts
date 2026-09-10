@@ -42,9 +42,62 @@ describe("the page reads as four bands and then its record", () => {
   });
 
   it("the advertisement's own record reads after the map, not inside the reading column", () => {
-    for (const heading of ["Fuentes", "Historial de precio", "Actividad"]) {
-      expect(at(`<h2 className={h2}>${heading}</h2>`)).toBeGreaterThan(at("{/* ---- band 4"));
+    expect(at('<h2 className={hRecord}>El anuncio</h2>')).toBeGreaterThan(at("{/* ---- band 4"));
+    for (const heading of ["Historial de precio", "Actividad"]) {
+      expect(at(`<h3 className={hRecord}>${heading}</h3>`)).toBeGreaterThan(at("{/* ---- band 4"));
     }
+  });
+
+  /**
+   * F36. «Fuentes», «Historial de precio» and «Actividad» carried the same `h2` as «Descripción»
+   * and «Tu opinión», so the record of the advertisement competed with the family's conversation
+   * about it.
+   */
+  it("gives the record a smaller voice than the conversation", () => {
+    expect(page).toContain("const hRecord =");
+    // Every `h2` left on the page belongs to a band a person reads, never to the record.
+    const h2s = [...page.matchAll(/<h2 className=\{h2\}>([^<]+)<\/h2>/g)].map((m) => m[1]);
+    expect(h2s).not.toContain("Fuentes");
+    expect(h2s).not.toContain("Historial de precio");
+    expect(h2s).not.toContain("Actividad");
+    // And the history is behind a fold the browser opens by itself.
+    expect(page).toContain("<details className=\"group mt-6\">");
+    expect(page).toContain("Historial de precio y actividad");
+  });
+
+  /**
+   * F35. The panel printed twelve rows whatever was known, and on a real listing seven of them
+   * read «Sin datos». Measured across the family's 23 homes: all 23 lack the energy certificate.
+   */
+  it("shows the facts it has, and names the rest once", () => {
+    expect(page).toContain("const known = facts.filter(([, v]) => v !== null)");
+    expect(page).toContain("const missing = facts.filter(([, v]) => v === null)");
+    expect(page).toContain("{known.map(([k, val, key])");
+    expect(page).toContain("No consta:");
+    // The one place that could answer, offered beside the question.
+    expect(page).toContain("Míralo en");
+    // A home nobody has read yet is a different sentence: nothing is missing, nothing is there.
+    expect(page).toContain("Todavía no se ha leído el anuncio.");
+    // «Sin datos» must not come back through the formatter that used to produce it.
+    expect(page).not.toContain("siNo(");
+  });
+
+  /** F36. «UNA REFORMA INTEGRAL EN PLENA DIAGON…» is where a one-line title ended. */
+  it("lets a gallery card use two lines for its title, and keeps the prices in a row aligned", () => {
+    const card = readFileSync(fileURLToPath(new URL("./card.tsx", import.meta.url)), "utf8");
+    const title = card.slice(card.indexOf("<h2"), card.indexOf("</h2>"));
+    expect(title).toContain("line-clamp-2");
+    expect(title).not.toContain("truncate");
+    // Both lines are always reserved, so a short title does not lift its price above its neighbour's.
+    expect(title).toContain("min-h-[2.75em]");
+  });
+
+  it("gives every band an anchor an activity line can land on", () => {
+    for (const anchor of ["descripcion", "opinion", "opiniones", "conversacion", "anuncio"]) {
+      expect(page, anchor).toContain(`id="${anchor}"`);
+    }
+    // An anchor under a sticky header lands behind it unless the offset is stated.
+    expect(page.match(/scroll-mt-\[calc\(var\(--header-h\)\+16px\)\]/g) ?? []).toHaveLength(5);
   });
 });
 

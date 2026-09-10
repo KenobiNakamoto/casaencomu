@@ -62,3 +62,22 @@ describe("the history is reachable", () => {
     expect(feedView).toContain("scroll-mt-[calc(var(--header-h)+16px)]");
   });
 });
+
+/**
+ * The other half of the deep links (#153). A line about a comment should land on the comment,
+ * not at the top of a page the person then has to scan.
+ */
+describe("a line lands on the part of the page it is about", () => {
+  const detail = read("../propiedades/[id]/page.tsx");
+
+  it("sends each kind of event to an anchor the detail page actually carries", () => {
+    const where = feedView.slice(feedView.indexOf("const WHERE"), feedView.indexOf("};", feedView.indexOf("const WHERE")));
+    const anchors = [...where.matchAll(/"#([a-z]+)"/g)].map((m) => m[1]);
+    expect(anchors.length).toBeGreaterThan(5);
+    for (const a of new Set(anchors)) expect(detail, a).toContain(`id="${a}"`);
+  });
+
+  it("leaves an event with no obvious place at the top of the page", () => {
+    expect(feedView).toContain("${WHERE[e.kind] ?? \"\"}");
+  });
+});

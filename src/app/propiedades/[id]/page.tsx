@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Chip, StageChip } from "@/components/propiedades/chip";
 import { Conversation } from "@/components/propiedades/conversation";
-import { fmtDate, fmtDateTime, fmtEur, fmtNum, SIN_DATOS, siNo } from "@/components/propiedades/format";
+import { fmtDate, fmtDateTime, fmtEur, fmtNum, SIN_DATOS, yesNo } from "@/components/propiedades/format";
 import { Gallery } from "@/components/propiedades/gallery";
 import { LocationMap } from "@/components/propiedades/location-map";
 import { OpinionCards, Disagreements, type PublishedOpinion } from "@/components/propiedades/opinion-cards";
@@ -127,6 +127,9 @@ function describe(kind: string, p: Record<string, unknown>) {
 
 const h2 = "text-[22px] font-medium leading-tight";
 const band = "mt-12";
+/** The record of the advertisement, not the conversation about it. Smaller, and never an `h2`
+ * that competes with «Descripción» or «Tu opinión» (F36). */
+const hRecord = "text-sm font-semibold uppercase tracking-wide text-muted";
 const cell = "border-b border-hairline-soft py-2 pr-3 align-top";
 const score = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const fmtScore = (n: number | null) => (n === null ? "—" : score(n));
@@ -203,20 +206,27 @@ export default async function PropiedadPage({
   // Somebody answered part of the form, so the family number is thinner than it looks (#130).
   const partial = isPartial(ratingRows, DIMENSIONS.length);
 
-  const facts: [string, string, string][] = [
-    ["Superficie", fmtNum(p.area_m2, "m²"), "area_m2"],
-    ["Habitaciones", fmtNum(p.rooms), "rooms"],
-    ["Baños", fmtNum(p.bathrooms), "bathrooms"],
-    ["Planta", p.floor ?? SIN_DATOS, "floor"],
-    ["Ascensor", siNo(p.lift), "lift"],
-    ["Exterior", p.outdoor ?? SIN_DATOS, "outdoor"],
-    ["Parking", siNo(p.parking), "parking"],
-    ["Estado", p.condition ?? SIN_DATOS, "condition"],
-    ["Certificado energético", p.energy_rating ?? SIN_DATOS, "energy_rating"],
-    ["Honorarios", fmtEur(p.fees_eur), "fees_eur"],
-    ["Barrio", p.neighborhood ?? SIN_DATOS, "neighborhood"],
-    ["Dirección", p.address_text ? `${p.address_text} ${PRECISION[p.address_precision] ?? ""}`.trim() : SIN_DATOS, "address_text"],
+  // `null` is «the advertisement does not say», and it is a different thing from a value. Twelve
+  // rows of «Sin datos» is what this used to print, and on a real listing seven of them were that
+  // (F35): the panel now carries what is known, and one sentence names the rest.
+  const facts: [string, string | null, string][] = [
+    ["Superficie", p.area_m2 === null ? null : fmtNum(p.area_m2, "m²"), "area_m2"],
+    ["Habitaciones", p.rooms === null ? null : fmtNum(p.rooms), "rooms"],
+    ["Baños", p.bathrooms === null ? null : fmtNum(p.bathrooms), "bathrooms"],
+    ["Planta", p.floor, "floor"],
+    ["Ascensor", yesNo(p.lift), "lift"],
+    ["Exterior", p.outdoor, "outdoor"],
+    ["Parking", yesNo(p.parking), "parking"],
+    ["Estado", p.condition, "condition"],
+    ["Certificado energético", p.energy_rating, "energy_rating"],
+    ["Honorarios", p.fees_eur === null ? null : fmtEur(p.fees_eur), "fees_eur"],
+    ["Barrio", p.neighborhood, "neighborhood"],
+    ["Dirección", p.address_text ? `${p.address_text} ${PRECISION[p.address_precision] ?? ""}`.trim() : null, "address_text"],
   ];
+  const known = facts.filter(([, v]) => v !== null) as [string, string, string][];
+  // Lower case, because they are being read as a sentence and not as labels of a table.
+  const missing = facts.filter(([, v]) => v === null).map(([k]) => k[0].toLowerCase() + k.slice(1));
+  const advert = sourceRows.find((s) => /^https?:\/\//.test(s.url_original));
   // A deduced value is not a fact the advertisement states, and the two must never look alike.
   // Only layer 3 is marked: layer 2 copies words that are on the page, which the portal's own
   // extractor simply failed to find.
@@ -280,7 +290,7 @@ export default async function PropiedadPage({
       {photoIds.length > 0 && <Gallery ids={photoIds} title={p.title} />}
 
       {/* ---- band 1: the advertisement's own words, and the facts beside them ---- */}
-      <section className={`${band} grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-12`}>
+      <section id="descripcion" className={`${band} scroll-mt-[calc(var(--header-h)+16px)] grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-12`}>
         <div>
           <h2 className={h2}>Descripción</h2>
           {p.description ? (
@@ -292,28 +302,59 @@ export default async function PropiedadPage({
         <aside className="lg:col-start-2 lg:row-start-1">
           <div className="bento">
             <h2 className="mb-2 text-sm font-semibold text-ink">Datos</h2>
-            <dl>
-              {facts.map(([k, val, key]) => (
-                <div key={k} className="flex justify-between gap-4 border-b border-hairline-soft py-2.5 text-sm last:border-0">
-                  <dt className="text-muted">{k}</dt>
-                  <dd className="text-right font-medium text-ink">
-                    {val}
-                    {deduced(key) && <span className="ml-1.5 text-[11px] font-normal text-muted">deducido</span>}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            {facts.some(([, , key]) => deduced(key)) && (
+            {known.length > 0 && (
+              <dl>
+                {known.map(([k, val, key]) => (
+                  <div key={k} className="flex justify-between gap-4 border-b border-hairline-soft py-2.5 text-sm last:border-0">
+                    <dt className="text-muted">{k}</dt>
+                    <dd className="text-right font-medium text-ink">
+                      {val}
+                      {deduced(key) && <span className="ml-1.5 text-[11px] font-normal text-muted">deducido</span>}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {known.some(([, , key]) => deduced(key)) && (
               <p className="mt-3 text-xs text-muted">
                 «deducido» lo ha completado la IA a partir del texto o de las fotos. El anuncio no lo dice.
               </p>
+            )}
+
+            {/* What is not known, named once instead of repeated down a column. A home nobody has
+                read yet is a different sentence: there is nothing missing, there is nothing yet. */}
+            {missing.length > 0 && (
+              <div className={known.length ? "mt-4 border-t border-hairline-soft pt-3" : ""}>
+                {p.filled ? (
+                  <>
+                    <p className="text-xs leading-relaxed text-muted">
+                      <span className="font-semibold text-body">No consta:</span> {missing.join(", ")}.
+                    </p>
+                    {advert && (
+                      <a
+                        href={advert.url_original}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="touch-target mt-2 inline-flex items-center gap-1 text-xs font-semibold text-ink underline underline-offset-4"
+                      >
+                        Míralo en <span className="capitalize">{advert.portal}</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <path d="M7 17L17 7M9 7h8v8" />
+                        </svg>
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs leading-relaxed text-muted">Todavía no se ha leído el anuncio.</p>
+                )}
+              </div>
             )}
           </div>
         </aside>
       </section>
 
       {/* ---- band 2: one box, one button ---- */}
-      <section className={band}>
+      <section id="opinion" className={`${band} scroll-mt-[calc(var(--header-h)+16px)]`}>
         <h2 className={h2}>Tu opinión</h2>
         <p className="mb-4 mt-1 text-sm text-muted">
           Tu opinión se publica aparte, cuando tú quieras. La etapa se guarda con el botón de abajo, y es la de todos.
@@ -349,7 +390,7 @@ export default async function PropiedadPage({
       </section>
 
       {/* ---- band 3: the table, and the conversation beside it ---- */}
-      <section className={band}>
+      <section id="opiniones" className={`${band} scroll-mt-[calc(var(--header-h)+16px)]`}>
         <h2 className={h2}>Lo que opina la familia</h2>
         <p className="mb-4 mt-1 text-sm text-muted">
           {opinionRows.length === 0
@@ -412,7 +453,7 @@ export default async function PropiedadPage({
             </div>
           </div>
 
-          <div className="bento flex flex-col">
+          <div id="conversacion" className="bento flex flex-col scroll-mt-[calc(var(--header-h)+16px)]">
             <p className="mb-3 text-sm font-semibold text-ink">Comentarios</p>
             {/* Oldest first now, and the box at the foot. The pane used to be newest-first, which
                 a thread cannot be: an answer would arrive above the comment it answers. */}
@@ -452,25 +493,26 @@ export default async function PropiedadPage({
       )}
     </section>
 
-    {/* ---- the record of the advertisement. Not an opinion, so it reads last. ---- */}
-    <div className="mx-auto max-w-[1120px] divide-y divide-hairline-soft px-4 pb-14 sm:px-6 lg:px-10">
-      <section className="space-y-4 py-8">
-        <h2 className={h2}>Fuentes</h2>
+    {/* ---- the record of the advertisement. Not the family's conversation about it, so it does
+           not carry the same headings as the conversation (F36). One block, one small heading,
+           and the history behind a fold that the browser opens with no script of ours. ---- */}
+    <div className="mx-auto max-w-[1120px] px-4 pb-14 sm:px-6 lg:px-10">
+      <section id="anuncio" className="mt-12 scroll-mt-[calc(var(--header-h)+16px)] border-t border-hairline-soft pt-8">
+        <h2 className={hRecord}>El anuncio</h2>
         {sourceRows.length === 0 ? (
-          <p className="text-sm text-muted">{SIN_DATOS}</p>
+          <p className="mt-3 text-sm text-muted">{SIN_DATOS}</p>
         ) : (
-          <ul className="space-y-3 text-sm">
+          <ul className="mt-3 space-y-3 text-sm">
             {sourceRows.map((s) => {
               const check = s.via === "bookmarklet" || s.availability === "unknown";
               return (
-                <li key={s.url_original} className="flex flex-wrap items-center gap-2">
+                <li key={s.url_original} className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                   <span className="font-medium capitalize text-ink">{s.portal}</span>
                   {/^https?:\/\//.test(s.url_original) && (
                     <a href={s.url_original} target="_blank" rel="noopener noreferrer" className="font-medium text-ink underline underline-offset-4">
                       Ver anuncio
                     </a>
                   )}
-                  <span className="text-muted">vía {s.via === "bookmarklet" ? "marcador" : s.via}</span>
                   <Chip tone={s.availability === "active" ? "success" : s.availability === "unknown" ? "warning" : "danger"}>
                     {AVAILABILITY[s.availability] ?? s.availability}
                   </Chip>
@@ -478,8 +520,11 @@ export default async function PropiedadPage({
                     <Chip tone="warning">Sin comprobar hace más de 48 h</Chip>
                   )}
                   {/* two different facts: when we last tried, and when we last succeeded */}
-                  <span className="text-muted">Comprobado: {s.last_checked_at ? fmtDateTime(s.last_checked_at) : "nunca"}</span>
-                  <span className="text-muted">Visto bien: {s.last_ok_at ? fmtDateTime(s.last_ok_at) : "nunca"}</span>
+                  <span className="text-xs text-muted">
+                    vía {s.via === "bookmarklet" ? "marcador" : s.via} · comprobado{" "}
+                    {s.last_checked_at ? fmtDateTime(s.last_checked_at) : "nunca"} · visto bien{" "}
+                    {s.last_ok_at ? fmtDateTime(s.last_ok_at) : "nunca"}
+                  </span>
                   {check && (
                     <span className="text-warning-ink">
                       <Chip tone="warning">Comprobar</Chip> Abre el anuncio y vuelve a pulsar el marcador.
@@ -490,41 +535,57 @@ export default async function PropiedadPage({
             })}
           </ul>
         )}
-      </section>
 
-      <section className="space-y-4 py-8">
-        <h2 className={h2}>Historial de precio</h2>
-        {priceHistory.length === 0 ? (
-          <p className="text-sm text-muted">Sin cambios de precio.</p>
-        ) : (
-          <ul className="space-y-1 text-sm">
-            {priceHistory.map((e, i) => (
-              <li key={i}>
-                <span className="text-muted">{fmtDate(e.created_at)}:</span> {describe(e.kind, e.payload)}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        {/* ponytail: a native <details>. The browser already opens, closes and finds text inside
+            one, and none of that is worth a client component. */}
+        <details className="group mt-6">
+          <summary className="touch-target inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium text-body transition hover:text-ink">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition group-open:rotate-90" aria-hidden>
+              <path d="M9 5l7 7-7 7" />
+            </svg>
+            Historial de precio y actividad
+            {priceHistory.length + eventRows.length > 0 && (
+              <span className="text-muted">({priceHistory.length + eventRows.length})</span>
+            )}
+          </summary>
 
-      <section className="space-y-4 py-8">
-        <h2 className={h2}>Actividad</h2>
-        {eventRows.length === 0 ? (
-          <p className="text-sm text-muted">Sin actividad.</p>
-        ) : (
-          <ol className="relative space-y-4 border-l border-hairline pl-5 text-sm">
-            {eventRows.map((e, i) => (
-              <li key={i} className="relative">
-                <span className="absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-raised bg-accent" aria-hidden />
-                <div className="text-muted">
-                  {fmtDateTime(e.created_at)}
-                  {e.actor && ` · ${e.actor}`}
-                </div>
-                <div className="text-body">{describe(e.kind, e.payload)}</div>
-              </li>
-            ))}
-          </ol>
-        )}
+          <div className="mt-5 grid gap-8 lg:grid-cols-2 lg:items-start">
+            <div>
+              <h3 className={hRecord}>Historial de precio</h3>
+              {priceHistory.length === 0 ? (
+                <p className="mt-3 text-sm text-muted">Sin cambios de precio.</p>
+              ) : (
+                <ul className="mt-3 space-y-1 text-sm">
+                  {priceHistory.map((e, i) => (
+                    <li key={i}>
+                      <span className="text-muted">{fmtDate(e.created_at)}:</span> {describe(e.kind, e.payload)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div>
+              <h3 className={hRecord}>Actividad</h3>
+              {eventRows.length === 0 ? (
+                <p className="mt-3 text-sm text-muted">Sin actividad.</p>
+              ) : (
+                <ol className="relative mt-3 space-y-4 border-l border-hairline pl-5 text-sm">
+                  {eventRows.map((e, i) => (
+                    <li key={i} className="relative">
+                      <span className="absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-raised bg-accent" aria-hidden />
+                      <div className="text-muted">
+                        {fmtDateTime(e.created_at)}
+                        {e.actor && ` · ${e.actor}`}
+                      </div>
+                      <div className="text-body">{describe(e.kind, e.payload)}</div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          </div>
+        </details>
       </section>
     </div>
     </>

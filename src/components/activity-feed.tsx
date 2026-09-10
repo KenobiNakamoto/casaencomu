@@ -55,6 +55,24 @@ export function line(e: Row) {
 const initial = (name: string | null) => (name ?? "?").trim().charAt(0).toUpperCase() || "?";
 
 /**
+ * The part of the home's page the line is about. A comment goes to the conversation, an opinion
+ * to the opinions, a price or an availability change to the record of the advertisement — the
+ * anchors the detail page carries since #153. Anything else lands at the top, which is right:
+ * «alguien añadió este piso» is about the whole page.
+ */
+const WHERE: Record<string, string> = {
+  comment: "#conversacion",
+  rating: "#opiniones",
+  opinion: "#opiniones",
+  opinion_withdrawn: "#opiniones",
+  stage_change: "#opinion",
+  price_change: "#anuncio",
+  availability_change: "#anuncio",
+  facts_change: "#descripcion",
+  enriched: "#descripcion",
+};
+
+/**
  * Everything that happened in this project, newest first. One component, shown in two places: the
  * «Actividad» tab of the bell menu, and the page behind «Ver todo».
  *
@@ -82,7 +100,7 @@ export default function ActivityFeed({
           // The anchor a deep link lands on, clear of the header that would otherwise cover it.
           <li key={e.id} id={`e-${e.id}`} className="scroll-mt-[calc(var(--header-h)+16px)]">
             <Link
-              href={`/propiedades/${e.property_id}`}
+              href={`/propiedades/${e.property_id}${WHERE[e.kind] ?? ""}`}
               className="flex min-h-11 items-start gap-3 rounded-lg px-3 py-3 transition hover:bg-surface-soft"
             >
               <span
