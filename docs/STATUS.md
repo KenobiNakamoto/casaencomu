@@ -11,12 +11,16 @@ no evidence is not a claim, it is a plan, and it belongs in `WORKPLAN.md`.
 
 ## 1. In one paragraph
 
-**Release A is finished.** All seven of its packages are merged, along with the preview
-authentication and three follow-up fixes: `main` is green at **356 tests, 3 skipped**, with lint,
-types and build clean. **Release B has not been started** — six packages, none of them begun.
-Nothing is deployed to a real domain, because three items only Kenobi can do are still open. To
-let him look at the app anyway, it runs on the Air, reachable over Tailscale, behind a shared
-password. That preview is not the deployment.
+**Release A is finished**, and **Release B's opinion work with it**: what a person thinks is now
+published, versioned, drafted and withdrawable (PIP-09, PIP-10), the family average counts people
+rather than rating rows, and the conversation takes replies, corrections and removals (PIP-11).
+`main` is green at **569 tests, 3 skipped**, with lint, types and build clean. Three packages are
+left in Release B: PIP-07, PIP-13 and PIP-14.
+
+**Nothing since 9 September is deployed.** The Air runs an older image, so the family has none of
+the above; `./deploy.sh` is the whole procedure. A real domain is still blocked on three items
+only Kenobi can do. To let him look at the app anyway, it runs on the Air, reachable over
+Tailscale, behind a shared password. That preview is not the deployment.
 
 ---
 
@@ -412,11 +416,17 @@ app's own import prefix.
 All seven packages are merged. PIP-05 and PIP-06 were the two that PIP-01 to PIP-03 had unblocked;
 PIP-08 was independent of them.
 
-### Release B — none of it
+### Release B — the opinion and the conversation are done
 
-PIP-07 (detail hierarchy), PIP-09 (review persistence), PIP-10 (opinion editor), PIP-11
-(conversation), PIP-13 (activity and freshness), PIP-14 (profile and capture help).
-**Not started.** Release B starts after Release A.
+Merged: **PIP-09** (opinions, private drafts and withdrawal, #139), **PIP-10** (the editor #141,
+and the person cards that read before the numbers #144), **PIP-11** (replies, editing, removal and
+opinion references, #146). The fair family average that F21 named landed with them (#130): the
+number is now the mean of each person's mean, not the mean of the rating rows.
+
+Left: **PIP-07** (detail and listing hierarchy, partly consumed by #122 and #126), **PIP-13**
+(activity and freshness, partly done by the bell and the «Revisar» tab in #137), **PIP-14**
+(profile and capture help, P2). Also split out of #144 and not yet filed: the person selector on
+the comparison page.
 
 ### Deferred by the proposal itself
 
@@ -453,11 +463,10 @@ went ahead, and why the Tailscale preview exists.
 
 Each of these is small, and each one is his to make.
 
-1. **Start Release B?** Six packages, in this order: PIP-07 (detail and listing hierarchy),
-   PIP-09 (review persistence and fair aggregates), PIP-10 (opinion editor), PIP-11
-   (conversation), PIP-13 (activity and freshness), PIP-14 (profile and help). PIP-09 is the one
-   that matters most: the family score currently averages **rating rows**, so somebody who scored
-   six dimensions has six times the weight of somebody who scored one (F21).
+1. **Deploy what is built.** Release B's opinion work is merged and nothing of it is on the Air:
+   the running image is from 9 September. `./deploy.sh` is the whole procedure. Until then the
+   family sees none of the editor, the person cards, the conversation, or the corrected average.
+   The data still has no backup either — issue **#21**.
 2. **Enable HTTPS certificates on the tailnet?** One toggle at the Tailscale admin console,
    DNS → HTTPS Certificates. It turns the preview into a real `https://` address with a valid
    certificate. Two minutes of work after that.

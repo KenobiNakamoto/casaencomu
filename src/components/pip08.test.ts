@@ -117,7 +117,9 @@ describe("a refused save keeps the words (F25)", () => {
   it("the comment comes back with its text, and the opinion keeps every field", () => {
     expect(actions).toContain("text: string");
     expect(actions).toContain("const back = { text: raw };");
-    expect(opinion).toContain("defaultValue={failed?.text ?? \"\"}");
+    // The comment box moved to the conversation in #146; the guarantee moved with it.
+    const talk = read("./propiedades/conversation.tsx");
+    expect(talk).toContain("defaultValue={failed?.text ?? \"\"}");
     // The editor holds every answer in React and a refusal never writes to that state, so a
     // refused publication costs nothing the person typed or chose (#141).
     const editor = read("./propiedades/opinion-editor.tsx");
@@ -131,9 +133,11 @@ describe("a refused save keeps the words (F25)", () => {
     expect(opinion).toContain('name="version"');
   });
 
-  it("the one save action never returns nothing at all", () => {
-    const at = actions.indexOf("export async function opinionAction");
-    const body = actions.slice(at, actions.indexOf("\n}\n", at));
-    expect(body, "opinionAction still has a bare return").not.toMatch(/^\s*(if \(.*\) )?return;\s*$/m);
+  it("no save action ever returns nothing at all", () => {
+    for (const fn of ["stageAction", "conversationAction"]) {
+      const at = actions.indexOf(`export async function ${fn}`);
+      const body = actions.slice(at, actions.indexOf("\n}\n", at));
+      expect(body, `${fn} still has a bare return`).not.toMatch(/^\s*(if \(.*\) )?return;\s*$/m);
+    }
   });
 });

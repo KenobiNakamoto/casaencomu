@@ -57,22 +57,21 @@ describe("one box, one button", () => {
     expect(page).not.toContain("CommentForm");
   });
 
-  it("is a quarter, a half and a quarter", () => {
-    expect(form).toContain("lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]");
+  it("is two halves now the comment box has gone down to the conversation (#146)", () => {
+    expect(form).toContain("lg:grid-cols-2");
+    expect(form).not.toContain('name="body"');
   });
 
-  it("carries your opinion, the comment and the state, in that order", () => {
+  it("carries your opinion and then the state", () => {
     const q = form.indexOf("<OpinionEditor ");
-    const c = form.indexOf('name="body"');
     const s = form.indexOf('name="etapa"');
     expect(q).toBeGreaterThan(-1);
-    expect(q).toBeLessThan(c);
-    expect(c).toBeLessThan(s);
+    expect(q).toBeLessThan(s);
   });
 
-  it("puts the button in the space the short column leaves, at the foot of the box", () => {
+  it("puts the button at the foot of the state column", () => {
     const tail = form.slice(form.indexOf('name="etapa"'));
-    expect(tail).toContain('<div className="mt-auto space-y-2">');
+    expect(tail).toContain('<div className="mt-auto space-y-2 pt-2">');
     expect(tail.indexOf('className="mt-auto')).toBeLessThan(tail.indexOf('type="submit"'));
   });
 
@@ -154,15 +153,14 @@ describe("the save is one write, and writes only what changed", () => {
   });
 
   it("everything lands in one transaction", () => {
-    const body = actions.slice(actions.indexOf("export async function opinionAction"));
-    expect(body.match(/db\.batch\([^)]*"write"\)/g) ?? []).toHaveLength(1);
-    expect(body).toContain('await db.batch(writes, "write");');
+    const body = actions.slice(actions.indexOf("export async function stageAction"));
+    expect(body.slice(0, body.indexOf("\n}\n")).match(/db\.batch\(/g) ?? []).toHaveLength(1);
   });
 
   it("no longer writes a score at all: that only happens through a publication", () => {
     expect(actions).not.toContain("UPSERT_RATING_SQL");
     expect(actions).not.toContain('event(propertyId, "rating"');
-    const body = actions.slice(actions.indexOf("export async function opinionAction"));
+    const body = actions.slice(actions.indexOf("export async function stageAction"));
     expect(body).not.toContain("INSERT INTO ratings");
   });
 
@@ -174,17 +172,12 @@ describe("the save is one write, and writes only what changed", () => {
     expect(actions).not.toContain("formData.get(\"userId\")");
   });
 
-  it("an empty box writes no comment, and the stage it is already in writes nothing", () => {
-    expect(actions).toContain("if (body) {");
-    expect(actions).toContain("if (from !== to) {");
+  it("the stage it is already in is refused, not silently accepted", () => {
+    expect(actions).toContain('if (from === to) return { ok: false, message: "Ya está en esa etapa." };');
   });
 
-  it("nothing at all is said, not silently accepted", () => {
-    expect(actions).toContain('if (writes.length === 0) return { ok: false, message: "No has cambiado nada todavía."');
-  });
-
-  it("the receipt names what was written, because three things went in at once", () => {
-    expect(actions).toContain("return { ok: true, saved: listOf(done) };");
+  it("the receipt names the stage it moved to", () => {
+    expect(actions).toContain("return { ok: true, saved: STAGE_LABELS[to as Stage] };");
     expect(form).toContain("Guardado: {state.saved}.");
   });
 });
@@ -230,17 +223,10 @@ describe("what the family thinks", () => {
     expect(table).toContain('{m[u.id][dim] ?? "—"}');
   });
 
-  it("the conversation scrolls on its own, newest at the foot", () => {
+  it("the conversation is a component of its own, in band 3", () => {
     const chat = page.slice(at("{/* ---- band 3"), at("{/* ---- band 4"));
-    expect(chat).toContain("flex-col-reverse");
-    expect(chat).toContain("overflow-y-auto");
-    expect(chat).toContain("[...commentRows].reverse().map(");
-    expect(chat).toContain("max-h-[520px]");
-    // Not stretched: a stretched column-reverse list packs a short conversation against the floor.
-    expect(chat).not.toContain("flex-1 flex-col-reverse");
-  });
-
-  it("an empty conversation says where to write one", () => {
-    expect(page).toContain("El tuyo se escribe arriba, junto a tus respuestas.");
+    expect(chat).toContain("<Conversation");
+    // The page renders none of it itself any more: replies need state, and state needs a client.
+    expect(chat).not.toContain("flex-col-reverse");
   });
 });

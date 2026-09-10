@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { STAGE_LABELS, STAGES, type EventKind, type Stage } from "@/lib/listing";
+import { edit, post, remove, type CommentResult, type Reason } from "@/lib/comments";
 import { publish, saveDraft, withdraw, type OpinionInput, type Result } from "@/lib/opinions";
 import { setBudget } from "@/lib/settings";
 
@@ -22,10 +23,6 @@ const nonNegInt = (v: FormDataEntryValue | null) => {
   return typeof v === "string" && v !== "" && Number.isInteger(n) && n >= 0 ? n : null;
 };
 
-/** «los aspectos, tu comentario y la etapa» — the receipt names what was actually written. */
-const listOf = (parts: string[]) =>
-  parts.length < 2 ? parts.join("") : `${parts.slice(0, -1).join(", ")} y ${parts[parts.length - 1]}`;
-
 export async function setBudgetAction(formData: FormData) {
   await currentUser();
   const a = nonNegInt(formData.get("min"));
@@ -38,61 +35,42 @@ export async function setBudgetAction(formData: FormData) {
 }
 
 /**
- * What the box has to show afterwards. A refused save gives the words back: losing what somebody
- * typed is the one failure they cannot undo (F25).
+ * What the stage box has to show afterwards. Nothing is typed here, so there is nothing to give
+ * back — only the reason it was refused (F25).
  */
-export type OpinionState =
-  | { ok: true; saved: string }
-  | { ok: false; message: string; text: string }
-  | null;
+export type StageState = { ok: true; saved: string } | { ok: false; message: string } | null;
 
 /**
- * The comment and the stage, in one write. The scores used to travel with them and no longer do:
- * a score is part of an opinion, and an opinion is published through `publishOpinionAction` so it
- * can be versioned, drafted and withdrawn (#141). A comment is the family's conversation and the
- * stage is the family's decision — neither is one person's opinion, so both stay here.
- *
- * Each part is written only if it changed: an empty box writes no comment, and the stage the home
- * is already in writes nothing.
+ * The stage: where the family has decided this home is. The scores left this action in #141 (a
+ * score is part of a published opinion) and the comment left it in #146 (a comment belongs beside
+ * the thread it answers). What is left is the one thing that is neither one person's opinion nor
+ * part of a conversation — the family's decision — and the version check that stops two people
+ * moving it past each other.
  */
-export async function opinionAction(_prev: OpinionState, formData: FormData): Promise<OpinionState> {
+export async function stageAction(_prev: StageState, formData: FormData): Promise<StageState> {
   const propertyId = String(formData.get("propertyId") ?? "");
   const user = await currentUser();
 
-  const raw = String(formData.get("body") ?? "");
-  const body = raw.trim().slice(0, 4000);
   const to = String(formData.get("etapa") ?? "");
   const seen = Number(formData.get("version"));
-  const back = { text: raw };
 
-  if (!STAGES.includes(to as Stage)) return { ok: false, message: "Esa etapa no existe.", ...back };
-  if (!Number.isInteger(seen)) return { ok: false, message: "Vuelve a cargar la página e inténtalo otra vez.", ...back };
+  if (!STAGES.includes(to as Stage)) return { ok: false, message: "Esa etapa no existe." };
+  if (!Number.isInteger(seen)) return { ok: false, message: "Vuelve a cargar la página e inténtalo otra vez." };
 
   const prop = await db.execute({ sql: "SELECT stage, stage_version FROM properties WHERE id = ?", args: [propertyId] });
   const from = prop.rows[0]?.stage;
-  if (typeof from !== "string") return { ok: false, message: "Esta propiedad ya no existe.", ...back };
+  if (typeof from !== "string") return { ok: false, message: "Esta propiedad ya no existe." };
   if (Number(prop.rows[0].stage_version) !== seen) {
     return {
       ok: false,
-      message: `Otra persona la ha movido a ${STAGE_LABELS[from as Stage] ?? from} mientras escribías. Míralo y vuelve a guardar.`,
-      ...back,
+      message: `Otra persona la ha movido a ${STAGE_LABELS[from as Stage] ?? from} mientras mirabas. Míralo y vuelve a guardar.`,
     };
   }
+  if (from === to) return { ok: false, message: "Ya está en esa etapa." };
 
   const now = new Date().toISOString();
-  const writes: InStatement[] = [];
-  const done: string[] = [];
-
-  if (body) {
-    const id = randomUUID();
-    writes.push(
-      { sql: "INSERT INTO comments (id, property_id, user_id, body, created_at) VALUES (?, ?, ?, ?, ?)", args: [id, propertyId, user.id, body, now] },
-      event(propertyId, "comment", { comment_id: id, body }, user.id, now),
-    );
-    done.push("tu comentario");
-  }
-  if (from !== to) {
-    writes.push(
+  await db.batch(
+    [
       {
         // stage_version advances here and nowhere else: a source refresh must not look like a
         // decision (doc 05 § 3). The `WHERE` on it is what makes the check above a real one and
@@ -101,15 +79,74 @@ export async function opinionAction(_prev: OpinionState, formData: FormData): Pr
         args: [to, now, propertyId, seen],
       },
       event(propertyId, "stage_change", { from, to }, user.id, now),
-    );
-    done.push("la etapa");
-  }
-  if (writes.length === 0) return { ok: false, message: "No has cambiado nada todavía.", ...back };
-
-  await db.batch(writes, "write");
+    ],
+    "write",
+  );
   revalidatePath(detail(propertyId));
   revalidatePath(LIST);
-  return { ok: true, saved: listOf(done) };
+  return { ok: true, saved: STAGE_LABELS[to as Stage] };
+}
+
+/* -------------------------------------------------------------------------------------------
+ * The conversation (#146). One action, three verbs, because all three share the same checks: the
+ * same author, the same identifier, and the same words handed back when the write is refused.
+ * `lib/comments.ts` decides; this only names the caller and turns a reason into a sentence.
+ * ----------------------------------------------------------------------------------------- */
+
+type Verb = "crear" | "editar" | "borrar";
+
+/** What a refused write has to give back: the reason, and every word the author typed. */
+export type CommentState = { ok: true; verb: Verb } | { ok: false; message: string; text: string } | null;
+
+const WHY: Record<Reason, string> = {
+  empty: "Escribe algo antes de enviarlo.",
+  too_long: "Es demasiado largo. Córtalo un poco.",
+  bad_id: "Vuelve a cargar la página e inténtalo otra vez.",
+  gone: "Ese comentario ya no está.",
+  not_yours: "Solo quien lo escribió puede cambiarlo.",
+  conflict: "Se ha editado mientras escribías. Vuelve a cargar la página.",
+  bad_parent: "No se puede responder a eso.",
+  bad_reference: "Esa opinión no es de esta vivienda.",
+};
+
+export async function conversationAction(_prev: CommentState, formData: FormData): Promise<CommentState> {
+  // The author, once, from the session. A form can carry any id it likes; every write below
+  // matches on this one (V23).
+  const user = await currentUser();
+  const propertyId = String(formData.get("propertyId") ?? "");
+  const verb = String(formData.get("verbo") ?? "") as Verb;
+  const raw = String(formData.get("body") ?? "");
+  const commentId = String(formData.get("commentId") ?? "");
+  const version = Number(formData.get("version"));
+  const now = new Date().toISOString();
+  const back = { text: raw };
+
+  let result: CommentResult;
+  if (verb === "crear") {
+    result = await post(
+      propertyId,
+      user.id,
+      {
+        id: commentId,
+        body: raw,
+        parentId: String(formData.get("parentId") ?? "") || null,
+        opinionUserId: String(formData.get("sobre") ?? "") || null,
+      },
+      now,
+    );
+  } else if (verb === "editar") {
+    if (!Number.isInteger(version)) return { ok: false, message: WHY.bad_id, ...back };
+    result = await edit(commentId, user.id, raw, version, now);
+  } else if (verb === "borrar") {
+    if (!Number.isInteger(version)) return { ok: false, message: WHY.bad_id, ...back };
+    result = await remove(commentId, user.id, version, now);
+  } else {
+    return { ok: false, message: WHY.bad_id, ...back };
+  }
+
+  if (!result.ok) return { ok: false, message: WHY[result.reason], ...back };
+  revalidatePath(detail(propertyId));
+  return { ok: true, verb };
 }
 
 /* -------------------------------------------------------------------------------------------
