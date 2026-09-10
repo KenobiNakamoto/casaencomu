@@ -33,8 +33,8 @@ beforeAll(async () => {
 });
 
 describe("the migration chain", () => {
-  it("reaches version 6 and adds every column the code reads", async () => {
-    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(6);
+  it("reaches version 7 and adds every column the code reads", async () => {
+    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(7);
     const cols = async (table: string) =>
       (await db.execute(`PRAGMA table_info(${table})`)).rows.map((r) => String(r.name));
     expect(await cols("sources")).toEqual(
@@ -57,11 +57,15 @@ describe("the migration chain", () => {
       expect.arrayContaining(["stance", "reasoning", "blocker", "basis", "withdrawn", "version", "published_at"]),
     );
     expect(await cols("opinion_drafts")).toEqual(expect.arrayContaining(["payload_json", "revision", "base_version"]));
+    // A conversation with answers in it: who is answered, what is answered, and who took it back.
+    expect(await cols("comments")).toEqual(
+      expect.arrayContaining(["parent_id", "opinion_user_id", "updated_at", "deleted_at", "version"]),
+    );
   });
 
   it("is idempotent: running it again changes nothing", async () => {
     await applySchema();
-    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(6);
+    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(7);
   });
 
   // Everything stored before this migration was read the old way, and the record says so: a row

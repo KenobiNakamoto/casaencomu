@@ -220,6 +220,38 @@ const MIGRATIONS: Migration[] = [
          ON CONFLICT DO NOTHING`,
     ],
   },
+  {
+    version: 7,
+    owner: "issue #146 — a conversation with replies (PIP-11)",
+    sql: async () => {
+      // Five columns on `comments`. Asked for by name rather than added blind, because
+      // `ALTER TABLE ADD COLUMN` is the one migration step that cannot be written to run twice,
+      // and a chain replayed from an earlier version is a thing that happens (see migrate.test).
+      const held = new Set((await db.execute("PRAGMA table_info(comments)")).rows.map((r) => String(r.name)));
+      const columns: [string, string][] = [
+        // A reply hangs off a root comment. `parent_id` on a reply is always a root: one level is
+        // the whole shape, and it is enforced where replies are written, not by a CHECK that
+        // cannot see the other row.
+        ["parent_id", "TEXT NULL REFERENCES comments(id)"],
+        // Which published opinion this comment answers, by its author. The pair
+        // (property_id, opinion_user_id) is what makes a cross-property reference impossible.
+        ["opinion_user_id", "TEXT NULL REFERENCES users(id)"],
+        // NULL means never edited, so «editado» is never shown for a comment nobody touched.
+        ["updated_at", "TEXT NULL"],
+        // A removed comment keeps its row: its replies still hang off it and still have to read
+        // as answers to something. The body is cleared at the same time.
+        ["deleted_at", "TEXT NULL"],
+        ["version", "INTEGER NOT NULL DEFAULT 1"],
+      ];
+      return [
+        ...columns.filter(([name]) => !held.has(name)).map(([name, type]) => `ALTER TABLE comments ADD COLUMN ${name} ${type}`),
+        // Every comment event ever written carried a copy of the words. That copy outlives the
+        // comment, so removing one would leave it readable in the activity feed for good. Take the
+        // text out of the history and stop writing it (V21).
+        "UPDATE events SET payload_json = json_remove(payload_json, '$.body') WHERE kind = 'comment' AND payload_json IS NOT NULL",
+      ];
+    },
+  },
 ];
 
 /**

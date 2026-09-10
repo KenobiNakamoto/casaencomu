@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Chip, StageChip } from "@/components/propiedades/chip";
+import { Conversation } from "@/components/propiedades/conversation";
 import { fmtDate, fmtDateTime, fmtEur, fmtNum, SIN_DATOS, siNo } from "@/components/propiedades/format";
 import { Gallery } from "@/components/propiedades/gallery";
 import { LocationMap } from "@/components/propiedades/location-map";
@@ -10,6 +11,7 @@ import { PendingPoll } from "@/components/propiedades/pending-poll";
 import { availabilityLine, AVAILABILITY_LABEL, isStale, propertyAvailability, type SourceAvailability } from "@/lib/availability";
 import { CompareToggle, CompareTray } from "@/components/comparar/controls";
 import { currentUser } from "@/lib/auth";
+import { COMMENTS_SQL, thread, visible, type CommentRow } from "@/lib/comments";
 import { db } from "@/lib/db";
 import { backHref } from "@/lib/filters";
 import { DIMENSION_LABELS, DIMENSIONS, STAGE_LABELS, type Stage } from "@/lib/listing";
@@ -57,7 +59,6 @@ type Source = {
   field_origin_json: string | null;
 };
 type Event = { kind: string; payload_json: string | null; created_at: string; actor: string | null };
-type Comment = { body: string; created_at: string; name: string };
 type Member = { id: string; name: string };
 type MyRating = RatingRow & { updated_at: string };
 
@@ -110,7 +111,9 @@ function describe(kind: string, p: Record<string, unknown>) {
     case "stage_change":
       return `Etapa: ${stageLabel(p.from)} → ${stageLabel(p.to)}`;
     case "comment":
-      return `Comentario: «${String(p.body ?? "").slice(0, 80)}${String(p.body ?? "").length > 80 ? "…" : ""}»`;
+      // No words, ever. The payload never held them after #146 and the migration took them out of
+      // the ones that did: a comment somebody removed must not stay readable here (V21).
+      return p.reply ? "Respuesta en la conversación" : "Comentario nuevo";
     case "rating":
       return "Valoración guardada";
     case "opinion":
@@ -125,7 +128,6 @@ function describe(kind: string, p: Record<string, unknown>) {
 const h2 = "text-[22px] font-medium leading-tight";
 const band = "mt-12";
 const cell = "border-b border-hairline-soft py-2 pr-3 align-top";
-const initial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 const score = (n: number) => n.toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const fmtScore = (n: number | null) => (n === null ? "—" : score(n));
 
@@ -157,7 +159,7 @@ export default async function PropiedadPage({
         args: [id],
       },
       { sql: "SELECT user_id, dimension, score, updated_at FROM ratings WHERE property_id = ?", args: [id] },
-      { sql: "SELECT c.body, c.created_at, u.name FROM comments c JOIN users u ON u.id = c.user_id WHERE c.property_id = ? ORDER BY c.created_at", args: [id] },
+      { sql: COMMENTS_SQL, args: [id] },
       "SELECT id, name FROM users ORDER BY created_at",
       // Published and not withdrawn: the only opinions that exist for anyone but their author.
       {
@@ -181,7 +183,8 @@ export default async function PropiedadPage({
   const eventRows = (events.rows as unknown as Event[]).map((e) => ({ ...e, payload: parse(e.payload_json) }));
   const priceHistory = eventRows.filter((e) => e.kind === "price_change");
   const ratingRows = ratings.rows as unknown as MyRating[];
-  const commentRows = comments.rows as unknown as Comment[];
+  const conversation = thread(comments.rows as unknown as CommentRow[]);
+  const talk = visible(conversation);
   const memberRows = members.rows as unknown as Member[];
   const opinionRows = opinions.rows as unknown as PublishedOpinion[];
   const silent = memberRows.filter((u) => !opinionRows.some((o) => o.user_id === u.id));
@@ -313,7 +316,7 @@ export default async function PropiedadPage({
       <section className={band}>
         <h2 className={h2}>Tu opinión</h2>
         <p className="mb-4 mt-1 text-sm text-muted">
-          Tu opinión se publica aparte, cuando tú quieras. El comentario y la etapa se guardan con el botón de abajo.
+          Tu opinión se publica aparte, cuando tú quieras. La etapa se guarda con el botón de abajo, y es la de todos.
         </p>
         <OpinionForm propertyId={p.id} mine={mine} stage={p.stage} version={Number(p.stage_version ?? 0)}>
           <dl className="space-y-2.5 text-sm">
@@ -338,7 +341,7 @@ export default async function PropiedadPage({
               <dd className="text-body">
                 {voices === 0 ? "Nadie ha valorado" : voices === 1 ? "1 persona ha valorado" : `${voices} personas han valorado`}
                 {partial ? " (parcial)" : ""}
-                {` · ${commentRows.length} ${commentRows.length === 1 ? "comentario" : "comentarios"}`}
+                {` · ${talk} ${talk === 1 ? "comentario" : "comentarios"}`}
               </dd>
             </div>
           </dl>
@@ -354,7 +357,7 @@ export default async function PropiedadPage({
             : `${opinionRows.length} ${opinionRows.length === 1 ? "persona ha opinado" : "personas han opinado"}` +
               (voices > 0 ? ` · ${voices} con puntuaciones${partial ? " · Parcial" : ""}` : "")}
         </p>
-        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:items-start">
           <div className="space-y-4">
             {/* What each person wrote comes before any grid of numbers: the numbers summarise
                 this, not the other way round (doc 04 § 5). */}
@@ -411,33 +414,14 @@ export default async function PropiedadPage({
 
           <div className="bento flex flex-col">
             <p className="mb-3 text-sm font-semibold text-ink">Comentarios</p>
-            {commentRows.length === 0 ? (
-              <p className="text-sm text-muted">
-                Todavía no hay comentarios. El tuyo se escribe arriba, junto a tus respuestas.
-              </p>
-            ) : (
-              // Newest first in the markup and `column-reverse` on the list: the newest comment
-              // sits at the foot, and the pane opens scrolled to it — where a conversation is read
-              // from. A column-reverse scroller starts at its own start, which is the bottom, so
-              // this costs no JavaScript. It is not stretched to the band: a stretched
-              // column-reverse list packs two comments against the floor and leaves a hole.
-              <ul className="flex max-h-[520px] flex-col-reverse gap-4 overflow-y-auto">
-                {[...commentRows].reverse().map((c, i) => (
-                  <li key={i} className="flex gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-strong text-sm font-semibold text-ink" aria-hidden>
-                      {initial(c.name)}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-[13px]">
-                        <span className="font-semibold text-ink">{c.name}</span>
-                        <span className="text-muted"> · {fmtDateTime(c.created_at)}</span>
-                      </div>
-                      <p className="mt-0.5 whitespace-pre-line text-sm leading-relaxed text-body">{c.body}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {/* Oldest first now, and the box at the foot. The pane used to be newest-first, which
+                a thread cannot be: an answer would arrive above the comment it answers. */}
+            <Conversation
+              propertyId={p.id}
+              nodes={conversation}
+              viewerId={user.id}
+              voices={opinionRows.map((o) => ({ id: o.user_id, name: o.name }))}
+            />
           </div>
         </div>
       </section>
