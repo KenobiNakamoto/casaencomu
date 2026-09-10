@@ -24,28 +24,68 @@ can be downloaded again while the advertisement is alive.
 
 ## `com.kenobi.casaencomu-backup.plist`
 
-The LaunchAgent that runs the script at 03:00.
+The LaunchAgent that runs the script at 03:30. **Installed and firing since 2026-09-10** (#21).
 
 ```sh
 scp air/com.kenobi.casaencomu-backup.plist air:Library/LaunchAgents/
 ssh air 'launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kenobi.casaencomu-backup.plist'
-ssh air 'tail -3 ~/Library/Logs/casaencomu-backup.log'
+ssh air 'launchctl kickstart -p gui/$(id -u)/com.kenobi.casaencomu-backup'   # fire it now
+ssh air 'tail -3 ~/Library/Logs/casaencomu-backup.log; launchctl list com.kenobi.casaencomu-backup | grep LastExitStatus'
 ```
 
-It does not run the script directly. `launchd` cannot read `/Volumes`, where the data lives, so
-the agent goes through `ssh localhost`, which inherits the ssh daemon's full-disk access. That
-detour is the reason this file looks stranger than it should.
+### Why it looks stranger than it should
 
-A restore has to be practised before it is needed:
+Nothing on this Mac has been granted Full Disk Access, and two different jails meet here. Both
+halves were measured on 2026-09-10, and both answer **`Interrupted system call`** — EINTR, which
+reads like a hardware fault and is not one. It is macOS refusing a path.
+
+| | Docker / `/Volumes` | iCloud Drive |
+|---|---|---|
+| launchd's own process | yes | **no** |
+| an ssh session | **no** | yes |
+
+So the agent runs `ssh localhost`, and the script does every read **inside the container**, which
+has the external disk bind-mounted. Only the encrypted stream crosses out, into the home
+directory, and that write happens in the ssh session, which is allowed.
+
+`-F /dev/null` on that ssh, because `~/.ssh/config` includes a colima file that lives on
+`/Volumes`: ssh dies parsing it before it ever tries to connect. Granting sshd Full Disk Access
+would lift the first constraint but not that one, so it is not the fix.
+
+### The restore drill — run 2026-09-10, passed
+
+A backup nobody has restored is not a backup. The archive holds `control.db` — which projects
+exist and who belongs to each — plus one file per project, named after its id.
 
 The archive holds `control.db` — which projects exist and who belongs to each — plus one file
 per project, named after its id.
 
 ```sh
-openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in casa-<date>.tar.enc -pass file:<passphrase file> | tar -xf - -C /tmp/restore
-sqlite3 /tmp/restore/control.db 'select id, name from projects;'
-sqlite3 /tmp/restore/<project-id>.db 'select count(*) from properties;'
+ssh air
+mkdir -p /tmp/casa-restore
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+  -in ~/Library/Mobile\ Documents/com~apple~CloudDocs/Backups/casaencomu/casa-<date>.tar.enc \
+  -pass "file:$HOME/.config/casaencomu/backup.pass" | tar -xf - -C /tmp/casa-restore
+for f in /tmp/casa-restore/*.db; do echo "$f: $(sqlite3 "$f" 'PRAGMA integrity_check;')"; done
+sqlite3 /tmp/casa-restore/control.db 'select id, name from projects;'
+sqlite3 /tmp/casa-restore/<project-id>.db 'select count(*) from properties;'
+rm -rf /tmp/casa-restore
 ```
+
+The counts have to match the live database. Read those through the container, never off the disk
+— an ssh session cannot see `/Volumes`:
+
+```sh
+ssh air 'docker exec casaencomu-web-1 sh -c "sqlite3 /data/p/<project-id>/casa.db \"select count(*) from properties\""'
+```
+
+**What passed on 2026-09-10:** a 680 KB archive; `integrity_check` **ok** on both files; and every
+count identical to the live database — 24 properties, 3 opinions, 3 comments, 18 ratings,
+57 events, 7 users, 7 memberships, 1 project.
+
+**Photographs are not in it.** Only the databases. A photograph can be downloaded again while the
+advertisement is alive, and cannot once it is gone — that is the accepted loss, and it is written
+here so nobody discovers it during a restore.
 
 ## `capture-agent.mjs` — the browser reader
 
