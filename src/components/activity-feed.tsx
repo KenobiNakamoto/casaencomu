@@ -54,6 +54,10 @@ function line(e: Row) {
       return `${who} comentó en ${t}`;
     case "rating":
       return `${who} puntuó ${t}`;
+    case "opinion":
+      return `${who} publicó su opinión sobre ${t}`;
+    case "opinion_withdrawn":
+      return `${who} retiró su opinión sobre ${t}`;
     default:
       return `${who}: ${e.kind} en ${t}`;
   }

@@ -105,6 +105,14 @@ export const db = {
   execute: async (stmt: InStatement) => (await current()).execute(stmt),
   batch: async (stmts: InStatement[], mode?: TransactionMode) => (await current()).batch(stmts, mode),
   executeMultiple: async (sql: string) => (await current()).executeMultiple(sql),
+  /**
+   * A batch is enough when the statements are known in advance. Publishing an opinion is not:
+   * it has to read the current version, decide whether anything changed, and only then write —
+   * all of it one atomic step, or two devices publishing at once lose one person's work.
+   * `"write"` begins IMMEDIATE, so the lock is taken before the read and cannot deadlock on an
+   * upgrade. Always `commit()` or `rollback()`; an open handle holds the write lock.
+   */
+  transaction: async (mode: TransactionMode = "write") => (await current()).transaction(mode),
 };
 
 /**
@@ -173,6 +181,43 @@ const MIGRATIONS: Migration[] = [
          property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
          user_id TEXT NOT NULL REFERENCES users(id), reviewed_at TEXT NOT NULL,
          PRIMARY KEY (property_id, user_id))`,
+    ],
+  },
+  {
+    version: 6,
+    owner: "issue #139 — opinions, private drafts and withdrawal (PIP-09)",
+    sql: [
+      // One opinion per person per home. `reviews` was taken by version 5 for «has this person
+      // looked at it», and the app says «opinión» wherever a person is asked, so this is
+      // `opinions`. Everything except the stance is optional: a stance alone is a whole opinion.
+      `CREATE TABLE IF NOT EXISTS opinions (
+         property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL REFERENCES users(id),
+         stance TEXT CHECK (stance IN ('me_interesa', 'dudas', 'no_me_encaja')),
+         reasoning TEXT NOT NULL DEFAULT '',
+         blocker INTEGER NOT NULL DEFAULT 0,
+         basis TEXT CHECK (basis IN ('listing', 'visit')),
+         withdrawn INTEGER NOT NULL DEFAULT 0,
+         version INTEGER NOT NULL DEFAULT 1,
+         published_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+         PRIMARY KEY (property_id, user_id))`,
+      // The private half. The row outlives its payload: publishing empties `payload_json` and
+      // advances `revision`, and that number is what rejects a save typed before the publication
+      // and delivered after it. `base_version` is the publication the draft was written against.
+      `CREATE TABLE IF NOT EXISTS opinion_drafts (
+         property_id TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL REFERENCES users(id),
+         payload_json TEXT, revision INTEGER NOT NULL DEFAULT 0,
+         base_version INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL,
+         PRIMARY KEY (property_id, user_id))`,
+      // Everyone who ever scored a home already holds an opinion; it just had no words. Give it a
+      // row so the count of people who have opined is one query, and so a later edit has
+      // something to version. Stance stays NULL: they were never asked, and a score is not a
+      // stance. `published_at` is their own last rating, never today.
+      `INSERT INTO opinions (property_id, user_id, stance, reasoning, blocker, basis, withdrawn, version, published_at, updated_at)
+         SELECT property_id, user_id, NULL, '', 0, NULL, 0, 1, MAX(updated_at), MAX(updated_at)
+         FROM ratings GROUP BY property_id, user_id
+         ON CONFLICT DO NOTHING`,
     ],
   },
 ];
