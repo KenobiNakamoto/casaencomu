@@ -555,22 +555,36 @@ Two of these cost real time. Read them before you debug something that is not yo
   checkout does not. PR #69 exists because of exactly that difference. Run the checks in the
   canonical checkout before you call a branch green — **except the build, which no longer runs
   there.** See the next trap.
-- **`next build` panics in the canonical checkout, and only there.** Since 2026-09-11:
+- **`next build` panics wherever `node_modules` is a symlink.** Measured 2026-09-11:
 
   ```
   internal error: entered unreachable code: there must be a path to a root
   turbopack/crates/turbopack-core/src/module_graph/mod.rs:746:25
   ```
 
-  Turbopack panics inside `ModuleGraphImportTracer::get_traces` — that is, while trying to
-  attribute an issue it wants to report, so the issue itself is never printed. **It is the
-  checkout, not the code:** on 2026-09-11 `main` at `0f7cefb` panicked in the canonical checkout
-  (90 panicking workers, `rm -rf .next` first) and built clean from the same commit in a worktree
-  outside iCloud. The `node_modules` symlink was intact and iCloud was idle at the time.
+  Turbopack panics inside `ModuleGraphImportTracer::get_traces` — while trying to attribute an
+  issue it wants to report — so the issue itself is never printed and 90 workers panic at once.
 
-  So: run `vitest` and `eslint` in the canonical checkout, which both still work; run
-  `next build` and `tsc --noEmit` in the worktree. `tsc` needs the `.next/types` the build
-  generates, so it fails there for the same reason and is not a second problem.
+  **The cause is the symlink, not iCloud and not the code.** Isolated by changing one thing in an
+  ASCII worktree outside iCloud, on the same commit: a real `node_modules` directory builds clean,
+  and `node_modules → node_modules.nosync` panics 90 times. `main` at `0f7cefb` behaves the same
+  way, so no branch introduced it.
+
+  That symlink is the workspace-wide `.nosync` convention (workspace `CLAUDE.md`, "Sync
+  architecture"), which keeps 705 MB of dependencies out of iCloud. It applies to 16 targets, so
+  this is likely to bite other Next projects here, not only this one.
+
+  What it does and does not break:
+
+  | | With the symlink |
+  |---|---|
+  | `vitest`, `eslint` | work |
+  | `next dev` | works |
+  | `next build`, and `tsc --noEmit` (it needs the `.next/types` the build writes) | **panic** |
+  | `./deploy.sh` | **unaffected** — `.dockerignore` excludes `node_modules*`, so the image runs its own `pnpm install` and gets a real directory. Verified 2026-09-11: `docker build --platform linux/arm64` exits 0 with no panic. |
+
+  So: run `vitest` and `eslint` in the canonical checkout; run `next build` and `tsc` in a
+  worktree, where `pnpm install` makes a real directory. Deployment needs no workaround.
 
 ---
 
