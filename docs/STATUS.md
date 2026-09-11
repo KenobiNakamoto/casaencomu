@@ -1,6 +1,6 @@
 # CasaEnComú — what is done, and what is not
 
-_2026-09-08. This file answers one question: **what is the real state right now?**
+_2026-09-11. This file answers one question: **what is the real state right now?**
 `WORKPLAN.md` holds the plan and the order. This holds the state. When they disagree, this one
 is newer — check the dates._
 
@@ -428,13 +428,13 @@ and the person cards that read before the numbers #144), **PIP-11** (replies, ed
 opinion references, #146). The fair family average that F21 named landed with them (#130): the
 number is now the mean of each person's mean, not the mean of the rating rows.
 
-Left: **PIP-07** (detail and listing hierarchy, partly consumed by #122 and #126), **PIP-13**
-(activity and freshness, partly done by the bell and the «Revisar» tab in #137). **PIP-14** is
-half done: #148 made `/ajustes` — your own editable name over the capture help that used to be
-`/ayuda` — and took the `?` out of the top bar, where the icon of several people became the
-account menu (Ajustes · Proyectos · Cerrar sesión). What PIP-14 still wants is the shared budget
-stated as shared, and instructions for the portals beyond the three named today. Also split out of
-#144 and not yet filed: the person selector on the comparison page.
+PIP-07, PIP-13 and PIP-14 followed and are merged (#154, #152, #156). The last piece of PIP-10,
+split out of #144, is **issue #161**: the comparison page compared flats and not opinions. It now
+carries the four sections document 02 § 6 asks for — stances with a published-author count,
+impediments by name, the reasoning of each person, and the six aspects — plus **Ver como**, which
+turns every one of those rows into one person's. The fact rows never move with it.
+
+Nothing of Release A or Release B is left.
 
 ### Deferred by the proposal itself
 
@@ -494,10 +494,15 @@ These are real, and none of them is fixed.
 
 - **`docs/product-improvement/` is untracked.** 16 packages, 40 findings, 12 decisions and 27
   validation cases, in no commit, on one machine.
-- **The family score is not fair yet.** It averages rating rows, so a member who scored six
-  dimensions outweighs one who scored a single dimension six to one. Finding F21, package PIP-09,
-  not started. It is the largest correctness gap left in the product.
-- **No layout above 960 px, and none below 768 px, has been seen in a browser.** The automation
+- ~~**The family score is not fair yet.**~~ **Done (#130).** It is the mean of each person's
+  mean. Since #161 the comparison page derives its number and its six aspect rows from the same
+  helpers, so the two can no longer disagree.
+- **Below 768 px is now partly seen.** Headless Chrome will not go under a 500 px layout
+  viewport, but 500 px is under the 768 px breakpoint, so the phone branch of the comparison page
+  was exercised for real on 2026-09-11: `wide` false, the pair selector present, and
+  `scrollWidth === innerWidth` after the fix. **320 px is still unseen, and so is every real
+  phone.**
+- **No layout above 960 px has been seen in a browser.** The automation
   cannot change the layout viewport, so the desktop split view and every phone layout are covered
   by source assertions only. Where a phone branch mattered — the comparison pair view — it was
   exercised by pointing its media query at 4000 px temporarily, which proves the branch and not
@@ -514,8 +519,11 @@ These are real, and none of them is fixed.
   a result state; its form belongs to PIP-10.
 - **Four of the 23 properties have no coordinates**, so they appear in the list and never on the
   map. The list now says how many, which is the fix — the behaviour itself is correct.
-- **The Air is still running the 2026-09-07 build.** Everything merged on 09-08 — five packages —
-  is on `main` and not on the preview. Redeploy with `./deploy.sh`.
+- **Two defects only a browser found (#161).** A row keyed by its label alone made React
+  reconcile the flat's «Estado» onto the family's score for «Estado», so «Solo diferencias» showed
+  a row that did not differ; and libSQL rows were being handed straight to a client component,
+  which React refused once per row — silently in production, loudly in development. Both are
+  fixed and both have a source test. Neither was visible in 692 passing tests. **Open the page.**
 
 ---
 
@@ -545,14 +553,33 @@ Two of these cost real time. Read them before you debug something that is not yo
   `node_modules 2`, so a collision rename can never be committed by accident.
 - **A worktree is not a faithful copy.** It sits on an ASCII path outside iCloud; the real
   checkout does not. PR #69 exists because of exactly that difference. Run the checks in the
-  canonical checkout before you call a branch green.
+  canonical checkout before you call a branch green — **except the build, which no longer runs
+  there.** See the next trap.
+- **`next build` panics in the canonical checkout, and only there.** Since 2026-09-11:
+
+  ```
+  internal error: entered unreachable code: there must be a path to a root
+  turbopack/crates/turbopack-core/src/module_graph/mod.rs:746:25
+  ```
+
+  Turbopack panics inside `ModuleGraphImportTracer::get_traces` — that is, while trying to
+  attribute an issue it wants to report, so the issue itself is never printed. **It is the
+  checkout, not the code:** on 2026-09-11 `main` at `0f7cefb` panicked in the canonical checkout
+  (90 panicking workers, `rm -rf .next` first) and built clean from the same commit in a worktree
+  outside iCloud. The `node_modules` symlink was intact and iCloud was idle at the time.
+
+  So: run `vitest` and `eslint` in the canonical checkout, which both still work; run
+  `next build` and `tsc --noEmit` in the worktree. `tsc` needs the `.next/types` the build
+  generates, so it fails there for the same reason and is not a second problem.
 
 ---
 
 ## 10. How to pick up the next piece of work
 
 1. Read `CLAUDE.md`, `DESIGN.md`, this file, and `WORKPLAN.md` § 4 (the agent contract).
-2. Take the next eligible package from § 5 above. **PIP-05 is next.**
+2. Take the next eligible package from § 5 above. **There is none left**: every package of
+   Release A and Release B is merged, and PIP-12 and PIP-15 are deferred by the proposal itself.
+   What is open is in § 6, and all of it is Kenobi's or needs a real phone.
 3. Open a GitHub issue for it. Do not invent issue numbers.
 4. Branch `issue-<n>-<slug>` in a worktree outside iCloud, then `pnpm install` inside it.
 5. Implement only that package. Add tests that fail if the behaviour breaks.
