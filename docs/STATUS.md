@@ -18,9 +18,9 @@ account; the activity feed stays unread until somebody presses a button; the fac
 what is missing instead of printing «Sin datos» twelve times; and the budget says whose decision
 it was. `main` is green at **660 tests, 3 skipped**, with lint, types and build clean.
 
-**It is deployed and the data is backed up.** The Air runs `e56f743`, built 2026-09-10, migrated
-in place — 19 descriptions repaired, schema at version 9. The nightly backup is installed and a
-restore has been carried out (#21).
+**It is deployed and the data is backed up.** The Air runs `aa1f8cf`, built 2026-09-11. Schema is
+at version 9; #161 added no migration. The nightly backup is installed and a restore has been
+carried out (#21). Every route answers in under 25 ms.
 
 **It is not on a domain, and it asks for no password.** `PREVIEW_OPEN_AS` is set on the Air, so
 anyone who reaches the port is one identity; the tailnet is the only perimeter. Cloudflare Access
@@ -519,6 +519,12 @@ These are real, and none of them is fixed.
   a result state; its form belongs to PIP-10.
 - **Four of the 23 properties have no coordinates**, so they appear in the list and never on the
   map. The list now says how many, which is the fix — the behaviour itself is correct.
+- **Seven accounts on the Air, six of them debris (#164).** Deploying #161 made it visible: the
+  new **Ver como** selector lists every account in the project, and the same seven are the
+  denominator of «Han opinado: 1 de 7 personas» everywhere. Only `familia@casa.local` — the
+  `PREVIEW_OPEN_AS` identity — has written anything. `--reset` is the fossil of the argv bug fixed
+  in #74 and owns all 23 imported properties, so it has to be renamed rather than deleted. The
+  code is not wrong; the data is. **Kenobi's decision — they are his logins.**
 - **Two defects only a browser found (#161).** A row keyed by its label alone made React
   reconcile the flat's «Estado» onto the family's score for «Estado», so «Solo diferencias» showed
   a row that did not differ; and libSQL rows were being handed straight to a client component,
