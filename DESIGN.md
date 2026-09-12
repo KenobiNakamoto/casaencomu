@@ -100,6 +100,24 @@ Both layers are a native `<dialog>`. The browser owns the top layer, Escape, the
 the return of focus; the stylesheet owns only the look. Nesting them is what makes Escape close
 the photograph back to the mosaic, and the mosaic back to the page.
 
+## The front door
+
+`/entrar` and `/invitacion` are the only two pages a person can reach with no session, and the
+only two with no header. They share one shell, `.puerta`: the mark and the line **«Preparaos para
+encontrar vuestra casa, juntos.»** centred over a translucent card.
+
+The ground moves. Three shapes — `--accent`, `--action-bg`, `--secondary` — are blurred 64 px past
+their own edges and drift on loops of 31 s, 37 s and 43 s. The three durations share no factor, so
+the picture never returns to where it started at an interval anybody would notice. Opacity is one
+token, `--blob`: 0.24 on paper, 0.34 at night, because paper takes less colour than black does.
+
+Transform only, never opacity or size, so the three of them stay on the compositor. The card is
+86% `--raised` over a 16 px backdrop blur — the shapes have to stay visible behind it, or the
+movement reads as a fault in the page rather than as its ground.
+
+Reduced motion needs no rule of its own here. The global one stops the shapes where they are, and
+what is left is the same picture without the movement.
+
 ## The distinctive move
 
 The theme switch. One button, one circular wipe out of it, the whole page repainted — no fade, no

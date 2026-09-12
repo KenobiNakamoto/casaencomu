@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AccountMenu from "./account-menu";
 import ActivityFeed from "./activity-feed";
+import Marca from "./marca";
 import { feed } from "@/lib/activity";
 import { currentUser } from "@/lib/auth";
 import { bellFor, DIGEST_DAYS } from "@/lib/notifications";
@@ -37,12 +38,8 @@ export default async function Nav() {
   return (
     <header className="sticky top-0 z-20 border-b border-hairline bg-raised">
       <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:h-[72px] lg:px-14">
-        <Link href="/propiedades" className="flex shrink-0 items-center gap-2 text-xl font-bold tracking-tight text-accent">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M3 11l9-8 9 8" />
-            <path d="M5 10v10h5v-6h4v6h5V10" />
-          </svg>
-          CasaEnComú
+        <Link href="/propiedades" className="shrink-0">
+          <Marca className="text-xl" />
         </Link>
         <NavLinks items={items} />
         <div className="ml-auto flex items-center gap-3 lg:ml-0">

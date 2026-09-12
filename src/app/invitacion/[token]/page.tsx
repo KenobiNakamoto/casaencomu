@@ -3,6 +3,7 @@ import Link from "next/link";
 import { accountBy } from "@/lib/accounts";
 import { inviteByToken, inviteProblem, type Problem } from "@/lib/control";
 import { aceptarInvitacionAction } from "@/app/proyectos/actions";
+import Puerta from "@/components/puerta";
 import { CuentaNuevaForm } from "./forms";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +15,8 @@ const PORQUE: Record<Problem, string> = {
   other: "Esta invitación es para otra dirección de correo.",
 };
 
-function Marco({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto max-w-sm space-y-6 px-4 py-16 sm:px-6">{children}</div>;
-}
+/** The same shell as `/entrar`: the mark, the tagline, and the card the message sits in. */
+const Marco = Puerta;
 
 /**
  * «Te han invitado a este proyecto.» This page does three different things, and which one depends
