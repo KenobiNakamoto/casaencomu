@@ -150,3 +150,16 @@ describe("a session", () => {
     expect(await checkPassword("p2@example.com", "otra clave larga")).toMatchObject({ ok: true });
   });
 });
+
+describe("the first account on a server that ran before accounts existed", () => {
+  it("is given no new project when the address already belongs to one", async () => {
+    // The Air's own case: Cloudflare Access or the preview password wrote the memberships, and
+    // the flats are already there. A second, empty project would hide all of them.
+    const { createProject, projectsOf } = await import("./control");
+    const before = await createProject("Nuestra casa", "vieja@example.com");
+    expect((await projectsOf("vieja@example.com")).map((p) => p.id)).toEqual([before]);
+    // primeraCuentaAction asks exactly this before it makes anything.
+    expect((await projectsOf("vieja@example.com")).length === 0).toBe(false);
+    expect((await projectsOf("nadie-nuevo@example.com")).length === 0).toBe(true);
+  });
+});
