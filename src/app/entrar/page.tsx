@@ -20,7 +20,7 @@ export default async function EntrarPage({
 
   return (
     <div className="mx-auto max-w-sm space-y-6 px-4 py-16 sm:px-6">
-      <h1 className="text-[22px] font-medium">{first ? "Empieza la casa" : "Entrar"}</h1>
+      <h1 className="text-[22px] font-medium">{first ? "Empieza el proyecto de búsqueda" : "Entrar"}</h1>
       <p className="text-body">
         {first
           ? "Todavía no hay ninguna cuenta. La primera es la tuya, y es la que invita a los demás."
@@ -29,7 +29,7 @@ export default async function EntrarPage({
       {first ? <PrimeraCuentaForm /> : <EntrarForm next={a ?? "/"} />}
       {!first && (
         <p className="text-sm text-muted">
-          ¿No tienes cuenta? Solo se entra con una invitación. Pídesela a quien lleva la casa.
+          ¿No tienes cuenta? Solo se entra con una invitación. Pídesela a quien lleva el proyecto.
         </p>
       )}
     </div>
