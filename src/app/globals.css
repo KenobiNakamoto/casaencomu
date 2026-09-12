@@ -117,6 +117,8 @@
      same shadow under it reads as a printing error rather than as height. `--lift` is that shadow
      at that scale: wider, softer, and further down. */
   --lift: rgba(0, 0, 0, 0.03) 0 0 0 1px, rgba(0, 0, 0, 0.05) 0 4px 12px -2px, rgba(0, 0, 0, 0.1) 0 14px 26px -8px;
+  /* the front door's drifting shapes: one opacity, because paper takes less colour than night does */
+  --blob: 0.24;
   /* map: the full palette, from docs/product-improvement/03-design-motion-map.md § 6.
    * map-style.ts maps every one of the basemap's 55 layers onto these. */
   --map-bg: #f4f3ee;
@@ -241,6 +243,8 @@
   /* night elevation is a lighter surface plus a hairline; a black shadow is invisible here */
   --shadow: rgba(255, 255, 255, 0.06) 0 0 0 1px, rgba(0, 0, 0, 0.5) 0 4px 14px 0;
   --lift: rgba(255, 255, 255, 0.07) 0 0 0 1px, rgba(0, 0, 0, 0.55) 0 14px 30px -10px;
+  /* the front door's drifting shapes: one opacity, because paper takes less colour than night does */
+  --blob: 0.34;
   --map-bg: #12151a;
   --map-building: #242a32;
   --map-water: #152d3c;
@@ -308,6 +312,8 @@
     --visit-ink: #c5addf;
     --shadow: rgba(255, 255, 255, 0.06) 0 0 0 1px, rgba(0, 0, 0, 0.5) 0 4px 14px 0;
   --lift: rgba(255, 255, 255, 0.07) 0 0 0 1px, rgba(0, 0, 0, 0.55) 0 14px 30px -10px;
+  /* the front door's drifting shapes: one opacity, because paper takes less colour than night does */
+  --blob: 0.34;
     --map-bg: #12151a;
     --map-building: #242a32;
     --map-water: #152d3c;
@@ -1419,4 +1425,106 @@ html[data-wipe]::view-transition-new(root) {
       0 1px 5px rgb(0 0 0 / 0.35),
       0 0 0 40px color-mix(in srgb, var(--action-bg) 16%, transparent);
   }
+}
+
+/* --- The front door ------------------------------------------------------------------------- */
+
+/*
+ * `/entrar` and `/invitacion` are the only pages with no header, no data and one thing to do. They
+ * are also the only two a stranger can reach, so they are the whole first impression of the app.
+ *
+ * The ground moves: three shapes of the brand colours, blurred well past their own edges, drifting
+ * on three long loops that never divide into each other — so the picture does not repeat at any
+ * interval a person would notice.
+ *
+ * Transform and nothing else, so the three of them stay on the compositor and no frame re-lays the
+ * page out. Reduced motion is already answered by the global rule further up: the shapes stop
+ * where they are, and what is left is the same picture without the movement.
+ */
+.puerta {
+  position: relative;
+  display: grid;
+  place-items: center;
+  /* `--nav-bottom-h` is 0 at lg, so this is the full viewport there. Below lg the layout reserves
+     that strip for a bottom bar this page does not draw, and without it the page would scroll. */
+  min-height: calc(100dvh - var(--nav-bottom-h));
+  padding: clamp(24px, 6vh, 64px) 16px;
+}
+
+/* Fixed, not absolute: it has to cover the viewport whatever the card inside is doing. */
+.puerta-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: clip;
+  pointer-events: none;
+}
+
+.puerta-fondo span {
+  position: absolute;
+  display: block;
+  /* Not a circle. An uneven radius is what makes it read as a shape rather than as a lamp. */
+  border-radius: 46% 54% 62% 38% / 58% 42% 56% 44%;
+  filter: blur(64px);
+  opacity: var(--blob);
+  animation: puerta-deriva var(--t) var(--ease-motion) var(--d, 0s) infinite alternate;
+}
+
+.puerta-fondo span:nth-child(1) {
+  top: -22vmin;
+  left: -18vmin;
+  width: 62vmin;
+  height: 62vmin;
+  background: var(--accent);
+  --dx: 13vmin;
+  --dy: 9vmin;
+  --s: 1.16;
+  --t: 31s;
+}
+
+.puerta-fondo span:nth-child(2) {
+  right: -20vmin;
+  bottom: -24vmin;
+  width: 70vmin;
+  height: 70vmin;
+  background: var(--secondary);
+  --dx: -11vmin;
+  --dy: -8vmin;
+  --s: 1.21;
+  --t: 43s;
+  --d: -9s;
+}
+
+.puerta-fondo span:nth-child(3) {
+  bottom: -14vmin;
+  left: -10vmin;
+  width: 50vmin;
+  height: 50vmin;
+  background: var(--action-bg);
+  --dx: 14vmin;
+  --dy: -11vmin;
+  --s: 0.85;
+  --t: 37s;
+  --d: -21s;
+}
+
+@keyframes puerta-deriva {
+  to {
+    transform: translate3d(var(--dx), var(--dy), 0) scale(var(--s));
+  }
+}
+
+/*
+ * The card is deliberately not opaque. The shapes have to keep moving behind it, or the movement
+ * reads as something wrong with the page rather than as the ground of it.
+ */
+.puerta-tarjeta {
+  position: relative;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--raised) 86%, transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--lift);
+  padding: 26px 24px;
 }

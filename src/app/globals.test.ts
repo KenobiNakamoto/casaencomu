@@ -245,3 +245,21 @@ describe("what components are not allowed to write", () => {
     expect(nav.flatMap(([n, c]) => (c.match(/\bmd:[a-z-]/g) ? [n] : []))).toEqual([]);
   });
 });
+
+/*
+ * The front door. Both of these fail silently: a missing `--blob` makes the shapes invisible in
+ * one theme only, and a keyframe that animates anything but `transform` takes them off the
+ * compositor and, worse, walks out from under the global reduced-motion rule.
+ */
+describe("the front door", () => {
+  it("sets the shapes' opacity in all three theme blocks", () => {
+    expect(css.match(/--blob:\s*[\d.]+;/g)).toHaveLength(3);
+  });
+
+  it("drifts by transform and by nothing else", () => {
+    const frames = css.slice(css.indexOf("@keyframes puerta-deriva"));
+    const body = frames.slice(0, frames.indexOf("\n}\n"));
+    expect(body).toContain("transform: translate3d");
+    expect(body).not.toMatch(/\b(?:opacity|width|height|top|left|filter):/);
+  });
+});
