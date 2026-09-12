@@ -1,6 +1,6 @@
 # CasaEnComú — what is done, and what is not
 
-_2026-09-11. This file answers one question: **what is the real state right now?**
+_2026-09-12. This file answers one question: **what is the real state right now?**
 `WORKPLAN.md` holds the plan and the order. This holds the state. When they disagree, this one
 is newer — check the dates._
 
@@ -11,21 +11,29 @@ no evidence is not a claim, it is a plan, and it belongs in `WORKPLAN.md`.
 
 ## 1. In one paragraph
 
-**Release A and Release B are both finished, merged and deployed.** What a person thinks is
+**The app has its own login, and it is deployed behind it.** A person signs in at `/entrar` with
+an address and a clave. The first account on an empty server adopts every project it finds, so
+the 23 flats are there when the owner lands rather than hidden behind a second, empty project.
+Ten accounts is the ceiling, enforced by a database trigger, not only by a count. Every account
+after the first arrives through an invitation, and the same link sets a new clave for somebody
+who has forgotten theirs — there is no mail server, so a reset is a link the owner hands over.
+`main` is green at **714 tests, 3 skipped**, with lint, types and build clean.
+
+Release A and Release B are both finished, merged and deployed. What a person thinks is
 published, versioned, drafted and withdrawable; the family average counts people rather than
 rating rows; the conversation takes replies, corrections and removals; the top bar carries the
 account; the activity feed stays unread until somebody presses a button; the facts panel names
 what is missing instead of printing «Sin datos» twelve times; and the budget says whose decision
-it was. `main` is green at **660 tests, 3 skipped**, with lint, types and build clean.
+it was.
 
-**It is deployed and the data is backed up.** The Air runs `aa1f8cf`, built 2026-09-11. Schema is
-at version 9; #161 added no migration. The nightly backup is installed and a restore has been
-carried out (#21). Every route answers in under 25 ms.
+**It is deployed and the data is backed up.** The Air runs the current image. The nightly backup
+is installed and a restore has been carried out (#21). Every route answers in under 25 ms.
 
-**It is not on a domain, and it asks for no password.** `PREVIEW_OPEN_AS` is set on the Air, so
-anyone who reaches the port is one identity; the tailnet is the only perimeter. Cloudflare Access
-is not configured. Both wait on Kenobi's #1 and #2. **Read `docs/RELEASE-B-PROOF.md` § 5** for
-that and the seven other things nobody has checked — a real phone has never opened this app.
+**It is not on a domain yet, and that is deliberate.** The domain is bought, the tunnel is healthy
+and its route is configured, but no DNS record is published: the first account claims the server,
+so the hostname must not be reachable before that account exists. The tailnet is still the only
+way in. **Read `docs/RELEASE-B-PROOF.md` § 5** for the things nobody has checked — a real phone
+has never opened this app.
 
 ---
 
@@ -35,19 +43,21 @@ that and the seven other things nobody has checked — a real phone has never op
 |---|---|
 | Where | The MacBook Air, in Docker under Colima |
 | Reachable from | The tailnet only, over plain HTTP on port 8080 |
-| Login | None. `PREVIEW_OPEN_AS` serves every visitor as one identity (§ 4e) |
+| Login | **The app's own.** An address and a clave at `/entrar`; no account exists yet |
 | Data | A **copy** of the Pro's development database: 23 properties, 621 photos |
 | Survives a reboot | Yes, on its own |
 
-The address, the password location and the exact commands are in `memory/decisions.md`
-(2026-09-07). `memory/` is gitignored on purpose: the address names the machine.
+The address, the clave location and the exact commands are in `memory/decisions.md`. `memory/` is
+gitignored on purpose: the address names the machine.
 
-**What this preview is not:**
+**What this is not:**
 
-- It is **not** the Cloudflare Access deployment. It has no domain and no Zero Trust policy.
-- Nothing asks who you are. The tailnet is the perimeter, and it always was: the shared password
-  it replaced only kept the family's identities apart. Everyone on the preview is now one
-  identity, so ratings and activity are shared until the Access deployment lands.
+- It is **not** public. The tunnel is healthy and its route is set, but no DNS record points at
+  it. Publishing that record is the last step, and it waits on the first account.
+- It is **not** a Cloudflare Access deployment, and it no longer needs to be. Access still works
+  as an outer gate when `CF_ACCESS_*` is set, but the app no longer depends on it to know who
+  anybody is. `PREVIEW_OPEN_AS` and `PREVIEW_PASSWORD` are commented out of the Air's `.env`
+  («removed 2026-09-12: the app has its own login (#166)»), so our login is the only door.
 - The database on the Air is a **copy**. The Pro's `data/` is still the source of truth. Do not
   start editing on the Air and expect it to come back.
 - It is **not** HTTPS. The tailnet has no HTTPS certificates enabled. Traffic is still
@@ -414,6 +424,42 @@ present, so this can never downgrade a real deployment — `src/proxy.test.ts` a
 `vitest.config.ts` gained the `@` alias, without which no test can import a module that uses the
 app's own import prefix.
 
+## 4f. The app grew its own accounts — issue #166, merged 2026-09-12
+
+The deployment depended on Cloudflare Access to say who anybody was. That made the family's front
+door somebody else's product, and it made a real deployment wait on a Zero Trust account. The app
+now owns its own accounts.
+
+**PR #168 — accounts and a login.** `src/lib/accounts.ts` is the whole of it: scrypt hashing with
+the salt carried in the stored string, `timingSafeEqual` on compare, an opaque 256-bit session id,
+five tries then a minute locked, and a refusal that reads the same for an unknown address as for a
+wrong clave — «El correo o la clave no son correctos.» — so the form cannot be asked, one address
+at a time, who is in this family. Ten accounts is the ceiling in two places: a count that gives a
+readable refusal, and a `BEFORE INSERT` trigger that is the one that cannot lose a race.
+
+The session is a row, not a token. Next 16 runs `src/proxy.ts` on the **Node.js** runtime, so the
+proxy can read the database; that single fact deleted a signed token, a signing secret, a second
+verification, a `resets` table and a `SIGNUP` environment variable from the design. Deleting the
+row ends the session on the next request, which is what makes «cerrar todas las sesiones» real.
+
+`/invitacion/<token>` does three things, decided by who is reading it: sign up, set a new clave,
+or join the project. One code path and one table, because there is no mail server to send a reset
+to — the owner hands over a link exactly as they do for a new person.
+
+**PR #169 — the first account takes over the server it finds.** The Air's control database held an
+owner called `--reset` (a command-line flag written where an address belonged) and six
+`@casa.local` members invented by the preview door. None of them could sign in, and the 23 flats
+belonged to them. Signing up would have built a second, empty project beside the real one.
+`adoptProjects()` deletes the rows that are not addresses and makes the first account owner of
+every project on the server. It never demotes anybody.
+
+**PR #171 — the front door says «proyecto».** «Empieza la casa» used the word two ways on the
+first screen a person sees: a house is the product this app collects, and the container is a
+search project. **PR #173** then gave `/entrar` and `/invitacion` one shell — the mark, a tagline,
+and a card over three drifting shapes. `DESIGN.md` § *The front door* is the specification.
+
+---
+
 ## 5. Not done
 
 ### Release A — nothing left
@@ -451,20 +497,24 @@ Not a package to build once. It is the proof step run for each release. **Run fo
 
 ## 6. Blocked, and on whom
 
-**Three items. Only Kenobi can do them. They block the entire server track.**
+**One item. Only Kenobi can do it, and it is two minutes of work.**
 
 | # | What | Where |
 |---|---|---|
-| 1 | A domain on Cloudflare DNS | dash.cloudflare.com |
-| 2 | A Zero Trust account; note the team name | one.dash.cloudflare.com |
-| 5 | Confirm the area and the member email list | never in the repo |
+| — | **Make the first account** at `/entrar`, over the tailnet | the Air, port 8080 |
 
-Behind them, in order: **#18** Air setup (needs the domain, the team domain, the Access AUD and
-the member emails) → **#19** M1 integration → **#21** backup restore drill → **#20** phone
-checklists.
+That account claims the server and adopts the 23 flats. Until it exists the DNS record stays
+unpublished, because whoever makes the first account on a reachable host owns everything on it.
 
-**Nothing in the product track is blocked by these three.** That is why the product packages
-went ahead, and why the Tailscale preview exists.
+What used to be here is gone. **#1** (a domain on Cloudflare DNS) is done — the domain is bought,
+the zone is on Cloudflare and the tunnel is healthy. **#2** (a Zero Trust account) is no longer a
+blocker of anything: the app has its own login, and Access is an optional outer gate. **#18**
+(Air setup) is done: `cloudflared` runs, the route is configured, and the `.env` is written.
+**#5** (the member email list) is no longer a deployment step either — members arrive through
+invitations from inside the app, so no list is needed anywhere in advance.
+
+Behind the first account, in order: publish the DNS record → **#19** M1 integration → **#20**
+phone checklists.
 
 ---
 
@@ -472,19 +522,18 @@ went ahead, and why the Tailscale preview exists.
 
 Each of these is small, and each one is his to make.
 
-1. **Deploy what is built.** Release B's opinion work is merged and nothing of it is on the Air:
-   the running image is from 9 September. `./deploy.sh` is the whole procedure. Until then the
-   family sees none of the editor, the person cards, the conversation, or the corrected average.
+1. **Rotate the Cloudflare API token.** His own terminal echoed it into a session transcript while
+   he was storing it. Nothing has used it since except the tunnel and zone work it was made for,
+   but a token that has been printed should not stay valid.
 2. **Enable HTTPS certificates on the tailnet?** One toggle at the Tailscale admin console,
    DNS → HTTPS Certificates. It turns the preview into a real `https://` address with a valid
-   certificate. Two minutes of work after that.
-3. **Commit `docs/product-improvement/`.** The 16-package proposal is **in no commit**. It
-   exists only as untracked files in this checkout. If this Mac is lost, so is it. See § 8.
-4. **Signed commits.** About half of this repository's history is unsigned. This is a private
+   certificate. Two minutes of work after that. Less urgent now that the domain exists.
+3. **Signed commits.** About half of this repository's history is unsigned. This is a private
    personal repository with one author, so nothing requires signing; it is worth a decision
    rather than an accident. Signing would use a personal key, never a work one.
-5. **The three items that unblock a real deployment** — issues #1, #2 and #5. Nothing in the
-   code is waiting on anything else. See § 6.
+4. **Issue #167** — the Jitsi/Netflix house link and profile boxes: one link, one clave, and a
+   row of people to pick from, so a family member can use the project without an account of their
+   own. Filed on his instruction, explicitly for later. It is not blocked; it is not started.
 
 ---
 
@@ -492,8 +541,8 @@ Each of these is small, and each one is his to make.
 
 These are real, and none of them is fixed.
 
-- **`docs/product-improvement/` is untracked.** 16 packages, 40 findings, 12 decisions and 27
-  validation cases, in no commit, on one machine.
+- ~~**`docs/product-improvement/` is untracked.**~~ **Done.** The 16 packages, 40 findings, 12
+  decisions and 27 validation cases are committed; nine files are tracked under that path.
 - ~~**The family score is not fair yet.**~~ **Done (#130).** It is the mean of each person's
   mean. Since #161 the comparison page derives its number and its six aspect rows from the same
   helpers, so the two can no longer disagree.

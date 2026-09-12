@@ -5,13 +5,17 @@ Idealista, Fotocasa, Habitaclia and three smaller portals; the app keeps the fac
 photos, removes duplicates, maps them, compares them, lets every member rate and comment, and
 rechecks price and availability every 48 hours. The interface is Spanish.
 
-It runs on one Mac at home, behind Cloudflare Access. There is no public sign-up, no
-multi-tenancy and no cloud database. One family, one container, one SQLite file.
+It runs on one Mac at home, behind its own login. There is no public sign-up, no multi-tenancy
+and no cloud database. One family, one container, one SQLite file per project.
 
-**Status (2026-09-07).** The code is complete on `main`: 24 pull requests merged, 60 tests green,
-production build green. Nothing is deployed yet — the tunnel and the domain are the owner's
-remaining tasks. The development database holds 23 real listings, every field extracted from the
-advertisement itself. The live status block is `docs/WORKPLAN.md` § 0.
+**Status (2026-09-12).** The app has its own accounts, and it is deployed. A person signs in at
+`/entrar`; the first account on an empty server claims what is already there and invites everyone
+else; ten accounts is the ceiling, enforced by a database trigger. `main` is green at 714 tests
+(3 skipped), with lint, types and build clean. The server runs on the Air, reachable over the
+tailnet. The domain is bought and the tunnel is healthy; the one DNS record that makes it public
+is held back until the first account exists. (The address itself is in `memory/`, not here.) The
+development database holds 23 real listings, every field extracted from the advertisement itself.
+What is true right now, with what is not done, is `docs/STATUS.md`.
 
 ## Start here
 
@@ -31,7 +35,7 @@ about a minute. Four commands take a fresh copy to the state the last session le
 
 ```sh
 pnpm install
-echo 'AUTH_DEV_EMAIL=you@example.com' > .env.local   # development bypass for the Access check
+echo 'AUTH_DEV_EMAIL=you@example.com' > .env.local   # dev only: skips the login, including ours
 pnpm tsx scripts/ingest.mts --reset                  # 23 listings with photos, from _local/captures
 pnpm dev                                             # http://localhost:3000
 ```
@@ -78,16 +82,19 @@ Everything at the top level is committed except the last four rows. That is the 
 ## How it works
 
 ```
-phone / laptop ──HTTPS──▶ Cloudflare Access ── Tunnel ──▶ cloudflared on the Mac ──▶ 127.0.0.1:3100
+phone / laptop ──HTTPS──▶ Cloudflare Tunnel ──▶ cloudflared on the Mac ──▶ 127.0.0.1:3100
                                                                   │
                                         one container: Next.js + SQLite + the hourly recheck loop
                                         data on an external volume, bind-mounted as /data
 ```
 
-- **Authentication is Cloudflare Access.** The email list in the Access policy is the whole
-  allowlist. The app verifies the Access JWT and creates a `users` row from the email. There are
-  no roles, no invitations and no administration page. To add a family member, add an email to
-  the policy.
+- **Authentication is the app's own.** An address and a clave, hashed with scrypt; the session is
+  an opaque 256-bit id and a row in `control.db`, so deleting the row ends the session on the next
+  request. Next 16 runs `src/proxy.ts` on Node, which is what lets the door be a database lookup
+  instead of a signed token. Ten accounts is the ceiling. There is no open sign-up: after the
+  first account, every account arrives through an invitation, and the same link sets a new clave
+  for somebody who has forgotten theirs. Cloudflare Access still works if `CF_ACCESS_*` is set —
+  it becomes an outer gate in front of this login, not a replacement for it.
 - **Intake has two paths.** A pasted URL is fetched by the server, but only for hosts in
   `ALLOWED_HOSTS` — that allowlist is the guard against server-side request forgery. Everything
   else arrives through the bookmarklet, which reads the page in the member's own browser and
