@@ -11,7 +11,7 @@ import {
   endSession,
   startSession,
 } from "@/lib/accounts";
-import { createProject, projectsOf } from "@/lib/control";
+import { adoptProjects, createProject, listProjects, projectsOf } from "@/lib/control";
 
 /**
  * The login page is the only page a person without a session can use, so everything it can do is
@@ -57,11 +57,10 @@ export async function entrarAction(_prev: Aviso, formData: FormData): Promise<Av
  * The first account, on an install where none exists. Every account after it arrives with an
  * invitation, so this runs once in the life of a server.
  *
- * **It only makes a project for somebody who belongs to none.** A server that ran before accounts
- * existed already holds projects and a membership list — the door was Cloudflare Access or the
- * preview password, and the memberships were written under the address it reported. The first
- * person to sign up there is almost always that same address, and making them a second, empty
- * project would hide every flat they have already saved.
+ * **It never makes a second, empty project.** A server that ran before accounts existed already
+ * holds projects and a membership list, written under whatever address the old door reported —
+ * and none of those addresses can sign in now. So the first account takes over what is there,
+ * rather than starting beside it and hiding every flat already saved.
  */
 export async function primeraCuentaAction(_prev: Aviso, formData: FormData): Promise<Aviso> {
   if ((await accountCount()) > 0) return { msg: "Ya hay una cuenta. Pide una invitación." };
@@ -73,7 +72,12 @@ export async function primeraCuentaAction(_prev: Aviso, formData: FormData): Pro
   const made = await createAccount(email, name, password);
   if (!made.ok) return { msg: PROBLEMA[made.reason] };
 
-  if ((await projectsOf(email)).length === 0) await createProject("Nuestra casa", email);
+  if ((await projectsOf(email)).length === 0) {
+    // Projects with no account behind them belong to whoever signs up first, because there are no
+    // accounts to take them from. A server with nothing on it gets a project to start with.
+    if ((await listProjects()).length > 0) await adoptProjects(email);
+    else await createProject("Nuestra casa", email);
+  }
   return open(email, "/");
 }
 
