@@ -3,6 +3,7 @@ import { currentUser } from "@/lib/auth";
 import { buildBookmarklet } from "@/lib/bookmarklet";
 import { PORTALS } from "@/lib/url";
 import { input } from "@/components/propiedades/format";
+import { ClaveForm } from "./clave";
 import { PERSON_NAME_MAX } from "@/lib/project-shape";
 import { CopyBox } from "./copy";
 import { renombrarseAction } from "./actions";
@@ -59,6 +60,14 @@ export default async function AjustesPage() {
           </button>
         </form>
         <p className="text-sm text-muted">Entras como {email}.</p>
+      </section>
+
+      <section className="space-y-3 py-8">
+        <h2 className={h2}>Tu clave</h2>
+        <p className="text-body">
+          Al cambiarla se cierran todas tus sesiones, también esta. Entras otra vez con la nueva.
+        </p>
+        <ClaveForm />
       </section>
 
       <section className="space-y-3 py-8">

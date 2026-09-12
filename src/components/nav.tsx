@@ -19,6 +19,11 @@ import ThemeToggle from "./theme-toggle";
  * into the account menu, where the name sits over the address it belongs to.
  */
 export default async function Nav() {
+  // The login page and an invitation are rendered by people who are nobody yet. There is no bell,
+  // no «Revisar» count and no account for them, so the header is not drawn at all.
+  const { headers } = await import("next/headers");
+  if (!(await headers()).get("x-user-email")) return null;
+
   const user = await currentUser();
   const [bell, recent] = await Promise.all([bellFor(user), feed(user.id, undefined, 12)]);
 

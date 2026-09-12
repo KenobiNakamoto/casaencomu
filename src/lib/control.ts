@@ -46,7 +46,21 @@ const ready = control
        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
        email TEXT NOT NULL, invited_by TEXT NOT NULL,
        created_at TEXT NOT NULL, expires_at TEXT NOT NULL, accepted_at TEXT);
-     CREATE INDEX IF NOT EXISTS invites_project ON invites(project_id);`,
+     CREATE INDEX IF NOT EXISTS invites_project ON invites(project_id);
+     CREATE TABLE IF NOT EXISTS accounts (
+       email TEXT PRIMARY KEY, name TEXT NOT NULL, password_hash TEXT NOT NULL,
+       created_at TEXT NOT NULL,
+       failed_count INTEGER NOT NULL DEFAULT 0, failed_at TEXT);
+     CREATE TABLE IF NOT EXISTS sessions (
+       id TEXT PRIMARY KEY, email TEXT NOT NULL,
+       created_at TEXT NOT NULL, expires_at TEXT NOT NULL);
+     CREATE INDEX IF NOT EXISTS sessions_email ON sessions(email);
+     -- The account limit, where it is actually true. accounts.ts counts before it inserts, but
+     -- counting and inserting are two statements, and two invitations accepted in the same moment
+     -- would both pass. The number here is MAX_ACCOUNTS in accounts.ts: change both or neither.
+     CREATE TRIGGER IF NOT EXISTS accounts_limit BEFORE INSERT ON accounts
+       WHEN (SELECT COUNT(*) FROM accounts) >= 10
+       BEGIN SELECT RAISE(ABORT, 'accounts: full'); END;`,
   )
   // A control database written before roles or descriptions existed. Each of these succeeds once
   // and fails every time after, which is the whole migration: every column is nullable or has a
@@ -63,6 +77,9 @@ const ready = control
 
 /** The shapes and the limits, in a file a `"use client"` component can import. */
 export * from "./project-shape";
+
+/** Every table in this file is made once, here. `accounts.ts` writes to two of them. */
+export const controlReady = ready;
 
 /**
  * One spelling of an address, everywhere in this file. A membership written as `Ana@…` and looked
@@ -239,11 +256,15 @@ export async function createInvite(
   projectId: string,
   by: string,
   to: string,
+  // The same link, for somebody who is already inside: with no mail server, an invitation is also
+  // how a forgotten clave is set again. Only `/proyectos` asks for this, and only the owner can.
+  forMember = false,
 ): Promise<{ token: string } | { refused: "invalid" | "member" }> {
   await mustOwn(by, projectId);
   const email = norm(to);
   if (!EMAIL.test(email)) return { refused: "invalid" };
-  if (await roleOf(email, projectId)) return { refused: "member" };
+  if (!forMember && (await roleOf(email, projectId))) return { refused: "member" };
+  if (forMember && !(await roleOf(email, projectId))) return { refused: "member" };
 
   const now = new Date();
   const open = await rowsOf(

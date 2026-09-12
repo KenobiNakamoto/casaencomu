@@ -89,6 +89,17 @@ export async function invitarAction(_prev: Aviso, formData: FormData): Promise<A
   return { ok: true, msg: "Listo. Copia el enlace y mándaselo." };
 }
 
+/**
+ * A link that lets somebody who is already in the house set a new clave. It is the same invitation
+ * the owner sends to a new person — there is no mail server, so a reset cannot be mailed, and one
+ * mechanism that works beats a second one to keep correct.
+ */
+export async function claveNuevaAction(formData: FormData) {
+  const email = await me();
+  await createInvite(which(formData), email, String(formData.get("correo") ?? ""), true);
+  revalidatePath(PAGE);
+}
+
 export async function revocarAction(formData: FormData) {
   const email = await me();
   await revokeInvite(which(formData), email, String(formData.get("token") ?? ""));
