@@ -44,6 +44,14 @@ pnpm dev                                             # http://localhost:3000
 pnpm test && pnpm lint && pnpm build                 # what must stay green
 ```
 
+To **show** the app rather than work on it, `./showcase.sh` serves it at
+`http://127.0.0.1:3010` with no login in front of it — `AUTH_DEV_EMAIL` skips every door, and
+that variable is read by dead code in a production build, so it cannot follow the image to the
+server. The script binds to the loopback address on purpose: `next dev` binds to every interface
+by default, which would put the family's listings, photographs and notes on whatever network this
+Mac is joined to, with no password. `./showcase.sh --lan` opens it to the network for a phone, and
+says so before it does.
+
 The database and the photo store are created under `./data` on first use. `src/lib/schema.sql` is
 applied at start-up, so there is no migration step.
 
