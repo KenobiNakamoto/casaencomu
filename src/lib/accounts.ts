@@ -115,7 +115,7 @@ export async function createAccount(
   if (problem) return { ok: false, reason: problem };
   if (await accountBy(email)) return { ok: false, reason: "taken" };
   // Counted after the existence check, so a person who already has an account is never told the
-  // house is full. Two people signing up at the same moment can both pass this; the eleventh row
+  // server is full. Two people signing up at the same moment can both pass this; the eleventh row
   // is then refused by the trigger below, which is the only place that can be sure.
   if ((await accountCount()) >= MAX_ACCOUNTS) return { ok: false, reason: "full" };
 

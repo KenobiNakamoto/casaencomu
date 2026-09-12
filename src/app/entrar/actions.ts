@@ -76,7 +76,7 @@ export async function primeraCuentaAction(_prev: Aviso, formData: FormData): Pro
     // Projects with no account behind them belong to whoever signs up first, because there are no
     // accounts to take them from. A server with nothing on it gets a project to start with.
     if ((await listProjects()).length > 0) await adoptProjects(email);
-    else await createProject("Nuestra casa", email);
+    else await createProject("Nuestra búsqueda", email);
   }
   return open(email, "/");
 }
@@ -86,7 +86,7 @@ export const PROBLEMA: Record<string, string> = {
   nameless: "Escribe tu nombre.",
   weak: "La clave necesita 10 caracteres como mínimo.",
   taken: "Ya hay una cuenta con ese correo. Entra con tu clave.",
-  full: "Esta casa ya tiene diez cuentas, que son todas las que caben.",
+  full: "Ya hay diez cuentas, que son todas las que caben.",
 };
 
 export async function salirAction() {

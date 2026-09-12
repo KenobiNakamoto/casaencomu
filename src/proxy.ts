@@ -65,7 +65,7 @@ export async function proxy(request: NextRequest) {
     const email = await previewEmail(request.headers.get("authorization"), password);
     return email
       ? forward(email)
-      : new NextResponse("Escribe tu nombre y la clave de la casa.", {
+      : new NextResponse("Escribe tu nombre y la clave de acceso.", {
           status: 401,
           headers: { "www-authenticate": 'Basic realm="CasaEnComu", charset="UTF-8"' },
         });
