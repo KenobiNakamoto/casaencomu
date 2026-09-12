@@ -192,6 +192,36 @@ async function mustOwn(email: string, projectId: string) {
   }
 }
 
+/**
+ * The first account on a server that already holds projects takes them over.
+ *
+ * Such a server ran before accounts existed: the door was Cloudflare Access or the shared preview
+ * password, and it wrote a membership under whatever address it reported — a real address, or a
+ * made-up one like `ana@casa.local`, or on one occasion a command-line flag. None of those can
+ * ever sign in now, so without this the only person who can own the flats already saved is nobody.
+ *
+ * It is safe **because there are no accounts yet**, which is the caller's job to be sure of: the
+ * first person to reach the login page of a server is the person who put it there. It also drops
+ * the memberships that are not addresses at all, since no account can ever be made for them.
+ */
+export async function adoptProjects(email: string): Promise<number> {
+  const at = new Date().toISOString();
+  const mine = norm(email);
+  const all = await listProjects();
+  await control.batch(
+    [
+      { sql: "DELETE FROM memberships WHERE email NOT LIKE '%@%'", args: [] },
+      ...all.map((p) => ({
+        sql: `INSERT INTO memberships (project_id, email, created_at, role) VALUES (?, ?, ?, 'owner')
+              ON CONFLICT (project_id, email) DO UPDATE SET role = 'owner'`,
+        args: [p.id, mine, at] as never,
+      })),
+    ],
+    "write",
+  );
+  return all.length;
+}
+
 /** Creates the project, its directory and its eight tables. Whoever starts it owns it. */
 export async function createProject(name: string, email: string): Promise<string> {
   await ready;
