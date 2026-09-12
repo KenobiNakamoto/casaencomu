@@ -59,11 +59,23 @@ describe("signing out", () => {
     expect(route).toContain("/cdn-cgi/access/logout");
   });
 
-  it("makes the preview forget the password it has been repeating", async () => {
-    delete process.env.CF_ACCESS_TEAM_DOMAIN;
-    const { GET } = await import("../app/salir/route");
-    const res = GET();
-    expect(res.status).toBe(401);
-    expect(res.headers.get("www-authenticate")).toContain("Basic");
+  // Read rather than run, since signing out now deletes a session row and needs a request scope.
+  it("makes the preview forget the password it has been repeating", () => {
+    const route = read("../app/salir/route.ts");
+    expect(route).toContain("PREVIEW_PASSWORD");
+    expect(route).toContain("status: 401");
+    expect(route).toContain("www-authenticate");
+  });
+
+  it("sends everybody else to the login page", () => {
+    const route = read("../app/salir/route.ts");
+    expect(route).toContain('redirect("/entrar")');
+  });
+
+  it("ends our own session first, whatever door is in front", () => {
+    // The row goes, not only the cookie: a cookie left in a browser must name nothing.
+    const route = read("../app/salir/route.ts");
+    expect(route).toContain("endSession");
+    expect(route).toContain("jar.delete(SESSION_COOKIE)");
   });
 });

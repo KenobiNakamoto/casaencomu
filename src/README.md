@@ -37,9 +37,14 @@ browser reader ─ scripts/capture-agent.mjs ─ real Chrome ─ /api/capture �
 Which layer produced each field is stored in `sources.field_origin_json`, and the detail page
 marks a deduced value «deducido». A field no layer can fill stays empty; that is a result.
 
-**A page is rendered.** `proxy.ts` verifies the Cloudflare Access JWT on every request and sets
+**A page is rendered.** `proxy.ts` reads the session cookie, finds its row in `sessions`, and sets
 `x-user-email`; `currentUser()` reads that header and creates the `users` row on first sight. The
 page then queries SQLite directly — there is no data-access layer and no ORM.
+
+The cookie carries nothing: it is 256 random bits naming a row, so nothing can be forged and
+signing out is deleting that row. Next 16 runs the proxy on Node, which is why it can read the
+database at all. Cloudflare Access and the preview password still work, in that order, but they
+are now outer gates in front of the app's own login rather than the only way it knows anybody.
 
 ## Directories
 
@@ -54,11 +59,12 @@ page then queries SQLite directly — there is no data-access layer and no ORM.
 
 | File | Job | Pure? |
 |---|---|---|
-| `control.ts` | the control database: which projects exist, who belongs to each and as what, the open invitations, and which project a capture token opens. The only shared tables there are. `mustOwn()` is the owner rule, and it throws | no |
+| `control.ts` | the control database: which projects exist, who belongs to each and as what, the open invitations, the accounts and the sessions, and which project a capture token opens. The only shared tables there are. `mustOwn()` is the owner rule, and it throws | no |
 | `notifications.ts` | what reaches one person — their own links being saved and read — and what is waiting for them to look at. «Por revisar» is the absence of a `reviews` row | no |
 | `db.ts` | **one libSQL client per project** — `db` finds the caller's project first, so the connection is the tenant. Also `applySchema()` and the ordered migration chain | no |
 | `schema.sql` | the eight tables, all `CREATE TABLE IF NOT EXISTS`. Version 1; everything after it is a migration in `db.ts` | — |
 | `listing.ts` | the zod schema of an extracted listing, plus the stage, dimension and event vocabularies | yes |
+| `accounts.ts` | the app's own front door: accounts, scrypt passwords, sessions, and the ten-account limit. `proxy.ts` asks it who is calling | no |
 | `auth.ts` | verifies the Access JWT (`jose`); `currentUser()` maps the email to a `users` row | half |
 | `url.ts` | `ALLOWED_HOSTS` (the SSRF guard and the intake gate, six sites), `PORTAL_HOSTS` (the three with an extractor branch), `ALLOWED_IMAGE_HOSTS` (the download allowlist), the listing reference per portal | yes |
 | `extract.ts` | one extractor for every portal: JSON-LD → OpenGraph → the portal's own blob. `extractResult()` says **why** a page gave nothing — `removed`, `blocked` or `unreadable` — and which fields it carried | yes |
