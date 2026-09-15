@@ -1,6 +1,6 @@
 # CasaEnComú — what is done, and what is not
 
-_2026-09-12. This file answers one question: **what is the real state right now?**
+_2026-09-15. This file answers one question: **what is the real state right now?**
 `WORKPLAN.md` holds the plan and the order. This holds the state. When they disagree, this one
 is newer — check the dates._
 
@@ -68,7 +68,7 @@ gitignored on purpose: the address names the machine.
 
 ## 3. Done and merged to `main`
 
-`main` is green in the canonical checkout: **346 tests pass, 3 skip**; `eslint`, `tsc --noEmit`
+`main` is green in the canonical checkout: **714 tests pass, 3 skip, in 51 files**; `eslint`, `tsc --noEmit`
 and `next build` are all clean.
 
 ### The base application, before this round
@@ -460,6 +460,39 @@ and a card over three drifting shapes. `DESIGN.md` § *The front door* is the sp
 
 ---
 
+## 4g. The repository, the documents and a way to show it — 2026-09-15
+
+No behaviour of the app changed in this session. Four things did.
+
+**The documents say what is true — issue #174, PR #175.** `README.md`, `CLAUDE.md` and this file
+still described a Cloudflare Access deployment of a code-complete, undeployed app. They now
+describe the app's own login and the deployment behind it. The exact hostname is deliberately not
+written in any tracked file; it is in `memory/`.
+
+**The repository is clean.** 43 remote branches were deleted, each one proved first to be an
+ancestor of `origin/main`. `origin` now holds `main` and nothing else. The names and their commit
+ids are in `memory/deleted-branches-2026-09-12.txt`, with the command that restores any of them.
+205 commits were searched for the operator's real name and for the Air's hostname: no hit.
+
+**`.next.nosync` is ignored — PR #176.** iCloud does not sync a folder whose name ends `.nosync`,
+so the build output here is `.next.nosync/` with `.next` a symlink to it, and git did not know
+that name. The same rename also broke `pnpm lint`; § 9 has that trap.
+
+**`./showcase.sh` — PR #177.** A way to show the app with no login. It writes `AUTH_DEV_EMAIL`
+into `.env.local` and runs `next dev` bound to **127.0.0.1**, on port 3010. Two facts make the
+script what it is:
+
+- `AUTH_DEV_EMAIL` is read inside a `process.env.NODE_ENV === "development"` branch, which Next
+  replaces at build time. The bypass is dead code in the production image and cannot reach a
+  deployment.
+- `next dev` binds to **every** interface by default. Measured before the script existed: a
+  request from the local network to port 3010 answered **200** and served 23 real listings with
+  their photographs and their notes, with no password. `-H 127.0.0.1` is the whole fix; the same
+  request then answered nothing. `./showcase.sh --lan` opens it on purpose, prints what it is
+  exposing, and waits four seconds first.
+
+---
+
 ## 5. Not done
 
 ### Release A — nothing left
@@ -522,9 +555,19 @@ phone checklists.
 
 Each of these is small, and each one is his to make.
 
-1. **Rotate the Cloudflare API token.** His own terminal echoed it into a session transcript while
-   he was storing it. Nothing has used it since except the tunnel and zone work it was made for,
-   but a token that has been printed should not stay valid.
+1. **Rotate the Cloudflare API token.** Investigated 2026-09-15: **there is no evidence of
+   compromise.** The value is in exactly one file — this project's own session transcript on the
+   Pro — and in nothing else: not shell history, not the working tree, not `git log --all -S`, not
+   anywhere in the iCloud workspace. The account shows nothing unexpected: **zero DNS records** in
+   the zone, and one tunnel, healthy, made on the day it was made. The audit log could not be
+   read, because this token does not carry the permission to read it; the dashboard shows it.
+
+   Rotation is therefore hygiene, not an incident: a transcript is resent as context on every
+   turn, so the value left the machine in plaintext. **It has not been rotated** — the Keychain
+   item `cloudflare-casa` is unchanged since 2026-09-12 10:15:25Z — and it **never expires**. A
+   replacement needs three permissions, scoped to the one account and the one zone:
+   Account · Cloudflare Tunnel · Edit, Zone · DNS · Edit, Zone · Zone · Read. The running tunnel
+   uses its own credentials file, not this token, so rotating it breaks nothing.
 2. **Enable HTTPS certificates on the tailnet?** One toggle at the Tailscale admin console,
    DNS → HTTPS Certificates. It turns the preview into a real `https://` address with a valid
    certificate. Two minutes of work after that. Less urgent now that the domain exists.
@@ -640,12 +683,21 @@ Two of these cost real time. Read them before you debug something that is not yo
 
   So: run `vitest` and `eslint` in the canonical checkout; run `next build` and `tsc` in a
   worktree, where `pnpm install` makes a real directory. Deployment needs no workaround.
+- **`pnpm lint` reported 552 errors that were not yours.** Same cause, other end: the build output
+  here is `.next.nosync/` with `.next` a symlink to it, and `eslint.config.mjs` ignored `.next/**`
+  only, so eslint walked into generated code. CI never saw it, because CI lints before it builds.
+  Fixed 2026-09-15 — the config ignores `.next.nosync/**` as well. If a lint run ever names a file
+  you did not write, look at what the ignore list does **not** cover on a `.nosync` Mac.
 
 ---
 
 ## 10. How to pick up the next piece of work
 
-1. Read `CLAUDE.md`, `DESIGN.md`, this file, and `WORKPLAN.md` § 4 (the agent contract).
+1. Read `CLAUDE.md`, `DESIGN.md`, this file, and `WORKPLAN.md` § 4 (the agent contract). Then
+   `memory/identity.md` and the tail of `memory/journal.md` — they are gitignored, they hold the
+   hostname, the domain and the Keychain item, and they are where the last session says what it
+   left. `memory/decisions.md` holds why the app has its own login and why the DNS record is not
+   published.
 2. Take the next eligible package from § 5 above. **There is none left**: every package of
    Release A and Release B is merged, and PIP-12 and PIP-15 are deferred by the proposal itself.
    What is open is in § 6, and all of it is Kenobi's or needs a real phone.
@@ -654,3 +706,7 @@ Two of these cost real time. Read them before you debug something that is not yo
 5. Implement only that package. Add tests that fail if the behaviour breaks.
 6. Run the checks **in the canonical checkout** before opening the pull request.
 7. Record what you did not verify. Do not mark a visual check passed from reading source.
+8. Close the session by appending a dated entry to `memory/journal.md`.
+
+To **show** the app rather than work on it: `./showcase.sh` serves it with no login at
+http://127.0.0.1:3010, on this Mac only.
