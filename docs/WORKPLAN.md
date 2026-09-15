@@ -9,9 +9,14 @@ this file holds the who, the order, and the done-when. Load into GitHub with § 
 **`docs/STATUS.md` is now the state of the project: what is done, what is not, what is blocked
 and on whom. Read that first.** This file keeps the plan, the file ownership and the order.
 
-What follows is the status as it stood on 2026-09-07, kept because the two lists below — the
-three items only Kenobi can do, and the lessons — are still true and still cost time. Anything
-here that disagrees with `STATUS.md` is out of date.
+What follows is the status as it stood on 2026-09-07, kept for the lessons at the end, which are
+still true and still cost time. Anything here that disagrees with `STATUS.md` is out of date.
+
+**The list of owner-only items below is one of those things: it is out of date.** #1 is done (the
+domain is bought and its zone is on Cloudflare), #2 is not needed any more (the app has its own
+login since 2026-09-12, so Zero Trust is optional), and #5 is not needed either (members arrive by
+invitation from inside the app). One owner-only item is left — make the first account — and
+`STATUS.md` § 6 is where it lives.
 
 ### Done
 
@@ -25,7 +30,7 @@ here that disagrees with `STATUS.md` is out of date.
   `docker compose` answers (5.5.0) and `cloudflared` is installed. `/Volumes/TimeMachine` is
   mounted into the Colima VM and already holds `casaencomu`. `~/srv/casaencomu` is empty.
 
-### Open, and only Kenobi can do them
+### Open, and only Kenobi can do them — **superseded, see `STATUS.md` § 6**
 
 | # | What | Where |
 |---|---|---|

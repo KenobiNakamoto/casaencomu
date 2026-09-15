@@ -9,6 +9,9 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // On a Mac inside iCloud the build output is `.next.nosync/` with `.next` a symlink to it,
+    // so the line above never matches and `pnpm lint` reports 552 errors in generated code.
+    ".next.nosync/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
