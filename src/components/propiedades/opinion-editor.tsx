@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import { publishOpinionAction, saveDraftAction, withdrawOpinionAction } from "@/app/propiedades/actions";
 import { Panel } from "@/components/panel";
 import { DIMENSION_LABELS, DIMENSIONS, type Dimension } from "@/lib/listing";
@@ -31,6 +31,47 @@ function initial(mine: Mine): OpinionInput {
   }
   return { ...EMPTY, basis: "listing" };
 }
+
+/**
+ * This tab's copy of what is being typed, so a reload does not cost somebody their words.
+ *
+ * The comment box has had this since PIP-11 (#146); the editor, which holds 1500 characters and six
+ * scores, had nothing — and a telephone discards a background tab whenever it needs the memory.
+ * It is `sessionStorage`, so it belongs to this tab alone: it never reaches the server, the
+ * family, or another tab of the same browser (doc 04 § 3).
+ *
+ * The stored copy carries the versions it was written against. A draft saved on another device
+ * moves the revision, so the copy is then stale and is ignored rather than allowed to overwrite
+ * newer work.
+ */
+const keep = {
+  key: (propertyId: string) => `casa:opinion:${propertyId}`,
+  read(propertyId: string, mine: Mine): OpinionInput | null {
+    try {
+      const raw = sessionStorage.getItem(keep.key(propertyId));
+      if (!raw) return null;
+      const held = JSON.parse(raw);
+      if (held?.version !== mine.version || held?.revision !== mine.revision) return null;
+      return held.input as OpinionInput;
+    } catch {
+      // A browser that refuses storage still has a working editor.
+      return null;
+    }
+  },
+  write(propertyId: string, mine: Mine, input: OpinionInput) {
+    try {
+      sessionStorage.setItem(
+        keep.key(propertyId),
+        JSON.stringify({ input, version: mine.version, revision: mine.revision }),
+      );
+    } catch {}
+  },
+  clear(propertyId: string) {
+    try {
+      sessionStorage.removeItem(keep.key(propertyId));
+    } catch {}
+  },
+};
 
 const sameInput = (a: OpinionInput, b: OpinionInput) =>
   a.stance === b.stance &&
@@ -63,14 +104,35 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
   const [leaving, setLeaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [pending, start] = useTransition();
+  /**
+   * Whether this tab is holding words that reached no server.
+   *
+   * `useSyncExternalStore` rather than an effect: it gives the server `false` and the browser the
+   * real answer, so the first paint matches on both sides and nothing is stored twice. It is the
+   * same reason `use-theme.ts` reads the theme this way. Nothing subscribes, because only this
+   * component writes the value, and its own renders re-read it.
+   */
+  const held = useSyncExternalStore(
+    () => () => {},
+    () => keep.read(propertyId, mine) !== null,
+    () => false,
+  );
 
   const dirty = !sameInput(input, saved);
   const set = <K extends keyof OpinionInput>(key: K, value: OpinionInput[K]) => {
-    setInput((i) => ({ ...i, [key]: value }));
+    setInput((i) => {
+      const next = { ...i, [key]: value };
+      keep.write(propertyId, mine, next);
+      return next;
+    });
     setNote(null);
   };
   const setScore = (dim: Dimension, score: number | null) => {
-    setInput((i) => ({ ...i, scores: { ...i.scores, [dim]: score } }));
+    setInput((i) => {
+      const next = { ...i, scores: { ...i.scores, [dim]: score } };
+      keep.write(propertyId, mine, next);
+      return next;
+    });
     setNote(null);
   };
 
@@ -89,6 +151,8 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
         });
         return;
       }
+      // The words are on the server now, so the tab's copy has nothing left to protect.
+      keep.clear(propertyId);
       setSaved(input);
       setLeaving(false);
       setNote({ tone: "ok", text: done });
@@ -103,7 +167,9 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
         <button
           type="button"
           onClick={() => {
-            setInput(initial(mine));
+            // The tab's copy wins over what the server last heard: it is the newer of the two,
+            // and it is the one the person actually typed.
+            setInput(keep.read(propertyId, mine) ?? initial(mine));
             setSaved(initial(mine));
             setNote(null);
             setLeaving(false);
@@ -115,11 +181,13 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
           {published ? "Editar mi opinión" : "Publicar opinión"}
         </button>
         <p className="text-sm text-muted">
-          {published
-            ? `Opinión publicada · ${STANCE_LABELS[published.stance ?? "dudas"]}`
-            : mine.draft
-              ? "Borrador guardado · solo tú"
-              : "Todavía no has opinado"}
+          {held
+            ? "Cambios sin guardar · solo en esta pestaña"
+            : published
+              ? `Opinión publicada · ${STANCE_LABELS[published.stance ?? "dudas"]}`
+              : mine.draft
+                ? "Borrador guardado · solo tú"
+                : "Todavía no has opinado"}
         </p>
       </div>
 
@@ -314,6 +382,7 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
                   <button
                     type="button"
                     onClick={() => {
+                      keep.clear(propertyId);
                       setInput(saved);
                       setLeaving(false);
                       setOpen(false);

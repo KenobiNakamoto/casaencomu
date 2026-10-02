@@ -12,7 +12,7 @@ import { availabilityLine, AVAILABILITY_LABEL, isStale, propertyAvailability, ty
 import { CompareToggle, CompareTray } from "@/components/comparar/controls";
 import { currentUser } from "@/lib/auth";
 import { COMMENTS_SQL, thread, visible, type CommentRow } from "@/lib/comments";
-import { db } from "@/lib/db";
+import { currentProjectId, db } from "@/lib/db";
 import { backHref } from "@/lib/filters";
 import { DIMENSION_LABELS, DIMENSIONS, STAGE_LABELS, type Stage } from "@/lib/listing";
 import { markReviewed } from "@/lib/notifications";
@@ -149,6 +149,8 @@ export default async function PropiedadPage({
   // so a hand-edited value can only ever produce a list URL (F14).
   const desde = one(sp.desde) ?? "";
   const faltan = Number(one(sp.faltan) ?? 0);
+  /** Whose opinion «Responder» was pressed on. Checked against the published authors below. */
+  const responder = one(sp.responder) ?? null;
   const user = await currentUser();
 
   // ponytail: one batch, eight statements, no joins to untangle
@@ -191,7 +193,27 @@ export default async function PropiedadPage({
   const memberRows = members.rows as unknown as Member[];
   const opinionRows = opinions.rows as unknown as PublishedOpinion[];
   const silent = memberRows.filter((u) => !opinionRows.some((o) => o.user_id === u.id));
-  const m = matrix(ratingRows, memberRows.map((u) => u.id), DIMENSIONS);
+  /**
+   * The table is «who put numbers on this home», not «everybody with an account». A person who
+   * has never scored anything used to take a whole column of dashes: with seven accounts on the
+   * server and ten allowed, that is what makes the grid unreadable on a telephone.
+   */
+  const scoringMembers = memberRows.filter((u) => ratingRows.some((r) => r.user_id === u.id));
+  const m = matrix(ratingRows, scoringMembers.map((u) => u.id), DIMENSIONS);
+  /**
+   * Answering one person: the conversation, with them already chosen. Every other parameter is
+   * carried through, so the back link still knows which list the reader came from.
+   */
+  const projectId = await currentProjectId();
+  /** That person, everywhere: what they said about every home in this project. */
+  const personHref = (userId: string) => `/proyectos/${projectId}/persona/${userId}`;
+  const replyHref = (userId: string) => {
+    const q = new URLSearchParams();
+    if (desde) q.set("desde", desde);
+    if (estado) q.set("estado", estado);
+    q.set("responder", userId);
+    return `/propiedades/${p.id}?${q}#conversacion`;
+  };
   const family = familyAverage(ratingRows);
   const perM2 = p.price_eur !== null && p.area_m2 ? fmtEur(Math.round(p.price_eur / p.area_m2)) : null;
 
@@ -402,14 +424,23 @@ export default async function PropiedadPage({
           <div className="space-y-4">
             {/* What each person wrote comes before any grid of numbers: the numbers summarise
                 this, not the other way round (doc 04 § 5). */}
-            <OpinionCards opinions={opinionRows} ratings={ratingRows} readerId={user.id} silent={silent} />
-            <Disagreements opinions={opinionRows} ratings={ratingRows} readerId={user.id} />
+            <OpinionCards opinions={opinionRows} ratings={ratingRows} readerId={user.id} silent={silent} replyHref={replyHref} personHref={personHref} />
+            <Disagreements opinions={opinionRows} ratings={ratingRows} readerId={user.id} replyHref={replyHref} />
+            {ratingRows.length === 0 ? (
+              // Six rows of dashes say nothing that this one line does not say better.
+              <p className="bento text-sm text-muted">
+                Nadie ha puntuado los aspectos todavía. Las puntuaciones se ponen en «Tu opinión», y son opcionales.
+              </p>
+            ) : (
             <div className="bento overflow-x-auto">
               <table className="w-full text-sm">
+                <caption className="mb-2 text-left text-xs text-muted">
+                  Solo las personas que han puntuado. Una opinión sin puntuaciones se lee arriba.
+                </caption>
                 <thead>
                   <tr>
                     <th className={`${cell} text-left font-medium text-muted`}>Aspecto</th>
-                    {memberRows.map((u) => (
+                    {scoringMembers.map((u) => (
                       <th key={u.id} className={`${cell} text-center font-medium ${u.id === user.id ? "text-ink" : "text-muted"}`}>
                         {u.id === user.id ? "Tú" : u.name}
                       </th>
@@ -425,7 +456,7 @@ export default async function PropiedadPage({
                         <th scope="row" className={`${cell} text-left font-normal text-body`}>
                           {DIMENSION_LABELS[dim]}
                         </th>
-                        {memberRows.map((u) => (
+                        {scoringMembers.map((u) => (
                           <td key={u.id} className={`${cell} text-center`}>
                             {m[u.id][dim] ?? "—"}
                           </td>
@@ -438,7 +469,7 @@ export default async function PropiedadPage({
                     <th scope="row" className={`${cell} text-left font-medium`}>
                       Media
                     </th>
-                    {memberRows.map((u) => (
+                    {scoringMembers.map((u) => (
                       <td key={u.id} className={`${cell} text-center font-medium`}>
                         {fmtScore(memberAverage(ratingRows, u.id))}
                       </td>
@@ -451,6 +482,7 @@ export default async function PropiedadPage({
                 </tbody>
               </table>
             </div>
+            )}
           </div>
 
           <div id="conversacion" className="bento flex flex-col scroll-mt-[calc(var(--header-h)+16px)]">
@@ -462,6 +494,7 @@ export default async function PropiedadPage({
               nodes={conversation}
               viewerId={user.id}
               voices={opinionRows.map((o) => ({ id: o.user_id, name: o.name }))}
+              about={responder}
             />
           </div>
         </div>

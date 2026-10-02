@@ -77,6 +77,7 @@ function Composer({
   propertyId,
   parentId,
   voices,
+  about,
   autoFocus,
   onDone,
   label,
@@ -85,6 +86,8 @@ function Composer({
   propertyId: string;
   parentId: string | null;
   voices: Voice[];
+  /** Whose opinion this box was opened to answer, from «Responder» on their card. */
+  about?: string | null;
   autoFocus?: boolean;
   onDone?: () => void;
   label: string;
@@ -141,7 +144,14 @@ function Composer({
         {voices.length > 0 && (
           <label className="flex items-center gap-1.5 text-xs text-muted">
             Sobre la opinión de
-            <select name="sobre" defaultValue="" className="h-8 rounded-md border border-control-border bg-raised px-2 text-xs text-ink">
+            {/* `key`: the person arrives in the URL, and React keeps a mounted <select> on its own
+                value rather than re-reading a changed defaultValue. */}
+            <select
+              key={about ?? ""}
+              name="sobre"
+              defaultValue={about ?? ""}
+              className="h-8 rounded-md border border-control-border bg-raised px-2 text-xs text-ink"
+            >
               <option value="">nadie en concreto</option>
               {voices.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -328,13 +338,20 @@ export function Conversation({
   nodes,
   viewerId,
   voices,
+  about,
 }: {
   propertyId: string;
   nodes: Node[];
   viewerId: string;
   voices: Voice[];
+  /**
+   * Whose opinion the reader pressed «Responder» on. It arrives in the URL, so the link works
+   * with no JavaScript of ours and the state survives a reload.
+   */
+  about?: string | null;
 }) {
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const answering = voices.find((v) => v.id === about) ?? null;
 
   return (
     <div className="flex min-h-0 flex-col gap-4">
@@ -380,12 +397,21 @@ export function Conversation({
       )}
 
       <div className="border-t border-hairline-soft pt-4">
+        {/* The reader arrived here from somebody's opinion. Saying whose, above the box, is what
+            tells them the link did something: the chooser below is one line of small print. */}
+        {answering && (
+          <p className="mb-2 text-xs text-muted">
+            Respondiendo a la opinión de <span className="font-medium text-ink">{answering.name}</span>
+          </p>
+        )}
         <Composer
           propertyId={propertyId}
           parentId={null}
           voices={voices}
+          about={about}
+          autoFocus={Boolean(answering)}
           label="Comentar"
-          placeholder="Qué te gusta, qué te preocupa y qué hay que comprobar."
+          placeholder={answering ? `Qué le dirías a ${answering.name}…` : "Qué te gusta, qué te preocupa y qué hay que comprobar."}
         />
       </div>
     </div>

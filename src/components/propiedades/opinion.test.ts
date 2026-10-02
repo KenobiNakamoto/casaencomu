@@ -13,6 +13,8 @@ const form = read("./opinion-form.tsx");
 const actions = read("../../app/propiedades/actions.ts");
 const editor = read("./opinion-editor.tsx");
 const panel = read("../panel.tsx");
+const cards = read("./opinion-cards.tsx");
+const chat = read("./conversation.tsx");
 
 const at = (marker: string) => {
   const i = page.indexOf(marker);
@@ -281,5 +283,78 @@ describe("what the family thinks", () => {
     expect(chat).toContain("<Conversation");
     // The page renders none of it itself any more: replies need state, and state needs a client.
     expect(chat).not.toContain("flex-col-reverse");
+  });
+});
+
+/**
+ * Answering one person, and the table staying readable on a telephone (2026-09-29).
+ *
+ * The opinion and the conversation were built as two separate things, and nothing joined them:
+ * you read what somebody thought, and then you scrolled past a table to a box and looked for
+ * their name in a chooser. Document 04 § 5 asks for «Responder» on the card itself.
+ */
+describe("answering the person whose opinion you just read", () => {
+  it("offers a way to answer every author but yourself", () => {
+    expect(cards).toContain("Responder a {o.name}");
+    // Answering your own opinion is a comment, not a reply: the card offers nothing.
+    expect(cards).toContain("{o.user_id !== readerId && (");
+  });
+
+  it("carries the person, and lands on the conversation", () => {
+    expect(page).toContain('q.set("responder", userId)');
+    expect(page).toContain("#conversacion");
+    // The list the reader came from survives the trip, so the back link still works.
+    expect(page).toContain('if (desde) q.set("desde", desde)');
+  });
+
+  it("opens the composer with that person already chosen", () => {
+    expect(chat).toContain('defaultValue={about ?? ""}');
+    expect(chat).toContain("Respondiendo a la opinión de");
+    // A mounted <select> keeps its own value, so the person in the URL needs a new one.
+    expect(chat).toContain('key={about ?? ""}');
+  });
+
+  it("ends the disagreement paragraph with the person to ask", () => {
+    // «Ana puntúa 1, tú puntúas 5.» used to be the last word on the subject.
+    expect(cards).toContain("Preguntar a {name(ask)}");
+    expect(cards).toContain("const other = (g:");
+  });
+});
+
+describe("the aspect table is who scored, not who has an account", () => {
+  it("draws a column only for a person who scored something", () => {
+    // Ten accounts are allowed and seven exist. A column of six dashes each makes the grid
+    // unreadable at 390 px, and the page is read on telephones.
+    expect(page).toContain("const scoringMembers = memberRows.filter((u) => ratingRows.some((r) => r.user_id === u.id))");
+    const table = page.slice(at("{/* ---- band 3"), at("{/* ---- band 4"));
+    expect(table).not.toContain("memberRows.map");
+    expect(table).toContain("scoringMembers.map");
+  });
+
+  it("says so, and draws nothing at all when nobody has scored", () => {
+    expect(page).toContain("Solo las personas que han puntuado");
+    expect(page).toContain("{ratingRows.length === 0 ? (");
+    expect(page).toContain("Nadie ha puntuado los aspectos todavía");
+  });
+});
+
+describe("the editor does not lose what somebody typed", () => {
+  it("keeps it in this tab, as the comment box already did", () => {
+    expect(editor).toContain("sessionStorage.setItem");
+    expect(editor).toContain("casa:opinion:");
+    // Read on opening, so the words come back after a reload or a telephone dropping the tab.
+    expect(editor).toContain("keep.read(propertyId, mine) ?? initial(mine)");
+    expect(editor).toContain("Cambios sin guardar · solo en esta pestaña");
+  });
+
+  it("ignores a copy that a newer save has overtaken", () => {
+    // A draft saved on another device moves the revision. The tab's older copy must not win.
+    expect(editor).toContain("if (held?.version !== mine.version || held?.revision !== mine.revision) return null;");
+  });
+
+  it("forgets it once the words are on the server", () => {
+    expect(editor).toContain("keep.clear(propertyId);");
+    // The server has no sessionStorage: reading it during render would break hydration.
+    expect(editor).toContain("useSyncExternalStore");
   });
 });
