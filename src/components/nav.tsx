@@ -39,7 +39,7 @@ export default async function Nav() {
     <header className="sticky top-0 z-20 border-b border-hairline bg-raised">
       <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:h-[72px] lg:px-14">
         <Link href="/propiedades" className="shrink-0">
-          <Marca className="text-xl" />
+          <Marca className="text-xl" nameClass="max-[359px]:hidden" />
         </Link>
         <NavLinks items={items} />
         <div className="ml-auto flex items-center gap-3 lg:ml-0">

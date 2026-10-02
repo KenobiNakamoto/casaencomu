@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Panel } from "@/components/panel";
 import { input } from "@/components/propiedades/format";
@@ -87,7 +88,13 @@ export function ProjectCard({
   return (
     <li className="flex flex-col rounded-card border border-hairline bg-raised p-5 shadow-lift">
       <div className="flex items-start gap-2">
-        <h2 className="min-w-0 flex-1 text-lg font-medium leading-snug text-ink">{p.name}</h2>
+        {/* The name opens the project; the three dots change it. Reading and configuring are two
+            different errands, and the card used to offer only the second one. */}
+        <h2 className="min-w-0 flex-1 text-lg font-medium leading-snug text-ink">
+          <Link href={`/proyectos/${p.id}`} className="underline-offset-4 hover:underline">
+            {p.name}
+          </Link>
+        </h2>
         <button
           type="button"
           onClick={() => setOpen(true)}
