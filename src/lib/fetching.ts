@@ -38,7 +38,7 @@ export type Fetched = {
 };
 
 /** Reads at most `maxBytes`, then cancels. Works when the server sends no `content-length`. */
-async function readCapped(res: Response, maxBytes: number): Promise<{ body: Buffer; truncated: boolean }> {
+export async function readCapped(res: Pick<Response, "headers" | "body">, maxBytes: number): Promise<{ body: Buffer; truncated: boolean }> {
   if (Number(res.headers.get("content-length")) > maxBytes) {
     await res.body?.cancel();
     return { body: Buffer.alloc(0), truncated: true };

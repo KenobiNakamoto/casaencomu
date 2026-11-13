@@ -4,6 +4,7 @@ import { runEnrichment } from "@/lib/enrich";
 import { extractResult, rawOf } from "@/lib/extract";
 import { IMPORT_DEADLINE_MS, MAX_CAPTURE_BYTES, pendingRecord, successLocation } from "@/lib/intake";
 import { inProject } from "@/lib/db";
+import { readCapped } from "@/lib/fetching";
 import { save } from "@/lib/save";
 import { normalizeUrl } from "@/lib/url";
 
@@ -41,9 +42,12 @@ const Form = z.object({
  */
 export async function POST(req: Request) {
   // The body is read before it is parsed, so an oversized capture is refused, not buffered whole.
-  const body = await req.arrayBuffer();
-  if (body.byteLength > MAX_CAPTURE_BYTES) return fail(413, "La captura es demasiado grande");
-  const fd = await new Response(body, { headers: { "content-type": req.headers.get("content-type") ?? "" } }).formData();
+  const { body, truncated } = await readCapped(req, MAX_CAPTURE_BYTES);
+  if (truncated) return fail(413, "La captura es demasiado grande");
+  let fd: FormData;
+  try {
+    fd = await new Response(new Uint8Array(body), { headers: { "content-type": req.headers.get("content-type") ?? "" } }).formData();
+  } catch { return fail(400, "Datos del marcador incompletos"); }
   // The token names the project as well as the member, so everything below reads and writes
   // that project's database and nothing else.
   const who = await captureIdentity(String(fd.get("token") ?? ""));

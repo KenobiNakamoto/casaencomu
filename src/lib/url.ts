@@ -95,12 +95,18 @@ const REF: Record<Exclude<Portal, "generic">, RegExp> = {
 };
 
 
-/** Lowercase host, no `www.`, no query or fragment, no trailing slash. Throws on an invalid URL. */
+/** Canonical listing paths, lowercase host, no tracking query, fragment or trailing slash. */
 export function normalizeUrl(url: string): { portal: Portal; portalRef: string | null; normalized: string } {
   const u = new URL(url);
   const host = hostOf(url);
   const portal: Portal = PORTAL_HOSTS.has(host) ? (host.split(".")[0] as Portal) : "generic";
-  const path = u.pathname.replace(/\/+$/, "");
+  let path = u.pathname.replace(/\/+$/, "");
+  // WhatsApp shares can point at one photo, or use Vivalta's long search-context path.
+  // Both still describe the same home as the plain listing link already in the database.
+  const photo = host === "idealista.com" && path.match(/^\/inmueble\/(\d+)\/foto\/\d+$/);
+  if (photo) path = `/inmueble/${photo[1]}`;
+  const vivalta = host === "vivalta.es" && path.match(/^\/es\/(?:.*\/)?ref-(\d+_\d+)$/);
+  if (vivalta) path = `/es/ref-${vivalta[1]}`;
   const portalRef = portal === "generic" ? null : (path.match(REF[portal])?.[1] ?? null);
   return { portal, portalRef, normalized: `${u.protocol}//${host}${path}` };
 }

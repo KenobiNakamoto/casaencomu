@@ -6,18 +6,13 @@ import type { Aviso } from "@/app/entrar/actions";
 import { crearCuentaAction } from "./actions";
 
 
-/**
- * One form, two jobs. A new person gives a name and a clave; somebody who already has an account
- * gives only a clave, because their name is already known and this link is a reset.
- */
+/** A new invited account. Existing accounts use the normal sign-in form. */
 export function CuentaNuevaForm({
   token,
   email,
-  nueva,
 }: {
   token: string;
   email: string;
-  nueva: boolean;
 }) {
   const [aviso, action, pending] = useActionState<Aviso, FormData>(crearCuentaAction, null);
   return (
@@ -39,14 +34,12 @@ export function CuentaNuevaForm({
           aria-label="Correo de la invitación"
         />
       </label>
-      {nueva && (
-        <label className="block space-y-2">
-          <span className="text-sm text-muted">Tu nombre</span>
-          <input name="nombre" required maxLength={40} autoComplete="name" className={input} />
-        </label>
-      )}
       <label className="block space-y-2">
-        <span className="text-sm text-muted">{nueva ? "Tu clave" : "Clave nueva"}</span>
+        <span className="text-sm text-muted">Tu nombre</span>
+        <input name="nombre" required maxLength={40} autoComplete="name" className={input} />
+      </label>
+      <label className="block space-y-2">
+        <span className="text-sm text-muted">Tu clave</span>
         <input
           name="clave"
           type="password"
@@ -62,7 +55,7 @@ export function CuentaNuevaForm({
         disabled={pending}
         className="h-12 w-full rounded-lg bg-ink px-6 text-base font-medium text-canvas transition hover:opacity-90 disabled:opacity-60"
       >
-        {pending ? "Un momento…" : nueva ? "Crear la cuenta y entrar" : "Guardar la clave y entrar"}
+        {pending ? "Un momento…" : "Crear la cuenta y entrar"}
       </button>
     </form>
   );

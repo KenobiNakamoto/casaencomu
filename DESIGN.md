@@ -102,8 +102,8 @@ the photograph back to the mosaic, and the mosaic back to the page.
 
 ## The front door
 
-`/entrar` and `/invitacion` are the only two pages a person can reach with no session, and the
-only two with no header. They share one shell, `.puerta`: the mark and the line **«Preparaos para
+`/entrar`, `/recuperar` and `/invitacion` are the pages a person can reach with no session,
+and they have no header. They share one shell, `.puerta`: the mark and the line **«Preparaos para
 encontrar vuestra casa, juntos.»** centred over a translucent card.
 
 The ground moves. Three shapes — `--accent`, `--action-bg`, `--secondary` — are blurred 64 px past

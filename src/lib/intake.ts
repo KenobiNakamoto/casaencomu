@@ -36,13 +36,13 @@ export type PendingReason = "blocked" | "removed" | "unreadable" | "offline" | "
 export function pendingNote(reason: PendingReason, url: string): string {
   switch (reason) {
     case "blocked":
-      return `Guardado. ${siteName(url)} no deja leerlo desde el servidor; se leerá en un navegador.`;
+      return `Guardado. ${siteName(url)} no deja leerlo desde el servidor. Abre el anuncio y usa el marcador de Ajustes.`;
     case "removed":
       return "Guardado. El anuncio ya no está publicado.";
     case "unreadable":
-      return "Guardado. No se pudo leer la página; se reintentará.";
+      return "Guardado. No se pudo leer la página. Puedes completarla con el marcador de Ajustes.";
     case "offline":
-      return "Guardado. No se pudo descargar la página; se reintentará.";
+      return "Guardado. No se pudo descargar la página. Puedes volver a pegar el enlace o usar el marcador de Ajustes.";
     case "offsite":
       return "Guardado. El enlace lleva fuera del portal; no se pudo leer.";
   }

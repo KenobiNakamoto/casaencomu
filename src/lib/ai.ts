@@ -10,6 +10,7 @@ import { z } from "zod";
 const BASE = process.env.AI_BASE_URL ?? "https://api.anthropic.com";
 const MODEL = process.env.AI_MODEL ?? "claude-sonnet-5";
 const MAX_TOKENS = 2048;
+export const AI_TIMEOUT_MS = 90_000;
 
 /** No key, no AI. Both fill layers are skipped and the record says what is still empty. */
 export const aiReady = () => !!process.env.ANTHROPIC_API_KEY;
@@ -22,8 +23,8 @@ type Block =
 
 /**
  * Asks for one object shaped like `schema` and returns it, or null. Null is an ordinary answer
- * here: no key, a refusal, a timeout, a body that does not parse. Every caller must already
- * handle "this layer found nothing", so a failure needs no separate path.
+ * means the request failed or returned invalid output and must be retried. A successful empty
+ * reading is a schema-valid object with null fields, never null itself.
  */
 export async function ask<T extends z.ZodType>(opts: {
   system: string;
@@ -62,7 +63,7 @@ export async function ask<T extends z.ZodType>(opts: {
         ],
         tool_choice: { type: "tool", name: opts.name },
       }),
-      signal: opts.signal,
+      signal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(AI_TIMEOUT_MS)]) : AbortSignal.timeout(AI_TIMEOUT_MS),
     });
   } catch {
     return null; // network error, or the caller's deadline fired

@@ -9,7 +9,7 @@ let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 const unauthorized = () => NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
 /** The two pages a person must reach before they have a session, or they can never get one. */
-const OPEN = (path: string) => path === "/entrar" || path.startsWith("/invitacion/");
+const OPEN = (path: string) => path === "/entrar" || path === "/recuperar" || path.startsWith("/invitacion/");
 
 export async function proxy(request: NextRequest) {
   // Always overwritten: an incoming x-user-email is never trusted.
@@ -38,7 +38,7 @@ export async function proxy(request: NextRequest) {
   // No session, and nothing else configured to say who this is: send them to the login page and
   // remember where they wanted to go. An API call has nowhere to be sent, so it is refused.
   if (!team && !process.env.PREVIEW_OPEN_AS && !process.env.PREVIEW_PASSWORD) {
-    if (OPEN(path)) return NextResponse.next();
+    if (OPEN(path)) return forward("");
     if (path.startsWith("/api/")) return unauthorized();
     const to = new URL("/entrar", request.url);
     if (path !== "/") to.searchParams.set("a", path + request.nextUrl.search);

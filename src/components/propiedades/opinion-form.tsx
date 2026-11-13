@@ -2,11 +2,13 @@
 
 import { useActionState, type ReactNode } from "react";
 import { stageAction, type StageState } from "@/app/propiedades/actions";
+import type { DraftOwner } from "@/lib/draft-storage";
 import { OpinionEditor } from "@/components/propiedades/opinion-editor";
 import { STAGE_LABELS, STAGES } from "@/lib/listing";
 import { type Mine } from "@/lib/opinion-input";
 
 type Props = {
+  owner: DraftOwner;
   propertyId: string;
   /** The author's own opinion and draft, for the editor this box opens. */
   mine: Mine;
@@ -25,7 +27,7 @@ type Props = {
  * thread has to stand beside it (#146). What is left is the one shared decision — the stage — and
  * the version check that stops two people moving it past each other.
  */
-export function OpinionForm({ propertyId, mine, stage, version, children }: Props) {
+export function OpinionForm({ propertyId, mine, stage, version, children, owner }: Props) {
   const [state, action, pending] = useActionState<StageState, FormData>(stageAction, null);
   const failed = state && !state.ok ? state : null;
 
@@ -34,7 +36,7 @@ export function OpinionForm({ propertyId, mine, stage, version, children }: Prop
       {/* ---- your opinion, which opens over the page ---- */}
       <div className="bento flex flex-col gap-3">
         <p className="text-sm font-semibold text-ink">Tu opinión</p>
-        <OpinionEditor propertyId={propertyId} mine={mine} />
+        <OpinionEditor owner={owner} propertyId={propertyId} mine={mine} />
       </div>
 
       {/* ---- the state of the home, and the one decision the family shares ---- */}

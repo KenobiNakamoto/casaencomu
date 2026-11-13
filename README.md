@@ -1,5 +1,13 @@
 # CasaEnComú
 
+**Unreleased safety changes (2026-11-12):** first-account setup requires `CASA_SETUP_TOKEN` (at
+least 32 random characters). Generate it with `openssl rand -hex 32`, configure it on the server,
+enter it once at `/entrar`, then remove it from the environment. Existing accounts do not need
+it. Invitations grant project membership only. Password recovery needs a separate verified flow;
+project owners can no longer reset another person's global account. See `docs/STATUS.md` for
+validation and remaining release work.
+
+
 A private web app for one family's home search in Barcelona. A member adds a listing from
 Idealista, Fotocasa, Habitaclia and three smaller portals; the app keeps the facts and the
 photos, removes duplicates, maps them, compares them, lets every member rate and comment, and
@@ -100,8 +108,8 @@ phone / laptop ──HTTPS──▶ Cloudflare Tunnel ──▶ cloudflared on t
   an opaque 256-bit id and a row in `control.db`, so deleting the row ends the session on the next
   request. Next 16 runs `src/proxy.ts` on Node, which is what lets the door be a database lookup
   instead of a signed token. Ten accounts is the ceiling. There is no open sign-up: after the
-  first account, every account arrives through an invitation, and the same link sets a new clave
-  for somebody who has forgotten theirs. Cloudflare Access still works if `CF_ACCESS_*` is set —
+  first account, every account arrives through an invitation. Existing accounts must sign in
+  before accepting; an invitation never resets a password. Cloudflare Access still works if `CF_ACCESS_*` is set —
   it becomes an outer gate in front of this login, not a replacement for it.
 - **Intake has two paths.** A pasted URL is fetched by the server, but only for hosts in
   `ALLOWED_HOSTS` — that allowlist is the guard against server-side request forgery. Everything
@@ -136,3 +144,10 @@ list, who owns which files, and the order they must run in are all in `docs/WORK
 
 Private repository. The interface language is Spanish and is hard-coded; there is no translation
 layer, and listing text stays in whatever language the advertisement used.
+
+## Safety and operations release — 2026-11-12
+
+Release `readiness-20261112` is deployed over tailnet HTTPS. Account recovery uses a code saved
+from Ajustes; invitation links never reset passwords. Complete encrypted database/photo backups
+and verified restore/rollback procedures are in [air/README.md](air/README.md).
+Read [docs/STATUS.md](docs/STATUS.md) for evidence, first-account setup and remaining release work.

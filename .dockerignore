@@ -6,3 +6,5 @@ _local
 _archive
 docs
 data
+.env*
+!.env.example

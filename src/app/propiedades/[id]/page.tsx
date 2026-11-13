@@ -71,10 +71,10 @@ const PRECISION: Record<string, string> = { exact: "(exacta)", approx: "(aproxim
  */
 const PENDING: Record<string, string> = {
   blocked:
-    "Este portal no deja leer el anuncio desde el servidor. Se leerá en un navegador; si tarda, ábrelo tú y pulsa el marcador.",
-  offline: "No se pudo descargar la página. Se volverá a intentar.",
+    "El enlace está guardado. Este portal no deja leerlo desde el servidor. Abre el anuncio y usa el marcador de Ajustes para completarlo.",
+  offline: "El enlace está guardado. No se pudo descargar la página. Puedes volver a pegarlo o usar el marcador de Ajustes.",
   offsite: "El enlace lleva fuera del portal, así que no se pudo leer. Ábrelo y pulsa el marcador.",
-  unreadable: "No se pudo leer la página. Se volverá a intentar.",
+  unreadable: "El enlace está guardado. No se pudo leer la página. Abre el anuncio y usa el marcador de Ajustes para completarlo.",
   removed: "El anuncio ya no está publicado, así que no hay datos que leer. El enlace queda guardado.",
   default: "Todavía no se ha leído este anuncio. El enlace está guardado.",
 };
@@ -290,6 +290,9 @@ export default async function PropiedadPage({
       {!p.filled && (
         <div className="mt-4 rounded-lg bg-accent-tint px-4 py-3 text-sm text-body">
           <p>{PENDING[sourceRows[0]?.last_check_outcome ?? ""] ?? PENDING.default}</p>
+          {sourceRows[0]?.last_check_outcome !== "removed" && (
+            <Link href="/ajustes#anadir-piso" className="mt-2 inline-block font-medium text-ink underline underline-offset-4">Cómo completar el anuncio</Link>
+          )}
           {sourceRows[0]?.last_check_outcome !== "removed" && <PendingPoll />}
         </div>
       )}
@@ -381,7 +384,7 @@ export default async function PropiedadPage({
         <p className="mb-4 mt-1 text-sm text-muted">
           Tu opinión se publica aparte, cuando tú quieras. La etapa se guarda con el botón de abajo, y es la de todos.
         </p>
-        <OpinionForm propertyId={p.id} mine={mine} stage={p.stage} version={Number(p.stage_version ?? 0)}>
+        <OpinionForm key={`${user.email}:${projectId}:${p.id}`} owner={{ accountId: user.email, projectId }} propertyId={p.id} mine={mine} stage={p.stage} version={Number(p.stage_version ?? 0)}>
           <dl className="space-y-2.5 text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <dt className="text-muted">Anuncio</dt>
@@ -490,6 +493,8 @@ export default async function PropiedadPage({
             {/* Oldest first now, and the box at the foot. The pane used to be newest-first, which
                 a thread cannot be: an answer would arrive above the comment it answers. */}
             <Conversation
+              key={`${user.email}:${projectId}:${p.id}`}
+              owner={{ accountId: user.email, projectId }}
               propertyId={p.id}
               nodes={conversation}
               viewerId={user.id}

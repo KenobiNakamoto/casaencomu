@@ -19,6 +19,13 @@ that already hosts umbrelOS, and is reached through Cloudflare Tunnel + Access.
 
 **State (2026-09-15): the app has its own login, and it is deployed.** A person signs in at `/entrar` with an address and a clave; the first account on an empty server adopts what is already there; ten accounts is the ceiling, enforced by a database trigger; every account after the first arrives through an invitation, and the same link resets a forgotten clave. `main` is green — **714 tests (3 skipped)**, lint, types and build clean, and GitHub Actions runs all four on every pull request. The Air runs the merged image behind that login, and `PREVIEW_OPEN_AS` and `PREVIEW_PASSWORD` are both commented out of its `.env`: the app's own door is the only one. The domain is bought and the tunnel is healthy, but **no DNS record is published yet** — the first account claims the house, so the hostname stays private until Kenobi has made it. All sixteen PIP packages that were ever in scope are done (PIP-12 and PIP-15 are deferred by the proposal itself — do not start them). The nightly encrypted backup is installed and a restore has been carried out (#21). Two things nobody has checked are still true: **no real phone has ever opened this app**, and `docs/RELEASE-B-PROOF.md` § 5 lists the rest. The dev database holds 23 real listings ingested from the ads themselves; nothing is hand-written. `origin` holds `main` and nothing else — 43 merged branches were deleted on 2026-09-12, with the restore list in `memory/`. To show the app with no login, `./showcase.sh` serves it at http://127.0.0.1:3010 on this Mac only. Full state, with what is not done: `docs/STATUS.md`.
 
+## Unreleased safety update — 2026-11-12
+
+The local readiness branch supersedes the password-reset and first-account behavior above.
+Invitations grant membership only; existing accounts must sign in. Initial setup requires the
+operator-held `CASA_SETUP_TOKEN` and an atomic one-time claim. See the dated entry at the top of
+`docs/STATUS.md` before deploying or giving setup instructions. The Air was updated by the later release entry in `docs/STATUS.md`. Read that entry for live state.
+
 ## Read in this order
 
 1. `README.md` — what the repo holds and where everything is. One page.
@@ -71,7 +78,7 @@ mount. **Ponytail is on**: nothing is added until a trigger in `docs/PLAN.md` fi
 - **The nightly encrypted dump is the only backup.** Passphrase in the family's own password
   store — Apple Passwords is on every device already — and shared with one other member, so it
   does not die with one phone.
-- Repo: private, `KenobiNakamoto/casaencomu` (created 2026-09-04). Work flows issue → branch
+- Repo: **public** (MIT) since 2026-11-13, `KenobiNakamoto/casaencomu` (created 2026-09-04). Pseudonymous content only: no real name, family name, email, hostname or username ever goes in — issues and PR bodies included. Work flows issue → branch
   `issue-<n>-<slug>` in a worktree outside iCloud → PR → merge. Commit and push only when asked.
 - **Anything not committed lives in `_local/`, `memory/`, `_archive/` or `data/`.** Page captures,
   the family's chat export and the untrimmed spike pages are all under `_local/` — one

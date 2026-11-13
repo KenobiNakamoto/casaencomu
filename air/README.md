@@ -7,85 +7,111 @@ Only a handful of things live on the server itself — `~/srv/casaencomu/compose
 
 Full procedure with the checks: `docs/SCAFFOLD.md` § 8.
 
-## `casaencomu-backup.sh`
+## Backup v2 — deployed 2026-11-12
 
-The nightly backup. It asks SQLite for a consistent copy (`VACUUM INTO`), encrypts it with a
-passphrase read from a file, writes it to iCloud Drive, and keeps 31 daily copies plus the first
-of each month. `-n` prints the three steps and exits without doing anything.
+The nightly job now backs up **control.db, every registered project database, and all retained
+photos**. It uses the existing passphrase file. The passphrase stays in the family's password
+manager; no new password was created. Old `.tar.enc` backups remain readable with the older
+OpenSSL procedure. New `.casa2` files use AES-256-GCM with a random salt/IV and scrypt-derived key.
+
+`casaencomu-backup.sh` performs these steps:
+
+1. Acquire a lock, check tools, the running container, passphrase and available space.
+2. Stop the app, snapshot SQLite files and photos on the data volume, then restart the app.
+3. Validate SQLite integrity, foreign keys, schema versions, table counts, file hashes and every
+   photo reference. Encrypt the snapshot and restore it into a separate temporary directory.
+4. Copy the verified ciphertext to a temporary file beside the destination. Check the copy and
+   rename it to the final filename. Only then prune v2 archives older than 31 days; keep monthly copies.
+
+The app is paused only for the snapshot. A failure restarts it and retains previous archives.
+A lock prevents overlap. An abrupt host shutdown can still interrupt maintenance; check service
+state after restarting the machine. The archive contains credentials and private data: keep the
+passphrase and decrypted restores private. Never restore over a running data directory.
+
+Install the helper and wrapper together:
 
 ```sh
+ssh air 'mkdir -p ~/.local/lib/casaencomu'
+scp air/ops/backup-tool.mjs air:.local/lib/casaencomu/
 scp air/casaencomu-backup.sh air:.local/bin/
-ssh air 'chmod +x ~/.local/bin/casaencomu-backup.sh && ~/.local/bin/casaencomu-backup.sh -n'
+ssh air 'chmod 700 ~/.local/bin/casaencomu-backup.sh; ~/.local/bin/casaencomu-backup.sh -n'
 ```
 
-The passphrase file is created once, by hand, and the passphrase goes into the password manager
-in the same minute. Without it the backups are unreadable noise. Photos are not backed up: they
-can be downloaded again while the advertisement is alive.
+The existing `com.kenobi.casaencomu-backup` LaunchAgent runs at 03:30 through `ssh localhost`.
+That SSH session must have Full Disk Access to the data volume and iCloud Drive. **Measured on
+2026-11-12:** direct SQLite reads through SSH work, and the new job completed through the actual
+LaunchAgent with exit status 0. Older notes about denied host reads no longer describe this setup.
+A future permission change causes an explicit failure; it must not produce an incomplete archive.
 
-## `com.kenobi.casaencomu-backup.plist`
+The default scratch location is the external data volume. Do not move restore tests to the small
+internal disk. `CASA_DATA_DIR`, `CASA_BACKUP_DEST`, `CASA_BACKUP_PASS`, `CASA_BACKUP_TOOL`,
+`CASA_COMPOSE_FILE` and `CASA_BACKUP_STATE` override the paths for an isolated test.
 
-The LaunchAgent that runs the script at 03:30. **Installed and firing since 2026-09-10** (#21).
+### Restore and rollback
 
 ```sh
-scp air/com.kenobi.casaencomu-backup.plist air:Library/LaunchAgents/
-ssh air 'launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kenobi.casaencomu-backup.plist'
-ssh air 'launchctl kickstart -p gui/$(id -u)/com.kenobi.casaencomu-backup'   # fire it now
-ssh air 'tail -3 ~/Library/Logs/casaencomu-backup.log; launchctl list com.kenobi.casaencomu-backup | grep LastExitStatus'
+# On the Air. NEW_DIRECTORY must not exist. Use a separate directory on the external volume.
+node ~/.local/lib/casaencomu/backup-tool.mjs restore ARCHIVE.casa2 NEW_DIRECTORY \
+  ~/.config/casaencomu/backup.pass
+node ~/.local/lib/casaencomu/backup-tool.mjs verify NEW_DIRECTORY
 ```
 
-### Why it looks stranger than it should
+Restore checks the GCM authentication tag before extracting any file. It refuses traversal,
+symlinks, special entries, an existing destination, changed file hashes and missing photos.
+The manifest records the source image ID and every database's schema version and table counts.
+The container runs as UID 1000; ensure the restored mount is readable and writable by that UID.
+Test this in an isolated container before a live switch.
 
-Nothing on this Mac has been granted Full Disk Access, and two different jails meet here. Both
-halves were measured on 2026-09-10, and both answer **`Interrupted system call`** — EINTR, which
-reads like a hardware fault and is not one. It is macOS refusing a path.
+`deploy.sh` uses unique image tags, an HTTPS/configuration preflight, a deployment lock and a
+verified pre-deploy backup. To deploy an already tested image, set `CASA_RELEASE_TAG` and
+`CASA_PREBUILT_IMAGE_ID`; the script refuses an ID mismatch. A prepared `.env.ready` is validated
+before use. It keeps the previous image, compose file, private environment and exact backup path
+in `~/srv/casaencomu/releases/<tag>/`. Do not reuse a release directory.
 
-| | Docker / `/Volumes` | iCloud Drive |
-|---|---|---|
-| launchd's own process | yes | **no** |
-| an ssh session | **no** | yes |
+For a rollback after a migration:
 
-So the agent runs `ssh localhost`, and the script does every read **inside the container**, which
-has the external disk bind-mounted. Only the encrypted stream crosses out, into the home
-directory, and that write happens in the ssh session, which is allowed.
+1. Stop the new app. Preserve its data separately; a pre-deploy restore discards later writes.
+2. Restore the recorded backup into a new sibling directory and verify it.
+3. Test the retained `casaencomu-web:before-<tag>` image against that restored directory.
+4. Replace the data mount only after checking the lost-write window. Keep the failed data copy.
+5. Restore the previous compose/environment, pin the retained image, and start the service.
+6. Check HTTPS, login, property counts and retained photos. Never run an older image blindly
+   against migrated data. There is no automatic destructive rollback.
 
-`-F /dev/null` on that ssh, because `~/.ssh/config` includes a colima file that lives on
-`/Volumes`: ssh dies parsing it before it ever tries to connect. Granting sshd Full Disk Access
-would lift the first constraint but not that one, so it is not the fix.
+**Live drill, 2026-11-12:** restored 24 properties and 657 photos. The new image migrated the copy
+from schema 9 to 10. A fictional account completed setup, login, one-time recovery and logout over
+HTTPS. A second restored copy booted with the previous image at schema 9, with all counts intact.
+Neither restore replaced production data. Test containers and copies were removed afterwards.
 
-### The restore drill — run 2026-09-10, passed
+### HTTPS and monitoring
 
-A backup nobody has restored is not a backup. The archive holds `control.db` — which projects
-exist and who belongs to each — plus one file per project, named after its id.
+Use the Air's Tailscale HTTPS name for `PUBLIC_URL`, including a non-default port if used.
+Tailscale Serve on the Air proxies port 443 to `127.0.0.1:3100`. This is tailnet-only. The old HTTP
+8080 endpoint was removed after HTTPS verification. The public custom domain is still unpublished.
+Production cookies remain Secure; do not weaken them to accommodate HTTP.
 
-The archive holds `control.db` — which projects exist and who belongs to each — plus one file
-per project, named after its id.
+`air/ops/deployment-check.mjs` refuses HTTP origins, preview identity bypasses, incomplete Access
+settings and placeholder credentials. First setup also requires the private operator key.
+
+Compose now probes `/api/health`. The probe reads actual tables, checks the data directory's free
+space and reads a retained-photo sample. Full integrity/photo checks happen in each backup.
+`check-service.mjs` additionally checks backup success/freshness and internal/data volume space.
+Its hourly LaunchAgent writes `~/Library/Logs/casaencomu-monitor.log` and exits nonzero on failure.
+This is local operator monitoring; **no email/push notification channel is configured**.
 
 ```sh
-ssh air
-mkdir -p /tmp/casa-restore
-openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
-  -in ~/Library/Mobile\ Documents/com~apple~CloudDocs/Backups/casaencomu/casa-<date>.tar.enc \
-  -pass "file:$HOME/.config/casaencomu/backup.pass" | tar -xf - -C /tmp/casa-restore
-for f in /tmp/casa-restore/*.db; do echo "$f: $(sqlite3 "$f" 'PRAGMA integrity_check;')"; done
-sqlite3 /tmp/casa-restore/control.db 'select id, name from projects;'
-sqlite3 /tmp/casa-restore/<project-id>.db 'select count(*) from properties;'
-rm -rf /tmp/casa-restore
+ssh air 'PATH=/opt/homebrew/bin:$PATH node ~/.local/lib/casaencomu/check-service.mjs'
+ssh air 'tail -5 ~/Library/Logs/casaencomu-monitor.log'
+ssh air 'cat ~/.local/state/casaencomu/backup-status.json'
 ```
 
-The counts have to match the live database. Read those through the container, never off the disk
-— an ssh session cannot see `/Volumes`:
-
-```sh
-ssh air 'docker exec casaencomu-web-1 sh -c "sqlite3 /data/p/<project-id>/casa.db \"select count(*) from properties\""'
-```
-
-**What passed on 2026-09-10:** a 680 KB archive; `integrity_check` **ok** on both files; and every
-count identical to the live database — 24 properties, 3 opinions, 3 comments, 18 ratings,
-57 events, 7 users, 7 memberships, 1 project.
-
-**Photographs are not in it.** Only the databases. A photograph can be downloaded again while the
-advertisement is alive, and cannot once it is gone — that is the accepted loss, and it is written
-here so nobody discovers it during a restore.
+The internal disk had less than 1 GB free during deployment. The monitor reports this condition.
+Backup preflight requires room for its destination copy plus a reserve and will fail before filling
+the disk. Free internal space or confirm iCloud eviction before depending on long-term retention.
+All three new archives were confirmed uploaded to iCloud. An attempt to release two redundant
+local copies through Apple’s `evictUbiquitousItem(at:)` API was refused by File Provider. No archive
+was deleted, and no unrelated files were removed. The next backup can fail the space preflight
+until internal capacity is restored.
 
 ## `capture-agent.mjs` — the browser reader
 

@@ -6,7 +6,6 @@ import { Panel } from "@/components/panel";
 import { input } from "@/components/propiedades/format";
 import {
   cambiarProyectoAction,
-  claveNuevaAction,
   expulsarAction,
   guardarProyectoAction,
   invitarAction,
@@ -199,15 +198,6 @@ export function ProjectCard({
                   </span>
                   {owner && m.role === "member" ? (
                     <>
-                      {/* Somebody who has forgotten their clave. It makes the same invitation
-                          link, which the owner sends the same way; there is no mail server. */}
-                      <form action={claveNuevaAction}>
-                        {id}
-                        <input type="hidden" name="correo" value={m.email} readOnly />
-                        <button type="submit" className={btnQuiet}>
-                          Clave nueva
-                        </button>
-                      </form>
                       <form action={expulsarAction}>
                         {id}
                         <input type="hidden" name="correo" value={m.email} readOnly />

@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { InStatement, InValue } from "@libsql/client";
+import { nextSourceState, type SourceState } from "./availability";
 import { canonicalFacts, classifyChanges, col, FACT_COLUMNS, factsHash, type Facts } from "./changes";
 import { db } from "./db";
 import type { Origin } from "./enrich";
+import { capped, merge, originOf } from "./observation";
 import type { Presence, Raw } from "./extract";
 import type { Listing } from "./listing";
 import { savePhotos } from "./photos";
@@ -23,25 +25,6 @@ export type Via = "bookmarklet" | "paste";
  */
 export type Observed = { presence: Presence; raw?: Raw | null; pending?: string | null };
 
-/** Every field this observation carried came off the page. The AI layers overwrite their own. */
-const originOf = (prev: Origin, presence: Presence): Origin => {
-  const out: Origin = { ...prev };
-  for (const [k, seen] of Object.entries(presence)) if (seen === "present") out[k] = "portal";
-  return out;
-};
-
-/**
- * The stored page never grows without bound: the text is what the layers read, and 32 KB is a long
- * advertisement. `MIN_RAW_TEXT` keeps a challenge page out — a DataDome body is 773 bytes of
- * "please enable JS", and storing it would only spend a model call rediscovering that.
- */
-const MAX_RAW_TEXT = 32 * 1024;
-const MIN_RAW_TEXT = 400;
-const capped = (raw: Raw | null | undefined): string | null =>
-  raw && ((raw.text?.length ?? 0) >= MIN_RAW_TEXT || raw.ogDescription)
-    ? JSON.stringify({ ...raw, text: raw.text?.slice(0, MAX_RAW_TEXT) })
-    : null;
-
 export type SaveResult = {
   propertyId: string;
   /** `created` first time · `updated` the advertisement changed · `unchanged` nothing moved. */
@@ -56,21 +39,6 @@ const event = (propertyId: string, kind: string, payload: unknown, actorId: stri
   args: [randomUUID(), propertyId, kind, JSON.stringify(payload), actorId, at],
 });
 
-/**
- * A field the new observation did not carry keeps the value already stored. Only an observed
- * field can change one — an extractor that failed to find the price must not erase last week's
- * price (`docs/product-improvement/05-implementation.md` § 5).
- */
-function merge(prev: Facts | null, listing: Listing, presence: Presence): Facts {
-  const next = canonicalFacts(listing);
-  if (!prev) return next;
-  const out = { ...next } as Record<string, unknown>;
-  for (const [k, seen] of Object.entries(presence)) {
-    if (seen === "absent" && k in prev) out[k] = (prev as Record<string, unknown>)[k];
-  }
-  return out as Facts;
-}
-
 /** The photo URLs already stored for this property, so a refresh downloads only the new ones. */
 async function knownPhotoUrls(propertyId: string): Promise<Set<string>> {
   const { rows } = await db.execute({
@@ -80,7 +48,13 @@ async function knownPhotoUrls(propertyId: string): Promise<Set<string>> {
   return new Set(rows.map((r) => String(r.source_url)));
 }
 
-type SourceRow = { id: string; property_id: string; facts_json: string; field_origin_json: string; filled: number };
+type SourceRow = SourceState & { id: string; property_id: string; facts_json: string; field_origin_json: string; filled: number };
+
+/** Pasting a link is a manual observation, never confirmation that a blocked listing is active. */
+function importedState(previous: SourceState, pending?: string | null) {
+  const outcome = !pending ? "listing" : pending === "removed" ? "removed" : pending === "blocked" ? "blocked" : "unreadable";
+  return nextSourceState(previous, outcome, false);
+}
 
 const parseOrigin = (s: string | null): Origin => {
   try {
@@ -93,7 +67,8 @@ const parseOrigin = (s: string | null): Origin => {
 /** `portal_ref = NULL` never matches in SQL, so a null ref falls back to the URL check alone. */
 async function findSource(src: Source): Promise<SourceRow | null> {
   const { rows } = await db.execute({
-    sql: `SELECT s.id, s.property_id, s.facts_json, s.field_origin_json, p.filled FROM sources s
+    sql: `SELECT s.id, s.property_id, s.facts_json, s.field_origin_json,
+          s.availability, s.consecutive_gone, s.consecutive_failures, p.filled FROM sources s
           JOIN properties p ON p.id = s.property_id
           WHERE s.url_normalized = ? OR (s.portal = ? AND s.portal_ref = ?) LIMIT 1`,
     args: [src.url_normalized, src.portal, src.portal_ref],
@@ -116,6 +91,7 @@ async function refresh(
   deadline?: AbortSignal,
 ): Promise<SaveResult> {
   const { presence, pending } = obs;
+  const state = importedState(row, pending);
   let prev: Facts | null = null;
   try {
     prev = JSON.parse(row.facts_json) as Facts;
@@ -137,17 +113,23 @@ async function refresh(
     ["facts_json", JSON.stringify(facts)],
     ["facts_hash", factsHash(facts)],
     ["field_presence_json", JSON.stringify(presence)],
-    ["photo_urls_json", JSON.stringify(listing.photos)],
+    // A refused fetch contains no evidence about the photos already recorded for the home.
+    ...(pending ? [] : ([["photo_urls_json", JSON.stringify(listing.photos)]] as [string, InValue][])),
     ["field_origin_json", JSON.stringify(originOf(parseOrigin(row.field_origin_json), presence))],
     ["last_check_outcome", pending || "listing"],
     ["last_checked_at", at],
+    ["availability", state.availability],
+    ["consecutive_gone", state.consecutive_gone],
+    ["consecutive_failures", state.consecutive_failures],
     ...(pending ? [] : ([["last_ok_at", at]] as [string, InValue][])),
     ...(raw ? ([["raw_json", raw]] as [string, InValue][]) : []),
   ];
   const stmts: InStatement[] = [
     {
       sql: `UPDATE sources SET ${set.map(([c]) => `${c} = ?`).join(", ")},
-            consecutive_failures = 0, availability = 'active', enriched_at = NULL WHERE id = ?`,
+            enriched_at = NULL,
+            observation_version = observation_version + 1, enrichment_attempts = 0,
+            enrichment_retry_at = NULL, enrichment_token = NULL, enrichment_lease_until = NULL WHERE id = ?`,
       args: [...set.map(([, v]) => v), row.id],
     },
   ];
@@ -195,6 +177,7 @@ async function create(
   deadline?: AbortSignal,
 ): Promise<SaveResult> {
   const { presence, pending } = obs;
+  const state = importedState({ availability: "unknown", consecutive_gone: 0, consecutive_failures: 0 }, pending);
   const facts = canonicalFacts(listing);
   const propertyId = randomUUID();
   const factCols = [...FACT_COLUMNS];
@@ -216,8 +199,9 @@ async function create(
       {
         sql: `INSERT INTO sources (id, property_id, portal, portal_ref, url_normalized, url_original, via,
               facts_json, facts_hash, field_presence_json, photo_urls_json, field_origin_json, raw_json,
-              last_check_outcome, first_seen_at, last_checked_at, last_ok_at, availability)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+              last_check_outcome, first_seen_at, last_checked_at, last_ok_at, availability,
+              consecutive_gone, consecutive_failures)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           randomUUID(),
           propertyId,
@@ -236,6 +220,9 @@ async function create(
           at,
           at,
           pending ? null : at,
+          state.availability,
+          state.consecutive_gone,
+          state.consecutive_failures,
         ],
       },
     ],

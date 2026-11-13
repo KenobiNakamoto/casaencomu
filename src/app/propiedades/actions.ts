@@ -4,7 +4,8 @@ import type { InStatement } from "@libsql/client";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { currentUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import type { DraftOwner } from "@/lib/draft-storage";
+import { currentProjectId, db } from "@/lib/db";
 import { STAGE_LABELS, STAGES, type EventKind, type Stage } from "@/lib/listing";
 import { edit, post, remove, type CommentResult, type Reason } from "@/lib/comments";
 import { publish, saveDraft, withdraw, type OpinionInput, type Result } from "@/lib/opinions";
@@ -123,6 +124,9 @@ export async function conversationAction(_prev: CommentState, formData: FormData
 
   let result: CommentResult;
   if (verb === "crear") {
+    if (formData.get("draftAccount") !== user.email || formData.get("draftProject") !== await currentProjectId()) {
+      return { ok: false, message: "La cuenta o el proyecto han cambiado. Vuelve a cargar la página.", text: "" };
+    }
     result = await post(
       propertyId,
       user.id,
@@ -159,7 +163,7 @@ export async function conversationAction(_prev: CommentState, formData: FormData
  * Next.js what to redraw.
  * ----------------------------------------------------------------------------------------- */
 
-type Expected = { version: number; revision: number };
+type Expected = { version: number; revision: number } & DraftOwner;
 
 const redraw = (propertyId: string) => {
   revalidatePath(detail(propertyId));
@@ -168,6 +172,9 @@ const redraw = (propertyId: string) => {
 
 export async function publishOpinionAction(propertyId: string, input: OpinionInput, expected: Expected): Promise<Result> {
   const user = await currentUser();
+  if (expected.accountId !== user.email || expected.projectId !== await currentProjectId()) {
+    return { ok: false, reason: "conflict" };
+  }
   const result = await publish(propertyId, user.id, input, expected);
   if (result.ok) redraw(propertyId);
   return result;
@@ -175,12 +182,18 @@ export async function publishOpinionAction(propertyId: string, input: OpinionInp
 
 export async function saveDraftAction(propertyId: string, input: OpinionInput, expected: Expected): Promise<Result> {
   const user = await currentUser();
+  if (expected.accountId !== user.email || expected.projectId !== await currentProjectId()) {
+    return { ok: false, reason: "conflict" };
+  }
   // No path is revalidated: a draft changes nothing anybody else can see.
   return saveDraft(propertyId, user.id, input, { revision: expected.revision });
 }
 
 export async function withdrawOpinionAction(propertyId: string, expected: Expected): Promise<Result> {
   const user = await currentUser();
+  if (expected.accountId !== user.email || expected.projectId !== await currentProjectId()) {
+    return { ok: false, reason: "conflict" };
+  }
   const result = await withdraw(propertyId, user.id, expected);
   if (result.ok) redraw(propertyId);
   return result;

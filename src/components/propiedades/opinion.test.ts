@@ -340,20 +340,20 @@ describe("the aspect table is who scored, not who has an account", () => {
 
 describe("the editor does not lose what somebody typed", () => {
   it("keeps it in this tab, as the comment box already did", () => {
-    expect(editor).toContain("sessionStorage.setItem");
-    expect(editor).toContain("casa:opinion:");
+    expect(editor).toContain("writeDraft(owner, key,");
+    expect(editor).toContain('draftKey(owner, "opinion", propertyId)');
     // Read on opening, so the words come back after a reload or a telephone dropping the tab.
-    expect(editor).toContain("keep.read(propertyId, mine) ?? initial(mine)");
+    expect(editor).toContain("keep.read(mine) ?? initial(mine)");
     expect(editor).toContain("Cambios sin guardar · solo en esta pestaña");
   });
 
   it("ignores a copy that a newer save has overtaken", () => {
     // A draft saved on another device moves the revision. The tab's older copy must not win.
-    expect(editor).toContain("if (held?.version !== mine.version || held?.revision !== mine.revision) return null;");
+    expect(editor).toContain("held?.version === mine.version && held?.revision === mine.revision ? held.input : null;");
   });
 
   it("forgets it once the words are on the server", () => {
-    expect(editor).toContain("keep.clear(propertyId);");
+    expect(editor).toContain("keep.clear();");
     // The server has no sessionStorage: reading it during render would break hydration.
     expect(editor).toContain("useSyncExternalStore");
   });

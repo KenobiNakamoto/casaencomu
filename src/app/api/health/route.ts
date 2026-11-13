@@ -1,4 +1,4 @@
-import { control } from "@/lib/control";
+import { checkDataHealth } from "@/lib/health";
 
 /**
  * The one route outside the proxy, so two rules hold at once: it must answer without a session,
@@ -9,13 +9,13 @@ import { control } from "@/lib/control";
  * which is a check that answers «ok» from a server whose data disk has gone — and the disk is
  * external and removable, so that is the failure it exists to catch.
  *
- * `SELECT 1` and nothing more: it proves the file is open, readable and answering, in under a
- * millisecond, and Docker asks this every thirty seconds forever.
+ * Checks actual control/project tables, disk space and a retained photo sample. The backup
+ * performs the complete integrity and photo check. No diagnostic paths leave this endpoint.
  */
 export async function GET() {
   const started = performance.now();
   try {
-    await control.execute("SELECT 1");
+    await checkDataHealth();
   } catch {
     // The reason is deliberately not returned: it would carry a filesystem path.
     return Response.json({ ok: false, db: "unreachable", time: new Date().toISOString() }, { status: 503 });

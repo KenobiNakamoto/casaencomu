@@ -87,6 +87,10 @@
   --hairline: #e4e1d9;
   --hairline-soft: #efece5;
   --control-border: #8b867d;
+  /* the brand mark (marca.tsx): the brand book's positive colours by day, reversed by night */
+  --mark-roof: #bf4428;
+  --mark-ink: #1b2140;
+  --mark-sun: #eba93b;
   --accent: #e02a1f;
   --accent-active: #b81f16;
   --accent-soft: #f7c4bf;
@@ -215,6 +219,9 @@
   --hairline: #2a2a31;
   --hairline-soft: #212127;
   --control-border: #77747e;
+  --mark-roof: #e5774f;
+  --mark-ink: #faf4e8;
+  --mark-sun: #eba93b;
   --accent: #ff453a;
   --accent-active: #ff6b62;
   --accent-soft: #7a251f;
@@ -285,6 +292,9 @@
     --hairline: #2a2a31;
     --hairline-soft: #212127;
     --control-border: #77747e;
+    --mark-roof: #e5774f;
+    --mark-ink: #faf4e8;
+    --mark-sun: #eba93b;
     --accent: #ff453a;
     --accent-active: #ff6b62;
     --accent-soft: #7a251f;

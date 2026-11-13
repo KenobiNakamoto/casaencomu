@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AccountMenu from "./account-menu";
 import ActivityFeed from "./activity-feed";
+import DraftBoundary from "./draft-boundary";
 import Marca from "./marca";
 import { feed } from "@/lib/activity";
 import { currentUser } from "@/lib/auth";
@@ -23,7 +24,8 @@ export default async function Nav() {
   // The login page and an invitation are rendered by people who are nobody yet. There is no bell,
   // no «Revisar» count and no account for them, so the header is not drawn at all.
   const { headers } = await import("next/headers");
-  if (!(await headers()).get("x-user-email")) return null;
+  const accountId = (await headers()).get("x-user-email");
+  if (!accountId) return <DraftBoundary accountId={null} />;
 
   const user = await currentUser();
   const [bell, recent] = await Promise.all([bellFor(user), feed(user.id, undefined, 12)]);
@@ -37,6 +39,7 @@ export default async function Nav() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-hairline bg-raised">
+      <DraftBoundary accountId={accountId} />
       <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:h-[72px] lg:px-14">
         <Link href="/propiedades" className="shrink-0">
           <Marca className="text-xl" nameClass="max-[359px]:hidden" />

@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { publishOpinionAction, saveDraftAction, withdrawOpinionAction } from "@/app/propiedades/actions";
+import { clearDraft, draftKey, readDraft, writeDraft, type DraftOwner } from "@/lib/draft-storage";
 import { Panel } from "@/components/panel";
 import { DIMENSION_LABELS, DIMENSIONS, type Dimension } from "@/lib/listing";
 // Never `@/lib/opinions`: one runtime value from there drags `node:async_hooks` into the
@@ -32,46 +33,18 @@ function initial(mine: Mine): OpinionInput {
   return { ...EMPTY, basis: "listing" };
 }
 
-/**
- * This tab's copy of what is being typed, so a reload does not cost somebody their words.
- *
- * The comment box has had this since PIP-11 (#146); the editor, which holds 1500 characters and six
- * scores, had nothing — and a telephone discards a background tab whenever it needs the memory.
- * It is `sessionStorage`, so it belongs to this tab alone: it never reaches the server, the
- * family, or another tab of the same browser (doc 04 § 3).
- *
- * The stored copy carries the versions it was written against. A draft saved on another device
- * moves the revision, so the copy is then stale and is ignored rather than allowed to overwrite
- * newer work.
- */
-const keep = {
-  key: (propertyId: string) => `casa:opinion:${propertyId}`,
-  read(propertyId: string, mine: Mine): OpinionInput | null {
-    try {
-      const raw = sessionStorage.getItem(keep.key(propertyId));
-      if (!raw) return null;
-      const held = JSON.parse(raw);
-      if (held?.version !== mine.version || held?.revision !== mine.revision) return null;
-      return held.input as OpinionInput;
-    } catch {
-      // A browser that refuses storage still has a working editor.
-      return null;
-    }
-  },
-  write(propertyId: string, mine: Mine, input: OpinionInput) {
-    try {
-      sessionStorage.setItem(
-        keep.key(propertyId),
-        JSON.stringify({ input, version: mine.version, revision: mine.revision }),
-      );
-    } catch {}
-  },
-  clear(propertyId: string) {
-    try {
-      sessionStorage.removeItem(keep.key(propertyId));
-    } catch {}
-  },
-};
+/** Versions still guard recovery from a newer draft saved on another device. */
+function opinionStorage(owner: DraftOwner, propertyId: string) {
+  const key = draftKey(owner, "opinion", propertyId);
+  return {
+    read(mine: Mine): OpinionInput | null {
+      const held = readDraft<{ version: number; revision: number; input: OpinionInput }>(owner, key);
+      return held?.version === mine.version && held?.revision === mine.revision ? held.input : null;
+    },
+    write(mine: Mine, input: OpinionInput) { writeDraft(owner, key, { input, version: mine.version, revision: mine.revision }); },
+    clear() { clearDraft(key); },
+  };
+}
 
 const sameInput = (a: OpinionInput, b: OpinionInput) =>
   a.stance === b.stance &&
@@ -95,7 +68,8 @@ const REFUSALS: Record<string, string> = {
  * Nothing saves by itself: there is no autosave, no debounce and no save on blur, so a half-formed
  * thought stays half-formed until the person decides otherwise.
  */
-export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: Mine }) {
+export function OpinionEditor({ propertyId, mine, owner }: { propertyId: string; mine: Mine; owner: DraftOwner }) {
+  const keep = opinionStorage(owner, propertyId);
   const published = mine.published && !mine.published.withdrawn ? mine.published : null;
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState(() => initial(mine));
@@ -114,7 +88,7 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
    */
   const held = useSyncExternalStore(
     () => () => {},
-    () => keep.read(propertyId, mine) !== null,
+    () => keep.read(mine) !== null,
     () => false,
   );
 
@@ -122,7 +96,7 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
   const set = <K extends keyof OpinionInput>(key: K, value: OpinionInput[K]) => {
     setInput((i) => {
       const next = { ...i, [key]: value };
-      keep.write(propertyId, mine, next);
+      keep.write(mine, next);
       return next;
     });
     setNote(null);
@@ -130,7 +104,7 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
   const setScore = (dim: Dimension, score: number | null) => {
     setInput((i) => {
       const next = { ...i, scores: { ...i.scores, [dim]: score } };
-      keep.write(propertyId, mine, next);
+      keep.write(mine, next);
       return next;
     });
     setNote(null);
@@ -152,7 +126,7 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
         return;
       }
       // The words are on the server now, so the tab's copy has nothing left to protect.
-      keep.clear(propertyId);
+      keep.clear();
       setSaved(input);
       setLeaving(false);
       setNote({ tone: "ok", text: done });
@@ -169,7 +143,7 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
           onClick={() => {
             // The tab's copy wins over what the server last heard: it is the newer of the two,
             // and it is the one the person actually typed.
-            setInput(keep.read(propertyId, mine) ?? initial(mine));
+            setInput(keep.read(mine) ?? initial(mine));
             setSaved(initial(mine));
             setNote(null);
             setLeaving(false);
@@ -334,7 +308,7 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
                         disabled={pending}
                         onClick={() =>
                           run(
-                            () => withdrawOpinionAction(propertyId, { version: mine.version, revision: mine.revision }),
+                            () => withdrawOpinionAction(propertyId, { ...owner, version: mine.version, revision: mine.revision }),
                             "Opinión retirada.",
                             true,
                           )
@@ -370,7 +344,7 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
                     disabled={pending}
                     onClick={() =>
                       run(
-                        () => saveDraftAction(propertyId, input, { version: mine.version, revision: mine.revision }),
+                        () => saveDraftAction(propertyId, input, { ...owner, version: mine.version, revision: mine.revision }),
                         "Borrador guardado · solo tú",
                         true,
                       )
@@ -382,7 +356,7 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
                   <button
                     type="button"
                     onClick={() => {
-                      keep.clear(propertyId);
+                      keep.clear();
                       setInput(saved);
                       setLeaving(false);
                       setOpen(false);
@@ -407,7 +381,7 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
                 disabled={pending}
                 onClick={() =>
                   run(
-                    () => publishOpinionAction(propertyId, input, { version: mine.version, revision: mine.revision }),
+                    () => publishOpinionAction(propertyId, input, { ...owner, version: mine.version, revision: mine.revision }),
                     published ? "Cambios publicados." : "Opinión publicada.",
                     true,
                   )
@@ -421,7 +395,7 @@ export function OpinionEditor({ propertyId, mine }: { propertyId: string; mine: 
                 disabled={pending}
                 onClick={() =>
                   run(
-                    () => saveDraftAction(propertyId, input, { version: mine.version, revision: mine.revision }),
+                    () => saveDraftAction(propertyId, input, { ...owner, version: mine.version, revision: mine.revision }),
                     "Borrador guardado · solo tú",
                     false,
                   )

@@ -7,6 +7,13 @@ const keys = ["CF_ACCESS_TEAM_DOMAIN", "CF_ACCESS_AUD", "PREVIEW_PASSWORD", "PRE
 
 afterEach(() => keys.forEach((k) => delete process.env[k]));
 
+it.each(["/entrar", "/recuperar", "/invitacion/example"])("strips a forged identity on anonymous page %s", async path => {
+  keys.forEach(k => delete process.env[k]);
+  const response = await proxy(new NextRequest(`https://casa.test${path}`, { headers: { "x-user-email": "victim@example.com" } }));
+  expect(response.status).toBe(200);
+  expect(response.headers.get("x-middleware-request-x-user-email")).toBe("");
+});
+
 describe("PREVIEW_OPEN_AS: no prompt on a tailnet-only host", () => {
   it("lets everyone in as the one identity", async () => {
     process.env.PREVIEW_OPEN_AS = "casa@casa.local";

@@ -32,9 +32,21 @@ beforeAll(async () => {
   await applySchema();
 });
 
+// Reconstruct the old schema before replaying its migrations; changing user_version alone
+// would leave columns from future migrations in place.
+const dropEnrichmentColumns = async () => {
+  for (const name of ["observation_version", "enrichment_attempts", "enrichment_retry_at", "enrichment_token", "enrichment_lease_until"]) {
+    await db.execute(`ALTER TABLE sources DROP COLUMN ${name}`);
+  }
+};
+const rewind = async (version: number) => {
+  await dropEnrichmentColumns();
+  await db.execute(`PRAGMA user_version = ${version}`);
+};
+
 describe("the migration chain", () => {
   it("reaches version 9 and adds every column the code reads", async () => {
-    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(9);
+    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(10);
     const cols = async (table: string) =>
       (await db.execute(`PRAGMA table_info(${table})`)).rows.map((r) => String(r.name));
     expect(await cols("sources")).toEqual(
@@ -67,7 +79,7 @@ describe("the migration chain", () => {
 
   it("is idempotent: running it again changes nothing", async () => {
     await applySchema();
-    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(9);
+    expect(Number((await db.execute("PRAGMA user_version")).rows[0][0])).toBe(10);
   });
 
   // Everything stored before this migration was read the old way, and the record says so: a row
@@ -87,6 +99,7 @@ describe("the opinions everybody already had", () => {
   // Whoever scored a home held an opinion before this table existed. The migration gives it a
   // row without inventing a word of it — no stance, no reasoning, and their own date.
   it("gives every past scorer an opinion, keeps the scores, and invents nothing", async () => {
+    await dropEnrichmentColumns();
     const home = randomUUID();
     const person = randomUUID();
     await db.batch(
@@ -195,7 +208,7 @@ describe("the descriptions that kept their entities", () => {
 
   it("rewrites a stored description in the letters it was written in", async () => {
     const id = await saved(randomUUID(), "&iexcl;Descubre este &aacute;tico de 72 m&sup2;!", "&Aacute;tico");
-    await db.execute("PRAGMA user_version = 7");
+    await rewind(7);
     await applySchema();
 
     const row = await wordsOf(id);
@@ -208,17 +221,17 @@ describe("the descriptions that kept their entities", () => {
   it("leaves a row that has nothing to decode exactly as it is", async () => {
     const clean = "Piso reformado en el Eixample, muy luminoso.";
     const id = await saved(randomUUID(), clean);
-    await db.execute("PRAGMA user_version = 7");
+    await rewind(7);
     await applySchema();
     expect((await wordsOf(id)).description).toBe(clean);
   });
 
   it("runs again over its own output without changing it", async () => {
     const id = await saved(randomUUID(), "Junto al mercado de Sant Antoni &ndash; &uacute;nico");
-    await db.execute("PRAGMA user_version = 7");
+    await rewind(7);
     await applySchema();
     const once = (await wordsOf(id)).description;
-    await db.execute("PRAGMA user_version = 7");
+    await rewind(7);
     await applySchema();
     expect((await wordsOf(id)).description).toBe(once);
     expect(once).toBe("Junto al mercado de Sant Antoni – único");
