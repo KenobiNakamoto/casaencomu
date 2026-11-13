@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import type { InStatement } from "@libsql/client";
 import { z } from "zod";
 import { aiReady, ask, type Image } from "./ai";
 import { canonicalFacts, col, FACT_COLUMNS, factsHash } from "./changes";
@@ -107,7 +106,7 @@ const schemaFor = (fields: string[]) =>
 
 const asked = (fields: string[]) => fields.map((f) => `- ${f}: ${GLOSS[f]}`).join("\n");
 
-export type Filled = { listing: Listing; presence: Presence; origin: Origin; read: string[]; inferred: string[] };
+export type Filled = { listing: Listing; presence: Presence; origin: Origin; read: string[]; inferred: string[]; retryable: boolean };
 
 /**
  * Layers 2 and 3, over whatever layer 1 left empty. Layer 2 reads the stored page and may only
@@ -130,6 +129,7 @@ export async function fill(opts: {
   for (const [k, seen] of Object.entries(presence)) if (seen === "present" && !origin[k]) origin[k] = "portal";
   const read: string[] = [];
   const inferred: string[] = [];
+  let retryable = false;
 
   const gaps = (fields: string[]) => fields.filter((f) => out[f] == null);
   const take = (
@@ -139,7 +139,7 @@ export async function fill(opts: {
     into: string[],
     page?: string,
   ) => {
-    if (!got) return;
+    if (!got) { retryable = true; return; }
     for (const f of fields) {
       const v = clean(f, got[f]);
       if (v === null) continue;
@@ -197,7 +197,7 @@ export async function fill(opts: {
     );
   }
 
-  return { listing: Listing.parse(out), presence, origin, read, inferred };
+  return { listing: Listing.parse(out), presence, origin, read, inferred, retryable };
 }
 
 const MAX_PHOTOS_SENT = 4;
@@ -228,6 +228,8 @@ type Row = {
   field_presence_json: string;
   field_origin_json: string;
   raw_json: string | null;
+  observation_version: number;
+  enrichment_attempts: number;
 };
 
 const parse = <T,>(s: string | null, fallback: T): T => {
@@ -238,81 +240,92 @@ const parse = <T,>(s: string | null, fallback: T): T => {
   }
 };
 
-/**
- * One pass over the sources whose current observation the fill layers have not seen. `enriched_at`
- * is the whole queue: a new observation sets it back to NULL and the source comes round again.
- *
- * Without a key nothing is marked done, so the day one is configured every waiting source is
- * filled rather than silently skipped.
- */
-export async function runEnrichment({ limit = 5, signal }: { limit?: number; signal?: AbortSignal } = {}) {
-  if (!aiReady()) return { filled: 0, skipped: 0 };
-  const { rows } = await db.execute({
-    sql: `SELECT id, property_id, facts_json, field_presence_json, field_origin_json, raw_json
-          FROM sources WHERE enriched_at IS NULL ORDER BY first_seen_at ASC LIMIT ?`,
-    args: [limit],
-  });
+/** Retry indefinitely, with a capped delay, while retaining a saved link and all observed facts. */
+export const retryDelayMs = (attempt: number) => Math.min(60 * 60_000, 60_000 * 2 ** Math.min(6, Math.max(0, attempt - 1)));
+const LEASE_MS = 5 * 60_000; // Longer than both bounded model calls; crashed workers become eligible again.
 
+export async function runEnrichment({ limit = 5, signal }: { limit?: number; signal?: AbortSignal } = {}) {
+  if (!aiReady()) return { filled: 0, skipped: 0, retrying: 0 };
+  const { rows } = await db.execute({
+    sql: `SELECT id FROM sources WHERE enriched_at IS NULL
+          AND (enrichment_retry_at IS NULL OR enrichment_retry_at <= ?)
+          AND (enrichment_lease_until IS NULL OR enrichment_lease_until <= ?)
+          ORDER BY first_seen_at ASC LIMIT ?`,
+    args: [new Date().toISOString(), new Date().toISOString(), limit],
+  });
   let filled = 0;
   let skipped = 0;
-  for (const row of rows as unknown as Row[]) {
-    const at = new Date().toISOString();
-    const raw = parse<Raw>(row.raw_json, {});
-    const stored = parse<Record<string, unknown>>(row.facts_json, {});
-    const listing = Listing.safeParse({ ...stored, photos: [] });
-    if (!listing.success) {
-      // An unreadable snapshot has nothing to fill. Mark it seen so the queue does not spin on it.
-      await db.execute({ sql: "UPDATE sources SET enriched_at = ? WHERE id = ?", args: [at, row.id] });
-      skipped++;
-      continue;
-    }
-
-    const before = canonicalFacts(listing.data);
-    const r = await fill({
-      listing: listing.data,
-      presence: parse<Presence>(row.field_presence_json, {}),
-      origin: parse<Origin>(row.field_origin_json, {}),
-      raw,
-      photos: await photosOf(row.property_id),
-      signal,
+  let retrying = 0;
+  for (const candidate of rows) {
+    if (signal?.aborted) break;
+    const token = randomUUID();
+    const now = new Date();
+    const claim = await db.execute({
+      sql: `UPDATE sources SET enrichment_token = ?, enrichment_lease_until = ?, enrichment_attempts = enrichment_attempts + 1
+            WHERE id = ? AND enriched_at IS NULL
+            AND (enrichment_retry_at IS NULL OR enrichment_retry_at <= ?)
+            AND (enrichment_lease_until IS NULL OR enrichment_lease_until <= ?) RETURNING *`,
+      args: [token, new Date(now.getTime() + LEASE_MS).toISOString(), candidate.id, now.toISOString(), now.toISOString()],
     });
-    const facts = canonicalFacts(r.listing);
-    const touched = [...r.read, ...r.inferred];
-
-    const stmts: InStatement[] = [
-      {
-        sql: `UPDATE sources SET facts_json = ?, facts_hash = ?, field_presence_json = ?,
-              field_origin_json = ?, enriched_at = ? WHERE id = ?`,
-        args: [
-          JSON.stringify(facts),
-          factsHash(facts),
-          JSON.stringify(r.presence),
-          JSON.stringify(r.origin),
-          at,
-          row.id,
-        ],
-      },
-    ];
-    const cols = touched.filter((f) => FACT_COLUMNS.has(f) && before[f as keyof typeof before] == null);
-    if (cols.length) {
-      stmts.push({
-        sql: `UPDATE properties SET ${cols.map((c) => `${c} = ?`).join(", ")}, updated_at = ? WHERE id = ?`,
-        args: [...cols.map((c) => col((facts as Record<string, unknown>)[c])), at, row.property_id],
-      });
-      // Its own kind, never `facts_change`: the advertisement did not change, our reading of it
-      // did. Saying "Datos actualizados" for a deduction would put a guess in the same sentence
-      // as a price cut.
-      stmts.push({
-        sql: `INSERT INTO events (id, property_id, kind, payload_json, actor_id, created_at)
-              VALUES (?, ?, 'enriched', ?, NULL, ?)`,
-        args: [randomUUID(), row.property_id, JSON.stringify({ read: r.read, inferred: r.inferred }), at],
-      });
+    if (!claim.rows.length) continue;
+    const row = claim.rows[0] as unknown as Row;
+    const listing = Listing.safeParse({ ...parse<Record<string, unknown>>(row.facts_json, {}), photos: [] });
+    let result: Filled | null = null;
+    let failed = false;
+    if (listing.success) {
+      try {
+        result = await fill({
+          listing: listing.data,
+          presence: parse<Presence>(row.field_presence_json, {}),
+          origin: parse<Origin>(row.field_origin_json, {}),
+          raw: parse<Raw>(row.raw_json, {}),
+          photos: await photosOf(row.property_id), signal,
+        });
+        failed = result.retryable;
+      } catch { failed = true; }
     }
-    await db.batch(stmts, "write");
-    if (cols.length) filled++;
-    else skipped++;
-    console.log(`[enrich] ${row.property_id} read=${r.read.join(",") || "-"} inferred=${r.inferred.join(",") || "-"}`);
+    const at = new Date().toISOString();
+    const tx = await db.transaction("write");
+    try {
+      const current = await tx.execute({
+        sql: "SELECT id FROM sources WHERE id = ? AND observation_version = ? AND enrichment_token = ?",
+        args: [row.id, row.observation_version, token],
+      });
+      // A new page observation or another worker owns it now. Discard the stale model response.
+      if (!current.rows.length) { skipped++; continue; }
+      await tx.execute({
+        sql: `UPDATE sources SET enriched_at = ?, enrichment_retry_at = ?, enrichment_token = NULL,
+              enrichment_lease_until = NULL WHERE id = ?`,
+        args: [failed ? null : at, failed ? new Date(Date.now() + retryDelayMs(row.enrichment_attempts)).toISOString() : null, row.id],
+      });
+      let changed = false;
+      if (result && listing.success) {
+        const facts = canonicalFacts(result.listing);
+        const before = canonicalFacts(listing.data);
+        await tx.execute({
+          sql: "UPDATE sources SET facts_json = ?, facts_hash = ?, field_presence_json = ?, field_origin_json = ? WHERE id = ?",
+          args: [JSON.stringify(facts), factsHash(facts), JSON.stringify(result.presence), JSON.stringify(result.origin), row.id],
+        });
+        const cols = [...result.read, ...result.inferred].filter((f) => FACT_COLUMNS.has(f) && before[f as keyof typeof before] == null);
+        // Another source may already have supplied a fact while the model was running.
+        const property = (await tx.execute({ sql: "SELECT * FROM properties WHERE id = ?", args: [row.property_id] })).rows[0];
+        const empty = cols.filter((f) => property && property[f] == null);
+        if (empty.length) {
+          await tx.execute({
+            sql: `UPDATE properties SET ${empty.map((c) => `${c} = ?`).join(", ")}, updated_at = ? WHERE id = ?`,
+            args: [...empty.map((c) => col((facts as Record<string, unknown>)[c])), at, row.property_id],
+          });
+          await tx.execute({
+            sql: "INSERT INTO events (id, property_id, kind, payload_json, actor_id, created_at) VALUES (?, ?, 'enriched', ?, NULL, ?)",
+            args: [randomUUID(), row.property_id, JSON.stringify({ read: result.read.filter((f) => empty.includes(f)), inferred: result.inferred.filter((f) => empty.includes(f)) }), at],
+          });
+          changed = true;
+        }
+      }
+      await tx.commit();
+      if (failed) retrying++;
+      if (changed) filled++; else skipped++;
+    } finally { tx.close(); }
   }
-  if (rows.length) console.log(`[enrich] filled=${filled} skipped=${skipped}`);
-  return { filled, skipped };
+  return { filled, skipped, retrying };
 }

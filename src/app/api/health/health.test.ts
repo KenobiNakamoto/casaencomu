@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, renameSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 /**
  * V23 and PIP-16. It is the only route the proxy lets through unauthenticated, so what it says is
@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
  */
 process.env.DATA_DIR = mkdtempSync(join(tmpdir(), "casa-health-"));
 const { GET } = await import("./route");
-const { control } = await import("@/lib/control");
+const { control, createProject, projectDir } = await import("@/lib/control");
 
 describe("the health check", () => {
   it("answers ok, and says the database answered too", async () => {
@@ -33,6 +33,15 @@ describe("the health check", () => {
    * The disk the data lives on is external and removable. A check that answers «ok» from a server
    * that has lost it is worse than no check, because the container keeps being restarted into it.
    */
+  it("detects a missing project file without silently creating an empty replacement", async () => {
+    const id = await createProject("Health fixture", "fixture@example.com");
+    const file = join(projectDir(id), "casa.db");
+    renameSync(file, file + ".moved");
+    try { expect((await GET()).status).toBe(503); }
+    finally { renameSync(file + ".moved", file); }
+    expect((await GET()).status).toBe(200);
+  });
+
   it("answers 503 when the database cannot be read", async () => {
     control.close();
     const res = await GET();
@@ -45,4 +54,4 @@ describe("the health check", () => {
   });
 });
 
-rmSync(process.env.DATA_DIR!, { recursive: true, force: true });
+afterAll(() => rmSync(process.env.DATA_DIR!, { recursive: true, force: true }));

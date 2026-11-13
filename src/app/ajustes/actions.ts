@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { checkPassword, endAllSessions, setPassword } from "@/lib/accounts";
+import { changeOwnPassword } from "@/lib/recovery";
+import { SESSION_COOKIE, sessionEmail } from "@/lib/accounts";
 import { currentUser } from "@/lib/auth";
 import type { Aviso } from "@/app/entrar/actions";
 import { db } from "@/lib/db";
@@ -32,17 +33,15 @@ export async function renombrarseAction(formData: FormData) {
  * is to stop them, and leaving their session open would undo the whole exercise.
  */
 export async function cambiarClaveAction(_prev: Aviso, formData: FormData): Promise<Aviso> {
-  const { headers } = await import("next/headers");
-  const email = (await headers()).get("x-user-email");
+  const { cookies } = await import("next/headers");
+  const email = await sessionEmail((await cookies()).get(SESSION_COOKIE)?.value);
   if (!email) return { msg: "No has entrado." };
 
   const vieja = String(formData.get("vieja") ?? "");
   const nueva = String(formData.get("nueva") ?? "");
-  if (!(await checkPassword(email, vieja)).ok) return { msg: "La clave de ahora no es correcta." };
-  if (!(await setPassword(email, nueva))) return { msg: "La clave nueva necesita 10 caracteres." };
+  if (!(await changeOwnPassword(email, vieja, nueva))) return { msg: "Comprueba la clave de ahora. La nueva necesita entre 10 y 1024 caracteres." };
 
   // The session this form was sent from is one of them, so the person signs in again. That is the
   // proof the new clave works, at the moment they still remember typing it.
-  await endAllSessions(email);
   redirect("/entrar");
 }

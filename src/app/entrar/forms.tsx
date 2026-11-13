@@ -54,6 +54,11 @@ export function PrimeraCuentaForm() {
     <form action={action} className="space-y-4">
       <Error aviso={aviso} />
       <label className="block space-y-2">
+        <span className="text-sm text-muted">Clave de instalación</span>
+        <input name="instalacion" type="password" required autoComplete="off" className={input} />
+        <span className="block text-sm text-muted">La proporciona quien instala la aplicación. Solo se usa una vez.</span>
+      </label>
+      <label className="block space-y-2">
         <span className="text-sm text-muted">Tu nombre</span>
         <input name="nombre" required maxLength={40} autoComplete="name" className={input} />
       </label>

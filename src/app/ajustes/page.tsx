@@ -4,6 +4,7 @@ import { buildBookmarklet } from "@/lib/bookmarklet";
 import { PORTALS } from "@/lib/url";
 import { input } from "@/components/propiedades/format";
 import { ClaveForm } from "./clave";
+import RecoveryCodeForm from "./recovery";
 import { PERSON_NAME_MAX } from "@/lib/project-shape";
 import { CopyBox } from "./copy";
 import { renombrarseAction } from "./actions";
@@ -66,12 +67,18 @@ export default async function AjustesPage() {
         <h2 className={h2}>Tu clave</h2>
         <p className="text-body">
           Al cambiarla se cierran todas tus sesiones, también esta. Entras otra vez con la nueva.
+          Si tenías un código de recuperación, deja de servir: crea otro después de entrar.
         </p>
         <ClaveForm />
       </section>
 
       <section className="space-y-3 py-8">
-        <h2 className={h2}>Cómo añadir un piso</h2>
+        <h2 className={h2}>Recuperación de cuenta</h2>
+        <RecoveryCodeForm />
+      </section>
+
+      <section className="space-y-3 py-8">
+        <h2 id="anadir-piso" className={`${h2} scroll-mt-24`}>Cómo añadir un piso</h2>
         <p className="text-body">
           Copia el enlace del anuncio y pégalo en{" "}
           <Link href="/propiedades" className="font-medium text-ink underline underline-offset-4">
@@ -80,9 +87,9 @@ export default async function AjustesPage() {
           → «Añadir enlace». Eso es todo, también desde el móvil.
         </p>
         <p className="text-body">
-          Se guarda al momento. Si el portal no deja leerlo desde el servidor, el anuncio se abre
-          solo en un navegador de verdad y se lee unos minutos después. Verás «Sin leer» hasta
-          entonces, y te avisa la campana cuando esté.
+          El enlace queda guardado aunque el portal no permita leerlo. Verás «Sin leer» hasta que
+          tengamos sus datos. Puedes completarlos abriendo el anuncio y usando el marcador de abajo.
+          La campana te avisa cuando se complete.
         </p>
         {/* The list is built from the allowlist itself, so it cannot promise a portal the app
             would refuse, or forget one it accepts. */}
@@ -91,7 +98,7 @@ export default async function AjustesPage() {
             <li key={p.host} className="flex items-center gap-3 py-2.5 text-sm">
               <span className="flex-1 font-medium text-ink">{p.name}</span>
               <span className="text-muted">
-                {p.route === "server" ? "Se lee al momento" : "Se lee en un navegador, unos minutos después"}
+                {p.route === "server" ? "Lectura directa cuando está disponible" : "Requiere lectura en el navegador"}
               </span>
             </li>
           ))}

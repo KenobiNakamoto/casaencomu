@@ -111,6 +111,8 @@ describe("save — a link is kept even when the page could not be read", () => {
     // Why it is empty, not merely that it is. `last_ok_at` stays null because nothing was read,
     // and a challenge page is evidence of nothing, so none of it is kept.
     expect(String(s.last_check_outcome)).toBe("blocked");
+    expect(s.availability).toBe("unknown");
+    expect(s.consecutive_failures).toBe(1);
     expect(s.last_ok_at).toBeNull();
     expect(s.raw_json).toBeNull();
     expect(s.enriched_at).toBeNull();
@@ -126,6 +128,8 @@ describe("save — a link is kept even when the page could not be read", () => {
     expect(Number(p.filled)).toBe(1);
     const s = await source(id);
     expect(String(s.last_check_outcome)).toBe("listing");
+    expect(s.availability).toBe("active");
+    expect(s.consecutive_failures).toBe(0);
     expect(s.last_ok_at).not.toBeNull();
     // The page is kept so the fill layers can read it later without asking anyone for it again,
     // and `enriched_at` back to NULL is what puts the source into their queue.
@@ -142,11 +146,29 @@ describe("save — a link is kept even when the page could not be read", () => {
   });
 
   it("a later blocked check never puts a read advertisement back to unread", async () => {
+    const knownPhotos = JSON.stringify(["https://img4.idealista.com/blur/WEB_DETAIL/0/synthetic.jpg"]);
+    await db.execute({ sql: "UPDATE sources SET photo_urls_json = ? WHERE property_id = ?", args: [knownPhotos, id] });
+    const before = await source(id);
     const { listing, presence: blank } = pendingRecord(URL_B, "112006681");
     await save(listing, srcB, { user, via: "paste", presence: blank, pending: "blocked" });
     const p = await property(id);
     expect(Number(p.filled)).toBe(1);
     // and the facts it already had survive, because the pending observation carried none
     expect(String(p.title)).toBe("Piso en venta en Calle del Rosselló");
+    expect((await source(id)).availability).toBe("unknown");
+    expect((await source(id)).photo_urls_json).toBe(knownPhotos);
+    expect((await source(id)).last_ok_at).toBe(before.last_ok_at);
+    expect((await source(id)).raw_json).toBe(before.raw_json);
+  });
+
+  it("a manual removed result cannot reactivate a confirmed removed source", async () => {
+    await db.execute({ sql: "UPDATE sources SET availability = 'removed', consecutive_gone = 2 WHERE property_id = ?", args: [id] });
+    const { listing, presence: blank } = pendingRecord(URL_B, "112006681");
+    await save(listing, srcB, { user, via: "paste", presence: blank, pending: "removed" });
+    expect((await source(id)).availability).toBe("removed");
+    expect((await source(id)).consecutive_gone).toBe(2);
+    await save(base, srcB, { user, via: "bookmarklet", presence });
+    expect((await source(id)).availability).toBe("active");
+    expect((await source(id)).consecutive_gone).toBe(0);
   });
 });

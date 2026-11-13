@@ -77,8 +77,8 @@ describe("what a person typed is never lost (F24)", () => {
   });
 
   it("an unsent box survives a reload, in this browser and nowhere else", () => {
-    expect(talk).toContain("sessionStorage.getItem(storeAs)");
-    expect(talk).toContain("sessionStorage.removeItem(storeAs)");
+    expect(talk).toContain("readDraft<string>(owner, storeAs)");
+    expect(talk).toContain("clearDraft(storeAs)");
     // Never localStorage: an unsent comment should not outlive the tab it was typed in.
     expect(talk).not.toContain("localStorage");
     // Every touch is guarded: a browser that refuses storage still has a working box.

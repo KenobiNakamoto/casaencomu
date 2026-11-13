@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { conversationAction, type CommentState } from "@/app/propiedades/actions";
+import { clearDraft, draftKey, readDraft, writeDraft, type DraftOwner } from "@/lib/draft-storage";
 import { BODY_MAX, removed, type CommentRow, type Node } from "@/lib/comment-shape";
 
 /** Who has published an opinion here, for the «sobre la opinión de…» chooser. */
@@ -28,23 +29,25 @@ const quiet = "touch-target text-xs font-medium text-muted underline-offset-4 ho
 function Keeping({
   name,
   storeAs,
+  owner,
   defaultValue,
   boxRef,
   ...rest
 }: {
   name: string;
   storeAs: string | null;
+  owner?: DraftOwner;
   defaultValue: string;
   boxRef: React.RefObject<HTMLTextAreaElement | null>;
 } & React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   useEffect(() => {
-    if (!storeAs || !boxRef.current || boxRef.current.value) return;
+    if (!storeAs || !owner || !boxRef.current || boxRef.current.value) return;
     try {
-      boxRef.current.value = sessionStorage.getItem(storeAs) ?? "";
+      boxRef.current.value = readDraft<string>(owner, storeAs) ?? "";
     } catch {
       // A browser that refuses storage still has a working box.
     }
-  }, [storeAs, boxRef]);
+  }, [storeAs, boxRef, owner]);
 
   return (
     <textarea
@@ -54,9 +57,9 @@ function Keeping({
       maxLength={BODY_MAX}
       rows={3}
       onChange={(e) => {
-        if (!storeAs) return;
+        if (!storeAs || !owner) return;
         try {
-          sessionStorage.setItem(storeAs, e.currentTarget.value);
+          writeDraft(owner, storeAs, e.currentTarget.value);
         } catch {}
       }}
       className={box}
@@ -74,6 +77,7 @@ function Keeping({
  * (V14). A new one is drawn only after a comment is actually accepted.
  */
 function Composer({
+  owner,
   propertyId,
   parentId,
   voices,
@@ -83,6 +87,7 @@ function Composer({
   label,
   placeholder,
 }: {
+  owner: DraftOwner;
   propertyId: string;
   parentId: string | null;
   voices: Voice[];
@@ -96,7 +101,7 @@ function Composer({
   const [state, action, pending] = useActionState<CommentState, FormData>(conversationAction, null);
   const idRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
-  const storeAs = `casa:comentario:${propertyId}:${parentId ?? ""}`;
+  const storeAs = draftKey(owner, "comment", propertyId, parentId ?? "");
   const failed = state && !state.ok ? state : null;
 
   // Rendered empty on the server and filled here, so there is no identifier in the HTML for the
@@ -111,7 +116,7 @@ function Composer({
     draw();
     if (boxRef.current) boxRef.current.value = "";
     try {
-      sessionStorage.removeItem(storeAs);
+      clearDraft(storeAs);
     } catch {}
     onDone?.();
     // `onDone` is a fresh closure on every render of the parent; the state is what says something
@@ -123,6 +128,8 @@ function Composer({
     <form action={action} className="space-y-2">
       <input type="hidden" name="propertyId" value={propertyId} readOnly />
       <input type="hidden" name="verbo" value="crear" readOnly />
+      <input type="hidden" name="draftAccount" value={owner.accountId} readOnly />
+      <input type="hidden" name="draftProject" value={owner.projectId} readOnly />
       <input type="hidden" name="parentId" value={parentId ?? ""} readOnly />
       <input ref={idRef} type="hidden" name="commentId" defaultValue="" />
 
@@ -132,6 +139,7 @@ function Composer({
       <Keeping
         id={`nuevo-${parentId ?? "raiz"}`}
         name="body"
+        owner={owner}
         storeAs={storeAs}
         defaultValue={failed?.text ?? ""}
         boxRef={boxRef}
@@ -334,12 +342,14 @@ function Bubble({
  * read newest-first without the answers arriving before what they answer.
  */
 export function Conversation({
+  owner,
   propertyId,
   nodes,
   viewerId,
   voices,
   about,
 }: {
+  owner: DraftOwner;
   propertyId: string;
   nodes: Node[];
   viewerId: string;
@@ -379,6 +389,7 @@ export function Conversation({
                   {replyTo === n.id && (
                     <li>
                       <Composer
+                        owner={owner}
                         propertyId={propertyId}
                         parentId={n.id}
                         voices={voices}
@@ -405,6 +416,7 @@ export function Conversation({
           </p>
         )}
         <Composer
+          owner={owner}
           propertyId={propertyId}
           parentId={null}
           voices={voices}

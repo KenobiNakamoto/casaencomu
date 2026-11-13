@@ -2,7 +2,7 @@
 name: casaencomu
 services:
   web:
-    image: casaencomu-web:latest
+    image: ${CASA_IMAGE:-casaencomu-web:latest}
     build: .
     restart: unless-stopped
     ports: ["127.0.0.1:3100:3000"]
@@ -12,3 +12,9 @@ services:
     # because the Claude Code CLI and its credentials live there. air/README.md.
     extra_hosts: ["host.docker.internal:host-gateway"]
     mem_limit: 1g        # ponytail: keeps a runaway import from starving electrs
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 8s
+      start_period: 30s
+      retries: 3

@@ -1,5 +1,150 @@
 # CasaEnComú — what is done, and what is not
 
+## 2026-11-13 — Local demo repaired and populated from the Air
+
+The local demo at `http://127.0.0.1:3120/propiedades` now uses a separate copy of the Air's data.
+The Air's application, configuration and data were not changed. Its service remains healthy on
+`readiness-20261112`. An original local snapshot is retained separately from the writable demo.
+
+- Copied all 24 opportunities, 657 photos, 18 ratings, three comments, three opinions, one review
+  and 81 existing events. The opportunities were first saved on September 7–8.
+- Added ten missing links from the supplied chat. The demo now holds 34 opportunities and 694
+  photos. Twenty-nine records have listing details. Five older links remain saved with a withdrawn
+  page result. Historical Air observations keep their original dates.
+- Fixed a development origin mismatch: Next normalizes its request URL to `localhost`, while
+  the browser used `127.0.0.1`. Development requests now use their actual Host when no public
+  origin is configured. An explicit `PUBLIC_URL` still wins. Foreign origins remain rejected.
+- Idealista photo links and Vivalta search-context links now resolve to the same saved listing.
+  A malformed import body returns a readable error. Blocked imports no longer mark an advert
+  active or erase its saved photo URL metadata. Existing facts and family decisions survive.
+- Pending pages now provide a direct link to capture instructions. The interface no longer
+  promises automatic browser reading when that service is absent. Local demo URLs in capture
+  instructions use port 3120. Server-side Idealista requests can still be blocked; browser capture
+  is the supported completion path. Three additional Idealista records were filled from visible
+  Safari text; their photographs were not captured. Two additional Fotocasa records supplied 37 photos.
+
+Validation: 798 tests pass, with three existing skips. TypeScript and targeted ESLint pass.
+HTTP checks cover health, catalogue, map, comparison and settings. A real browser form saved a
+new Idealista link. Chrome submitted a Fotocasa duplicate and the server returned the existing
+record. Capture requests filled the pending records in place. A photo-link duplicate preserved
+the original property. Foreign origins received 403 responses.
+
+All original property, photo, rating, comment, opinion, review and event rows remain in the local
+copy. SQLite integrity and foreign-key checks pass; every retained photo file exists. Read-only
+hash comparisons confirm the Air's property, photo, rating, comment, opinion and review tables
+match the original snapshot. No commit, push or deployment was made for this demo repair.
+
+Source changes remain in the readiness worktree. The running demo uses a disposable source copy
+to avoid another development server's Next lock. Private snapshot, verification, launch and sync
+instructions are in `_local/product-story-20261113/`. The earlier synthetic presentation data is
+retained separately. The HTML/PDF presentation has not been changed to expose the restored data.
+
+## 2026-11-12 — Deployed safety and operations release
+
+**Release `readiness-20261112` is live on the Air.** It includes the first safety batch below and
+the recovery/operations changes in this entry. Source remains uncommitted in the
+`fix/readiness-account-data` worktree. No issue, commit, push or PR was created. Deployment used
+`./deploy.sh` with the exact production image tested against a restored copy on the Air.
+
+### What now works
+
+- **HTTPS:** Tailscale Serve terminates HTTPS on the Air and forwards to the local app. Its actual
+  HTTPS origin is now `PUBLIC_URL`. The old HTTP 8080 endpoint is removed. This remains tailnet-only;
+  the public custom domain is not published. Secure cookies remain enabled.
+- **Recovery:** each account holder can create a 256-bit recovery code in Ajustes after entering
+  the current password. Only its digest is stored. The code lasts one year and can be used once.
+  Recovery consumes it, changes the password and revokes sessions in one transaction. Replacing
+  a code or changing a password revokes the previous code. No project owner can reset another account.
+- **Anonymous identity:** public login, invitation and recovery pages strip incoming identity
+  headers. Recovery-code issuance and password changes require a real session cookie.
+- **Backups:** the nightly job includes all databases and retained photos. It briefly stops the
+  writer, validates a complete snapshot, encrypts it with authenticated encryption, restores and
+  verifies it, and publishes the archive atomically. Retention happens only after success.
+- **Release recovery:** unique image tags, configuration/TLS preflight, a deployment lock, a verified
+  pre-deploy backup, and retained previous image/environment/compose files. Migration rollback uses
+  the matching restored data, never a blind image downgrade.
+- **Health:** Compose checks actual database tables, data-volume space and a photo sample. An hourly
+  operator check reports app failure, failed/stale backups and low disk space to a local log.
+
+### Evidence
+
+- **783 passing tests, 3 existing skips, 63 test files**; full ESLint and production build passed.
+  The ARM64 Docker production build also passed. No npm dependencies were added.
+- Local Chrome: recovery form, login link, existing-account sign-in and recovery settings rendered.
+  Credential changes were tested through real HTTP form submissions against isolated staging.
+- Live encrypted backup and restore: **24 properties, 657 photos**, SQLite integrity/foreign-key
+  checks, table counts and file hashes verified. The actual backup LaunchAgent exited 0.
+- Restored staging copy: migrated project schema 9 to 10, completed operator-key setup with a
+  fictional account, issued Secure cookies, created/redeemed a recovery code, refused its reuse
+  and the old password, rejected the old session, and accepted the new password over HTTPS.
+- Rollback drill: a second original-schema restore booted with the retained older image at schema 9;
+  property/photo counts stayed intact. Production was not replaced by either test copy.
+- Post-deploy: HTTPS health and setup pages passed; Docker reports **healthy**; schema **10**,
+  **24 properties**, **657 photos**, integrity **ok**. Temporary test services and copies removed.
+
+Detailed local logs: `_local/release-tests.txt`, `release-lint.txt`, `release-build.txt`,
+`docker-build.txt`, `air-staging-smoke.txt`, `air-backup-v2.txt`, `deploy-readiness.txt`.
+Operator procedure: [air/README.md](../air/README.md). Release assets are on the Air under
+`~/srv/casaencomu/releases/readiness-20261112/`. Actual addresses and machine-specific details
+belong in ignored project memory, not this document.
+
+### Still required
+
+- **Create the first real account.** There are still zero accounts. The operator key is in
+  `~/.config/casaencomu/setup.key` on the Air, mode 600. Enter it at the HTTPS setup page. After
+  creation, store a recovery code in the password manager and remove the setup key from the running
+  environment at the next controlled restart. No real user's password was chosen by this release.
+- **Free internal disk space.** Only about 700 MB remained at the final check. The hourly monitor
+  reports `internal_disk_below_2gb`. Restore scratch is external; backup destination capacity is
+  checked before writing. The next backup can fail its space preflight until space is freed. All three new archives were
+  confirmed uploaded to iCloud. macOS refused cache eviction; no archive was deleted.
+- No email/push alert delivery is configured. Logs and nonzero job status require operator review.
+- Real-phone use, real-account invitations and bookmarklet imports still need a household pilot.
+  Staging verified login/recovery on the real HTTPS certificate; it did not create a production account.
+- The wider multi-household gaps remain: project-aware navigation/media, capacity and reader scope,
+  ownership transfer, export/leave/delete flows, visible import retries and old AI-failure repair.
+  Recovery requires a code saved before a password is lost; no email service or owner-issued reset exists.
+
+## 2026-11-12 — First safety batch (implemented before the release)
+
+Implementation is in the local `fix/readiness-account-data` worktree, based on `08a68cc`.
+At that point it had not been committed, merged or deployed. The release above now includes it.
+Historical deployment descriptions below still refer to the older behavior. In particular, invitation links no longer reset passwords.
+
+- First-account setup requires an operator-held `CASA_SETUP_TOKEN`. Account creation, the
+  one-time installation claim and legacy-project adoption are one transaction.
+- Invitation signup creates only a new account. Existing accounts authenticate normally to join.
+  Validation, token consumption and membership creation are atomic. No invitation changes a password.
+- Local opinion/comment drafts carry account and project ownership. Account switching and logout
+  remove old text. Server actions refuse stale forms from a different account or selected project.
+- Rechecks share the import merge rules, retain missing facts and provenance, and use guarded,
+  size-limited fetches. Capture requests enforce the byte limit while reading the stream.
+- Enrichment uses a bounded model-call deadline, delayed retries and expiring worker claims.
+  A new observation invalidates an older AI result. Successful empty output completes normally.
+- Account error messages live outside server-action modules. Browser testing exposed the previous
+  non-function export as a runtime login error despite a successful build.
+
+Project schema migration 10 adds observation versions and enrichment retry/claim columns.
+It runs through the existing migration runner. Initial setup now needs the new environment key.
+Existing accounts retain their passwords and sessions. Unscoped browser drafts are discarded,
+because their ownership cannot be established. Server-saved drafts are retained.
+
+Validation: **768 tests passed, 3 existing skips, 60 test files**. Full repository ESLint and the
+production Turbopack build passed, including TypeScript. No dependencies were added.
+
+Old sources marked complete before this fix are not automatically requeued. Their saved state
+does not distinguish a failed AI call from valid empty output. Revisit this when checking live data.
+
+Local Chrome checks used fictional accounts and a separate temporary dataset: sign-in, unsent
+comment/opinion recovery after reload, logout, switching accounts, normal opinion publication,
+and the existing-account invitation sign-in screen. Real phones and the Air remain unverified.
+
+The readiness review's wider release gates remain open: independent password recovery, visible
+retry controls, project-aware navigation/media, household capacity and reader scope, ownership
+and data lifecycle, HTTPS, complete backups, recovery/rollback and operational monitoring. This
+batch fixes the reproduced core failures; it does not certify production readiness.
+
+
 _2026-09-15. This file answers one question: **what is the real state right now?**
 `WORKPLAN.md` holds the plan and the order. This holds the state. When they disagree, this one
 is newer — check the dates._

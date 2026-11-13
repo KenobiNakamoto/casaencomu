@@ -1,5 +1,6 @@
 "use client";
 
+import { syncDraftAccount } from "@/lib/draft-storage";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -80,7 +81,7 @@ export default function AccountMenu({ name, email }: { name: string; email: stri
             </Link>
           ))}
 
-          <a role="menuitem" href="/salir" className={`${ROW} mt-1 border-t border-hairline-soft pt-3 text-body`}>
+          <a role="menuitem" href="/salir" onClick={() => syncDraftAccount(null)} className={`${ROW} mt-1 border-t border-hairline-soft pt-3 text-body`}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
             </svg>

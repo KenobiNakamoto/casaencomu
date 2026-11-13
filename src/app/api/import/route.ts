@@ -31,11 +31,20 @@ async function readUrl(req: Request): Promise<string | null> {
 function sameOrigin(req: Request): boolean {
   const origin = req.headers.get("origin");
   if (!origin) return false; // a form from another site sends `Origin: null`
-  // Scheme, host and port all have to match. A `PUBLIC_URL` that says https for a site served
-  // over http on a port refuses every import here and looks like nothing at all from outside.
-  const expected = process.env.PUBLIC_URL ?? new URL(req.url).origin;
   try {
-    return new URL(origin).origin === new URL(expected).origin;
+    const expected = new URL(process.env.PUBLIC_URL ?? req.url);
+    // Next dev normalizes req.url to localhost even when bound to 127.0.0.1. Use the
+    // actual request authority in development; never trust forwarded headers or replace
+    // an explicitly configured public origin. Scheme, hostname and port must still match.
+    if (!process.env.PUBLIC_URL && process.env.NODE_ENV === "development") {
+      const host = req.headers.get("host");
+      if (host) {
+        const authority = new URL(`${expected.protocol}//${host}`);
+        if (authority.username || authority.password || authority.pathname !== "/" || authority.search || authority.hash) return false;
+        expected.host = authority.host;
+      }
+    }
+    return new URL(origin).origin === expected.origin;
   } catch {
     return false;
   }
@@ -80,7 +89,12 @@ export async function POST(req: Request) {
   const user = await currentUser();
   if (!sameOrigin(req)) return failResponse(req, 403, "Petición no permitida");
 
-  const url = await readUrl(req);
+  let url: string | null;
+  try {
+    url = await readUrl(req);
+  } catch {
+    return failResponse(req, 400, "Enlace no válido");
+  }
   // ponytail: allowlist instead of a DNS-resolving SSRF guard; revisit if non-portal URLs are ever allowed
   let norm: ReturnType<typeof normalizeUrl>;
   try {

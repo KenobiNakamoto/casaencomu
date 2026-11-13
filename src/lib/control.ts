@@ -1,4 +1,4 @@
-import { createClient } from "@libsql/client";
+import { createClient, type Transaction } from "@libsql/client";
 import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
@@ -47,6 +47,7 @@ const ready = control
        email TEXT NOT NULL, invited_by TEXT NOT NULL,
        created_at TEXT NOT NULL, expires_at TEXT NOT NULL, accepted_at TEXT);
      CREATE INDEX IF NOT EXISTS invites_project ON invites(project_id);
+     CREATE TABLE IF NOT EXISTS installation (id INTEGER PRIMARY KEY CHECK (id = 1), claimed_at TEXT NOT NULL);
      CREATE TABLE IF NOT EXISTS accounts (
        email TEXT PRIMARY KEY, name TEXT NOT NULL, password_hash TEXT NOT NULL,
        created_at TEXT NOT NULL,
@@ -55,6 +56,9 @@ const ready = control
        id TEXT PRIMARY KEY, email TEXT NOT NULL,
        created_at TEXT NOT NULL, expires_at TEXT NOT NULL);
      CREATE INDEX IF NOT EXISTS sessions_email ON sessions(email);
+     CREATE TABLE IF NOT EXISTS recovery_codes (
+       email TEXT PRIMARY KEY REFERENCES accounts(email) ON DELETE CASCADE,
+       digest TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, expires_at TEXT NOT NULL);
      -- The account limit, where it is actually true. accounts.ts counts before it inserts, but
      -- counting and inserting are two statements, and two invitations accepted in the same moment
      -- would both pass. The number here is MAX_ACCOUNTS in accounts.ts: change both or neither.
@@ -192,36 +196,6 @@ async function mustOwn(email: string, projectId: string) {
   }
 }
 
-/**
- * The first account on a server that already holds projects takes them over.
- *
- * Such a server ran before accounts existed: the door was Cloudflare Access or the shared preview
- * password, and it wrote a membership under whatever address it reported — a real address, or a
- * made-up one like `ana@casa.local`, or on one occasion a command-line flag. None of those can
- * ever sign in now, so without this the only person who can own the flats already saved is nobody.
- *
- * It is safe **because there are no accounts yet**, which is the caller's job to be sure of: the
- * first person to reach the login page of a server is the person who put it there. It also drops
- * the memberships that are not addresses at all, since no account can ever be made for them.
- */
-export async function adoptProjects(email: string): Promise<number> {
-  const at = new Date().toISOString();
-  const mine = norm(email);
-  const all = await listProjects();
-  await control.batch(
-    [
-      { sql: "DELETE FROM memberships WHERE email NOT LIKE '%@%'", args: [] },
-      ...all.map((p) => ({
-        sql: `INSERT INTO memberships (project_id, email, created_at, role) VALUES (?, ?, ?, 'owner')
-              ON CONFLICT (project_id, email) DO UPDATE SET role = 'owner'`,
-        args: [p.id, mine, at] as never,
-      })),
-    ],
-    "write",
-  );
-  return all.length;
-}
-
 /** Creates the project, its directory and its eight tables. Whoever starts it owns it. */
 export async function createProject(name: string, email: string): Promise<string> {
   await ready;
@@ -286,15 +260,11 @@ export async function createInvite(
   projectId: string,
   by: string,
   to: string,
-  // The same link, for somebody who is already inside: with no mail server, an invitation is also
-  // how a forgotten clave is set again. Only `/proyectos` asks for this, and only the owner can.
-  forMember = false,
 ): Promise<{ token: string } | { refused: "invalid" | "member" }> {
   await mustOwn(by, projectId);
   const email = norm(to);
   if (!EMAIL.test(email)) return { refused: "invalid" };
-  if (!forMember && (await roleOf(email, projectId))) return { refused: "member" };
-  if (forMember && !(await roleOf(email, projectId))) return { refused: "member" };
+  if (await roleOf(email, projectId)) return { refused: "member" };
 
   const now = new Date();
   const open = await rowsOf(
@@ -345,9 +315,10 @@ export async function pendingInvites(projectId: string): Promise<Invite[]> {
   ).map(invite);
 }
 
-export async function inviteByToken(token: string): Promise<Invite | null> {
+export async function inviteByToken(token: string, tx?: Transaction): Promise<Invite | null> {
   if (!token || token.length < 16) return null;
-  const rows = await rowsOf(`${INVITE_SELECT} WHERE i.token = ?`, [token]);
+  await ready;
+  const { rows } = await (tx ?? control).execute({ sql: `${INVITE_SELECT} WHERE i.token = ?`, args: [token] });
   return rows.length ? invite(rows[0]) : null;
 }
 
@@ -378,13 +349,14 @@ export function inviteProblem(found: Invite | null, email: string): Problem | nu
   return null;
 }
 
-export async function acceptInvite(token: string, email: string): Promise<Accepted> {
-  const found = await inviteByToken(token);
+/** Caller owns the write transaction: validation, membership and consumption are one change. */
+export async function joinInvite(tx: Transaction, token: string, email: string): Promise<Accepted> {
+  const found = await inviteByToken(token, tx);
   const problem = inviteProblem(found, email);
   if (problem || !found) return { ok: false, reason: problem ?? "unknown" };
 
   const at = new Date().toISOString();
-  await control.batch(
+  await tx.batch(
     [
       {
         sql: "INSERT OR IGNORE INTO memberships (project_id, email, created_at, role) VALUES (?, ?, ?, 'member')",
@@ -392,9 +364,20 @@ export async function acceptInvite(token: string, email: string): Promise<Accept
       },
       { sql: "UPDATE invites SET accepted_at = ? WHERE token = ?", args: [at, token] },
     ],
-    "write",
   );
   return { ok: true, projectId: found.project_id, name: found.project_name };
+}
+
+export async function acceptInvite(token: string, email: string): Promise<Accepted> {
+  await ready;
+  const tx = await control.transaction("write");
+  try {
+    const result = await joinInvite(tx, token, email);
+    if (result.ok) await tx.commit();
+    return result;
+  } finally {
+    tx.close();
+  }
 }
 
 /**

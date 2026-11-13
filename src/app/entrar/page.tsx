@@ -1,4 +1,5 @@
 import { accountCount } from "@/lib/accounts";
+import Link from "next/link";
 import Puerta from "@/components/puerta";
 import { EntrarForm, PrimeraCuentaForm } from "./forms";
 
@@ -32,6 +33,7 @@ export default async function EntrarPage({
         </p>
       </div>
       {first ? <PrimeraCuentaForm /> : <EntrarForm next={a ?? "/"} />}
+      {!first && <Link href="/recuperar" className="touch-target inline-flex items-center underline">He olvidado la clave</Link>}
       {!first && (
         <p className="text-sm text-muted">
           ¿No tienes cuenta? Solo se entra con una invitación. Pídesela a quien lleva el proyecto.

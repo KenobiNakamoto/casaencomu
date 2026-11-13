@@ -18,28 +18,14 @@ const PORQUE: Record<Problem, string> = {
 /** The same shell as `/entrar`: the mark, the tagline, and the card the message sits in. */
 const Marco = Puerta;
 
-/**
- * «Te han invitado a este proyecto.» This page does three different things, and which one depends
- * on who is reading it:
- *
- * - **Nobody is signed in, and the invited address has no account.** An invitation is the only way
- *   to make an account, so this is the sign-up form: a name and a clave, and the person is in.
- * - **Nobody is signed in, and the address already has an account.** The same link then sets a new
- *   clave. There is no mail server to send a reset to, so the owner hands over a link exactly as
- *   they do for a new person — one code path, one table, nothing extra to keep correct.
- * - **Somebody is signed in.** The signed-in address is the evidence, never the one in the link,
- *   and the button only joins the project.
- *
- * Nothing changes until a button is pressed. A link that joined a project by being opened would be
- * joined by the first program that follows it — a chat application making a preview, for one.
- */
+/** A link only grants membership. An existing account must authenticate independently. */
 export default async function InvitacionPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const me = (await headers()).get("x-user-email");
   const invite = await inviteByToken(token);
 
   // With no session there is no address to compare against, so «other» cannot apply yet: the
-  // person is about to prove the address by setting its clave.
+  // account holder must sign in, or create an account if the address has none.
   const problem = inviteProblem(invite, me ?? invite?.email ?? "");
 
   if (problem || !invite) {
@@ -83,15 +69,17 @@ export default async function InvitacionPage({ params }: { params: Promise<{ tok
   const known = await accountBy(invite.email);
   return (
     <Marco>
-      <h1 className="text-[22px] font-medium">
-        {known ? "Pon una clave nueva" : `Te han invitado a «${invite.project_name}»`}
-      </h1>
+      <h1 className="text-[22px] font-medium">Te han invitado a «{invite.project_name}»</h1>
       <p className="text-body">
         {known
-          ? "Escribe una clave nueva. La anterior deja de funcionar, y se cierran las sesiones abiertas."
-          : `${invite.invited_by} quiere buscar piso contigo. Crea tu cuenta y entras a «${invite.project_name}».`}
+          ? "Ya tienes cuenta. Entra con tu correo y tu clave para aceptar la invitación."
+          : `${invite.invited_by} quiere buscar piso contigo. Crea tu cuenta para aceptar.`}
       </p>
-      <CuentaNuevaForm token={token} email={invite.email} nueva={!known} />
+      {known ? (
+        <Link href={`/entrar?a=${encodeURIComponent(`/invitacion/${token}`)}`} className="inline-block text-sm font-medium text-ink underline underline-offset-4">
+          Entrar para aceptar
+        </Link>
+      ) : <CuentaNuevaForm token={token} email={invite.email} />}
     </Marco>
   );
 }

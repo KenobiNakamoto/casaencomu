@@ -302,6 +302,17 @@ const MIGRATIONS: Migration[] = [
       "CREATE INDEX IF NOT EXISTS events_newest ON events(created_at DESC, id DESC)",
     ],
   },
+  {
+    version: 10,
+    owner: "readiness — retryable enrichment and observation ownership",
+    sql: [
+      "ALTER TABLE sources ADD COLUMN observation_version INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE sources ADD COLUMN enrichment_attempts INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE sources ADD COLUMN enrichment_retry_at TEXT",
+      "ALTER TABLE sources ADD COLUMN enrichment_token TEXT",
+      "ALTER TABLE sources ADD COLUMN enrichment_lease_until TEXT",
+    ],
+  },
 ];
 
 /**

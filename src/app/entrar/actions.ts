@@ -5,13 +5,12 @@ import { redirect } from "next/navigation";
 import {
   SESSION_COOKIE,
   SESSION_MAX_AGE,
-  accountCount,
   checkPassword,
-  createAccount,
   endSession,
   startSession,
 } from "@/lib/accounts";
-import { adoptProjects, createProject, listProjects, projectsOf } from "@/lib/control";
+import { PROBLEMA } from "@/lib/account-messages";
+import { createFirstAccount } from "@/lib/registration";
 
 /**
  * The login page is the only page a person without a session can use, so everything it can do is
@@ -63,31 +62,17 @@ export async function entrarAction(_prev: Aviso, formData: FormData): Promise<Av
  * rather than starting beside it and hiding every flat already saved.
  */
 export async function primeraCuentaAction(_prev: Aviso, formData: FormData): Promise<Aviso> {
-  if ((await accountCount()) > 0) return { msg: "Ya hay una cuenta. Pide una invitación." };
-
-  const email = String(formData.get("correo") ?? "");
-  const name = String(formData.get("nombre") ?? "");
-  const password = String(formData.get("clave") ?? "");
-
-  const made = await createAccount(email, name, password);
-  if (!made.ok) return { msg: PROBLEMA[made.reason] };
-
-  if ((await projectsOf(email)).length === 0) {
-    // Projects with no account behind them belong to whoever signs up first, because there are no
-    // accounts to take them from. A server with nothing on it gets a project to start with.
-    if ((await listProjects()).length > 0) await adoptProjects(email);
-    else await createProject("Nuestra búsqueda", email);
-  }
-  return open(email, "/");
+  const made = await createFirstAccount(
+    String(formData.get("correo") ?? ""),
+    String(formData.get("nombre") ?? ""),
+    String(formData.get("clave") ?? ""),
+    String(formData.get("instalacion") ?? ""),
+  );
+  if (!made.ok) return { msg: PROBLEMA[made.reason] ?? "No se ha podido crear la cuenta." };
+  return open(made.email, "/");
 }
 
-export const PROBLEMA: Record<string, string> = {
-  invalid: "Esa dirección de correo no es válida.",
-  nameless: "Escribe tu nombre.",
-  weak: "La clave necesita 10 caracteres como mínimo.",
-  taken: "Ya hay una cuenta con ese correo. Entra con tu clave.",
-  full: "Ya hay diez cuentas, que son todas las que caben.",
-};
+
 
 export async function salirAction() {
   const jar = await cookies();

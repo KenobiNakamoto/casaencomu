@@ -10,8 +10,10 @@ import { describe, expect, it } from "vitest";
  */
 process.env.DATA_DIR = mkdtempSync(join(tmpdir(), "casa-adopt166-"));
 
-const { addMember, adoptProjects, control, createProject, membersOf, projectsOf, roleOf } =
+const { addMember, control, createProject, membersOf, projectsOf, roleOf } =
   await import("./control");
+const { createFirstAccount } = await import("./registration");
+process.env.CASA_SETUP_TOKEN = "test-only-installation-key-32-characters";
 
 describe("the first account takes over what is already there", () => {
   it("becomes the owner of every project, and clears the rows that are not addresses", async () => {
@@ -25,7 +27,10 @@ describe("the first account takes over what is already there", () => {
       args: [p, new Date().toISOString()],
     });
 
-    expect(await adoptProjects("KENOBI@example.com")).toBe(2);
+    await addMember(p, "kenobi@example.com");
+    const created = await createFirstAccount("KENOBI@example.com", "Kenobi", "a long test password", process.env.CASA_SETUP_TOKEN!);
+    expect(created.ok).toBe(true);
+    expect((await membersOf(p)).filter((m) => m.email === "kenobi@example.com")).toHaveLength(1);
 
     expect(await roleOf("kenobi@example.com", p)).toBe("owner");
     expect(await roleOf("kenobi@example.com", q)).toBe("owner");
@@ -38,10 +43,10 @@ describe("the first account takes over what is already there", () => {
     expect(await roleOf("ana@casa.local", p)).toBe("owner");
   });
 
-  it("promotes rather than duplicates when the address is already a member", async () => {
+  it("cannot adopt projects a second time", async () => {
+    expect(await createFirstAccount("k@casa.local", "K", "a long test password", process.env.CASA_SETUP_TOKEN!))
+      .toMatchObject({ ok: false, reason: "claimed" });
     const [first] = await projectsOf("k@casa.local");
-    await adoptProjects("k@casa.local");
-    expect(await roleOf("k@casa.local", first.id)).toBe("owner");
-    expect((await membersOf(first.id)).filter((m) => m.email === "k@casa.local")).toHaveLength(1);
+    expect(await roleOf("k@casa.local", first.id)).toBe("member");
   });
 });

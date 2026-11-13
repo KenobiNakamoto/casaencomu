@@ -19,6 +19,7 @@ const cases = [
       "https://idealista.com/inmueble/112446118",
       "https://WWW.Idealista.com/inmueble/112446118/?utm_source=x&utm_medium=y",
       "https://www.idealista.com/inmueble/112446118/#photos",
+      "https://www.idealista.com/inmueble/112446118/foto/7/?utm_medium=socialmedia",
     ],
   },
   {
@@ -59,6 +60,15 @@ describe("normalizeUrl", () => {
       portalRef: null,
       normalized: "https://idealista.com/venta-viviendas/barcelona",
     });
+  });
+
+  it("deduplicates Vivalta's shared search-context path against the saved listing", () => {
+    expect(normalizeUrl("https://www.vivalta.es/es/venta-pisos-aticos~pisos/en-barcelona-barcelona/con-3_habitaciones_min,600000_precio_max/ref-7742_1168#galeria_imagenes"))
+      .toEqual(normalizeUrl("https://vivalta.es/es/ref-7742_1168"));
+  });
+
+  it("does not collapse unrelated Idealista paths into a listing", () => {
+    expect(normalizeUrl("https://idealista.com/inmueble/123/foto/not-a-number").portalRef).toBeNull();
   });
 
   it("unknown host → generic, ref null", () => {
